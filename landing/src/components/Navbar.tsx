@@ -6,11 +6,9 @@ import { Menu, X, Sparkles, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
 const navLinks = [
-  { label: "Fonctionnalités", href: "#features" },
-  { label: "Comment ça marche", href: "#how-it-works" },
-  { label: "Tarifs", href: "#pricing" },
-  { label: "Témoignages", href: "#testimonials" },
-  { label: "FAQ", href: "#faq" },
+  { label: "Accueil", href: "/" },
+  { label: "Restaurer", href: "/upload" },
+  { label: "Tarifs", href: "/#pricing" },
 ];
 
 export default function Navbar() {
@@ -81,11 +79,11 @@ export default function Navbar() {
 
             {/* CTA */}
             <a
-              href="#cta"
+              href="/upload"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent text-white dark:text-gray-950 text-sm font-semibold hover:brightness-110 transition-all hover:shadow-lg hover:shadow-accent/25 active:scale-95"
             >
               <Sparkles className="w-4 h-4" />
-              Télécharger
+              Restaurer une photo
             </a>
           </div>
 
@@ -139,12 +137,12 @@ export default function Navbar() {
                 </a>
               ))}
               <a
-                href="#cta"
+                href="/upload"
                 onClick={() => setMobileOpen(false)}
                 className="mt-2 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-accent text-white dark:text-gray-950 text-sm font-semibold hover:brightness-110 transition-all w-full justify-center"
               >
                 <Sparkles className="w-4 h-4" />
-                Télécharger l&apos;application
+                Restaurer une photo
               </a>
             </div>
           </motion.div>

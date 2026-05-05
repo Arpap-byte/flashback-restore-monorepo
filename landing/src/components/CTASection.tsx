@@ -55,7 +55,7 @@ export default function CTASection() {
           >
             {/* App Store */}
             <a
-              href="#"
+              href="/upload"
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-foreground text-background font-semibold hover:opacity-90 transition-all hover:shadow-2xl hover:shadow-foreground/10 active:scale-[0.97] w-full sm:w-auto justify-center"
             >
               <Apple className="w-7 h-7" />
@@ -67,7 +67,7 @@ export default function CTASection() {
 
             {/* Google Play */}
             <a
-              href="#"
+              href="/upload"
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-foreground text-background font-semibold hover:opacity-90 transition-all hover:shadow-2xl hover:shadow-foreground/10 active:scale-[0.97] w-full sm:w-auto justify-center"
             >
               <Play className="w-7 h-7 fill-background" />

@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
 import { Check, Sparkles, Zap, Crown, Gift, Building2, Mail } from "lucide-react";
+import StripeCheckoutButton from "@/components/StripeCheckoutButton";
 
 const plans = [
   {
@@ -23,6 +24,7 @@ const plans = [
     border: "border-card-border",
     buttonStyle:
       "border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all",
+    href: "/upload",
   },
   {
     name: "Découverte",
@@ -45,6 +47,7 @@ const plans = [
     buttonStyle:
       "bg-accent text-white dark:text-gray-950 hover:brightness-110 shadow-xl shadow-accent/25 font-semibold",
     badge: "⭐ Le plus populaire",
+    plan: "decouverte",
   },
   {
     name: "Premium",
@@ -67,6 +70,7 @@ const plans = [
     border: "border-violet-500/20",
     buttonStyle:
       "border-2 border-violet-500/30 text-foreground hover:bg-violet-500/10 hover:border-violet-400 transition-all font-semibold",
+    plan: "premium",
   },
   {
     name: "Annuel",
@@ -90,6 +94,7 @@ const plans = [
     buttonStyle:
       "border-2 border-emerald-500/30 text-foreground hover:bg-emerald-500/10 hover:border-emerald-400 transition-all font-semibold",
     savings: "Économisez 99€",
+    plan: "annuel",
   },
   {
     name: "Pro",
@@ -113,6 +118,7 @@ const plans = [
     border: "border-gray-500/20",
     buttonStyle:
       "border-2 border-gray-500/30 text-foreground hover:bg-gray-500/10 hover:border-gray-400 transition-all font-semibold inline-flex items-center gap-2 justify-center",
+    href: "mailto:contact@flashbackrestore.app",
   },
 ];
 
@@ -125,6 +131,43 @@ function PricingCard({
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-60px" });
+
+  const renderCTA = () => {
+    // Free plan → link to /upload
+    if (plan.name === "Gratuit") {
+      return (
+        <a
+          href={plan.href}
+          className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] inline-flex items-center justify-center gap-2 ${plan.buttonStyle}`}
+        >
+          {plan.cta}
+        </a>
+      );
+    }
+    // Pro plan → mailto link
+    if (plan.name === "Pro") {
+      return (
+        <a
+          href={plan.href}
+          className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] inline-flex items-center justify-center gap-2 ${plan.buttonStyle}`}
+        >
+          <Mail className="w-4 h-4" />
+          {plan.cta}
+        </a>
+      );
+    }
+    // Paid plans → Stripe checkout
+    if (plan.plan) {
+      return (
+        <StripeCheckoutButton
+          plan={plan.plan}
+          label={plan.cta}
+          className={plan.buttonStyle}
+        />
+      );
+    }
+    return null;
+  };
 
   return (
     <motion.div
@@ -213,12 +256,7 @@ function PricingCard({
           </ul>
 
           {/* CTA */}
-          <button
-            className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] ${plan.buttonStyle}`}
-          >
-            {plan.name === "Pro" && <Mail className="w-4 h-4" />}
-            {plan.cta}
-          </button>
+          {renderCTA()}
         </div>
       </div>
     </motion.div>
