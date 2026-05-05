@@ -94,7 +94,7 @@ export default function CTASection() {
               4.8 • 10K+ avis
             </span>
             <span className="text-muted/70">
-              Gratuit avec options premium
+              Formules dès 4,99€/mois — gratuit pour commencer
             </span>
           </motion.div>
         </motion.div>

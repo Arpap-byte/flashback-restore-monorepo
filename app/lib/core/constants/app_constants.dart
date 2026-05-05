@@ -38,19 +38,31 @@ class AppConstants {
   static const String rcApiKeyAndroid = 'YOUR_REVENUECAT_ANDROID_KEY';
   static const String rcApiKeyIOS = 'YOUR_REVENUECAT_IOS_KEY';
 
-  // ============ PRODUCT IDS ============
-  static const String productAnimationSingle = 'animation_single';
-  static const String productAnimationPack5 = 'animation_pack_5';
-  static const String productAnimationPack10 = 'animation_pack_10';
+  // ============ ABONNEMENTS (Stripe) ============
+  static const String planDecouverte = 'decouverte';
+  static const String planPremium = 'premium';
+  static const String planAnnuel = 'annuel';
+  static const String planPro = 'pro';
+
+  // ============ PRODUCT IDS (RevenueCat) ============
+  static const String productDecouverteMonthly = 'decouverte_monthly';
   static const String productPremiumMonthly = 'premium_monthly';
   static const String productPremiumYearly = 'premium_yearly';
+  static const String productPro = 'pro_enterprise';
 
-  // ============ PRICING (display only) ============
-  static const String priceAnimationSingle = '1,99 €';
-  static const String priceAnimationPack5 = '7,99 €';
-  static const String priceAnimationPack10 = '12,99 €';
-  static const String pricePremiumMonthly = '4,99 €/mois';
-  static const String pricePremiumYearly = '39,99 €/an';
+  // ============ PRICING ============
+  static const String priceDecouverte = '4,99 €/mois';
+  static const String pricePremium = '29 €/mois';
+  static const String priceAnnuel = '249 €/an';
+  static const String pricePro = 'Sur mesure';
+
+  // ============ LIMITES PAR PLAN ============
+  static const int limitGratuitRestaurations = 3;
+  static const int limitGratuitAnimations = 0;
+  static const int limitDecouverteRestaurations = 10;
+  static const int limitDecouverteAnimations = 3;
+  static const int limitPremiumRestaurations = 100;
+  static const int limitPremiumAnimations = 30;
 }
 
 /// Routes de l'application

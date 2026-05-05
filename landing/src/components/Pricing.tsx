@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Check, Sparkles, Zap, Crown, Gift } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Gift, Building2, Mail } from "lucide-react";
 
 const plans = [
   {
@@ -13,12 +13,11 @@ const plans = [
     description: "Pour découvrir la magie de Flashback Restore.",
     features: [
       "3 restaurations offertes",
-      "1 animation incluse",
+      "0 animation",
       "Qualité standard",
       "Galerie de base",
-      "Partage réseaux sociaux",
     ],
-    cta: "Commencer",
+    cta: "Commencer gratuitement",
     highlighted: false,
     gradient: "from-card-border/50 to-card/50",
     border: "border-card-border",
@@ -26,21 +25,20 @@ const plans = [
       "border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all",
   },
   {
-    name: "Premium",
-    icon: Crown,
+    name: "Découverte",
+    icon: Sparkles,
     price: "4,99€",
     period: "par mois",
-    description: "Le plus populaire. Pour les passionnés de souvenirs.",
+    description: "Pour les amateurs de souvenirs. Le meilleur rapport qualité-prix.",
     features: [
-      "Restaurations illimitées",
-      "Animations illimitées",
-      "Qualité HD premium",
-      "Galerie chiffrée cloud",
+      "10 restaurations / mois",
+      "3 animations / mois",
+      "Qualité HD",
+      "Galerie cloud",
       "Sans filigrane",
-      "Support prioritaire 24/7",
-      "Colorisation automatique",
+      "Support par email",
     ],
-    cta: "Essayer Premium",
+    cta: "Essayer Découverte",
     highlighted: true,
     gradient: "from-amber-500/20 via-amber-400/10 to-violet-600/10",
     border: "border-accent/50",
@@ -49,27 +47,72 @@ const plans = [
     badge: "⭐ Le plus populaire",
   },
   {
-    name: "Annuel",
-    icon: Sparkles,
-    price: "39,99€",
-    period: "par an",
-    description: "Le meilleur rapport qualité-prix.",
+    name: "Premium",
+    icon: Crown,
+    price: "29€",
+    period: "par mois",
+    description: "Pour les passionnés qui veulent le meilleur.",
     features: [
-      "Tout le plan Premium",
-      "2 mois offerts (33% d'économies)",
-      "Animations qualité 4K",
-      "Export vidéo HD",
-      "Accès anticipé nouveautés",
-      "Badge VIP communauté",
-      "Sauvegarde prioritaire",
+      "100 restaurations / mois",
+      "30 animations / mois",
+      "Qualité HD premium",
+      "Galerie chiffrée cloud",
+      "Sans filigrane",
+      "Support prioritaire 24/7",
+      "Colorisation automatique",
     ],
-    cta: "Économiser 33%",
+    cta: "Devenir Premium",
     highlighted: false,
     gradient: "from-violet-600/20 to-violet-500/5",
     border: "border-violet-500/20",
     buttonStyle:
       "border-2 border-violet-500/30 text-foreground hover:bg-violet-500/10 hover:border-violet-400 transition-all font-semibold",
-    savings: "Économisez 19,89€",
+  },
+  {
+    name: "Annuel",
+    icon: Zap,
+    price: "249€",
+    period: "par an",
+    description: "Tout le plan Premium avec 2 mois offerts.",
+    features: [
+      "100 restaurations / mois",
+      "30 animations / mois",
+      "Tous les avantages Premium",
+      "2 mois offerts (99€ d'économies)",
+      "Export vidéo HD",
+      "Accès anticipé nouveautés",
+      "Badge VIP communauté",
+    ],
+    cta: "S'abonner",
+    highlighted: false,
+    gradient: "from-emerald-600/20 to-emerald-500/5",
+    border: "border-emerald-500/20",
+    buttonStyle:
+      "border-2 border-emerald-500/30 text-foreground hover:bg-emerald-500/10 hover:border-emerald-400 transition-all font-semibold",
+    savings: "Économisez 99€",
+  },
+  {
+    name: "Pro",
+    icon: Building2,
+    price: "Sur mesure",
+    period: "",
+    description: "Pour les professionnels : photographes, archives, musées.",
+    features: [
+      "Restaurations illimitées",
+      "Animations illimitées",
+      "Qualité maximale",
+      "API dédiée",
+      "Stockage prioritaire",
+      "Support dédié 24/7",
+      "Contrat SLA",
+      "Formation équipe",
+    ],
+    cta: "Nous contacter",
+    highlighted: false,
+    gradient: "from-gray-500/10 to-gray-400/5",
+    border: "border-gray-500/20",
+    buttonStyle:
+      "border-2 border-gray-500/30 text-foreground hover:bg-gray-500/10 hover:border-gray-400 transition-all font-semibold inline-flex items-center gap-2 justify-center",
   },
 ];
 
@@ -88,7 +131,7 @@ function PricingCard({
       ref={ref}
       initial={{ opacity: 0, y: 40 }}
       animate={isInView ? { opacity: 1, y: 0 } : {}}
-      transition={{ duration: 0.6, delay: index * 0.12 }}
+      transition={{ duration: 0.6, delay: index * 0.1 }}
       className={`relative ${
         plan.highlighted
           ? "scale-[1.03] lg:scale-105 z-10"
@@ -96,7 +139,7 @@ function PricingCard({
       }`}
     >
       <div
-        className={`relative bg-card rounded-2xl border ${plan.border} p-8 flex flex-col h-full transition-all duration-300 ${
+        className={`relative bg-card rounded-2xl border ${plan.border} p-6 lg:p-8 flex flex-col h-full transition-all duration-300 ${
           plan.highlighted
             ? "shadow-2xl shadow-accent/10 dark:shadow-accent/5"
             : "hover:shadow-xl hover:shadow-black/10 dark:hover:shadow-black/30"
@@ -109,7 +152,7 @@ function PricingCard({
 
         {/* Badge */}
         {plan.badge && (
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-950 text-xs font-bold rounded-full shadow-lg shadow-amber-500/25 whitespace-nowrap">
+          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-950 text-xs font-bold rounded-full shadow-lg shadow-amber-500/25 whitespace-nowrap z-20">
             {plan.badge}
           </div>
         )}
@@ -138,7 +181,9 @@ function PricingCard({
             <span className="text-4xl font-bold text-foreground">
               {plan.price}
             </span>
-            <span className="text-muted ml-2 text-sm">{plan.period}</span>
+            {plan.period && (
+              <span className="text-muted ml-2 text-sm">{plan.period}</span>
+            )}
           </div>
 
           {/* Savings badge */}
@@ -171,6 +216,7 @@ function PricingCard({
           <button
             className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] ${plan.buttonStyle}`}
           >
+            {plan.name === "Pro" && <Mail className="w-4 h-4" />}
             {plan.cta}
           </button>
         </div>
@@ -203,13 +249,13 @@ export default function Pricing() {
             <span className="text-gradient">formule idéale</span>
           </h2>
           <p className="text-muted max-w-2xl mx-auto text-lg">
-            Démarrez gratuitement et passez à la version premium quand vous le
-            souhaitez. Sans engagement, annulez à tout moment.
+            Du gratuit au sur-mesure, il y a une formule pour chaque besoin.
+            Sans engagement, annulez à tout moment.
           </p>
         </motion.div>
 
-        {/* Cards */}
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto items-start">
+        {/* Cards — 5 columns on xl, 3 on md, 1 on mobile */}
+        <div className="grid md:grid-cols-3 xl:grid-cols-5 gap-6 max-w-[90rem] mx-auto items-start">
           {plans.map((plan, index) => (
             <PricingCard key={plan.name} plan={plan} index={index} />
           ))}
@@ -222,8 +268,7 @@ export default function Pricing() {
           transition={{ duration: 0.6, delay: 0.5 }}
           className="text-center text-muted/70 text-sm mt-10"
         >
-          Tous les prix sont en euros TTC. Paiement sécurisé via l&apos;App
-          Store et Google Play.
+          Tous les prix sont en euros TTC. Paiement sécurisé par Stripe.
         </motion.p>
       </div>
     </section>
