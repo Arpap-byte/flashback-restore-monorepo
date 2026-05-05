@@ -31,6 +31,7 @@ RUN apt-get update && \
         libpng-dev \
         libtiff-dev \
         libwebp-dev \
+        curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copie des dépendances Python et installation

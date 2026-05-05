@@ -1,0 +1,63 @@
+# ============================================
+# Flashback Restore — .dockerignore
+# Fichiers exclus des contextes de build Docker
+# ============================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+dist/
+build/
+*.egg
+
+# Environnements virtuels
+venv/
+.venv/
+env/
+.env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Tests et couverture
+.pytest_cache/
+.coverage
+htmlcov/
+tests/
+
+# Documentation
+docs/
+*.md
+LICENSE
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Variables d'environnement (sécurité)
+.env
+.env.*
+!.env.example
+
+# Base de données locale
+*.db
+*.sqlite3
+
+# Uploads (les volumes Docker les gèrent)
+uploads/

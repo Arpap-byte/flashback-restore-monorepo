@@ -1,9 +1,7 @@
 # ============================================
 # Flashback Restore — Docker Compose
-# Environnement de développement local
+# Environnement de production / développement local
 # ============================================
-
-version: "3.9"
 
 services:
   # --- Backend FastAPI (Python) ---
@@ -18,10 +16,11 @@ services:
     environment:
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - DID_API_KEY=${DID_API_KEY}
-      - DATABASE_URL=postgresql://flashback:flashback@db:5432/flashback
-      - REDIS_URL=redis://redis:6379/0
-      - ENVIRONMENT=development
-      - LOG_LEVEL=info
+      - DATABASE_URL=${DATABASE_URL:-postgresql://flashback:flashback@db:5432/flashback}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - SECRET_KEY=${SECRET_KEY}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
     volumes:
       - ./backend:/app
       - uploads_data:/app/uploads
@@ -112,6 +111,12 @@ services:
       - landing
     networks:
       - flashback-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
 volumes:
   postgres_data:

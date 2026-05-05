@@ -76,3 +76,7 @@ docker-compose.override.yml
 # --- Logs ---
 *.log
 logs/
+
+# --- Base de données locale ---
+*.db
+*.sqlite3

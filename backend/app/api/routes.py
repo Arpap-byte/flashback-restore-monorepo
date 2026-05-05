@@ -14,7 +14,7 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from PIL import Image, ImageEnhance, ImageFilter
 
 from app.config import DID_API_KEY, GEMINI_API_KEY, UPLOAD_DIR
@@ -97,7 +97,7 @@ async def analyser(fichier: UploadFile = File(...)):
                    f"Formats acceptés : {', '.join(FORMATS_ACCEPTES)}",
         )
 
-    contenu = await fichier.lire()
+    contenu = await fichier.read()
     if len(contenu) > TAILLE_MAX_UPLOAD:
         raise HTTPException(
             status_code=400,
@@ -234,7 +234,7 @@ async def restaurer(fichier: UploadFile = File(...)):
                    f"Formats acceptés : {', '.join(FORMATS_ACCEPTES)}",
         )
 
-    contenu = await fichier.lire()
+    contenu = await fichier.read()
     if len(contenu) > TAILLE_MAX_UPLOAD:
         raise HTTPException(
             status_code=400,
@@ -306,7 +306,7 @@ async def restaurer(fichier: UploadFile = File(...)):
 @router.post("/animate", response_model=AnimationReponse)
 async def animer(
     fichier: UploadFile = File(...),
-    texte: str = "Bonjour ! Je suis un souvenir restauré.",
+    texte: str = Form("Bonjour ! Je suis un souvenir restauré."),
 ):
     """
     Crée une animation de portrait parlant (style Harry Potter) avec D-ID.
@@ -332,7 +332,7 @@ async def animer(
             detail=f"Format non accepté : {fichier.content_type}.",
         )
 
-    contenu = await fichier.lire()
+    contenu = await fichier.read()
     if len(contenu) > TAILLE_MAX_UPLOAD:
         raise HTTPException(
             status_code=400,

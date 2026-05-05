@@ -33,7 +33,20 @@ DID_BASE_URL: str = os.getenv(
     "https://api.d-id.com",
 )
 
+# --- Sécurité ---
+SECRET_KEY: str = os.getenv(
+    "SECRET_KEY",
+    "fe5cdce1484b7677d2c7dec478d57389ccbee8b1c999a13ca690b2deea001a09",
+)
+
+# --- Base de données ---
+DATABASE_URL: str = os.getenv(
+    "DATABASE_URL",
+    "postgresql://flashback:flashback@db:5432/flashback",
+)
+
 # --- Serveur ---
 HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8000"))
 DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
+ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
