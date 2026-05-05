@@ -45,6 +45,13 @@ DATABASE_URL: str = os.getenv(
     "postgresql://flashback:flashback@db:5432/flashback",
 )
 
+# --- Stripe (paiements) ---
+STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "sk_test_placeholder")
+STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_placeholder")
+STRIPE_PRICE_DECOUVERTE: str = os.getenv("STRIPE_PRICE_DECOUVERTE", "price_decouverte_monthly")
+STRIPE_PRICE_PREMIUM: str = os.getenv("STRIPE_PRICE_PREMIUM", "price_premium_monthly")
+STRIPE_PRICE_ANNUEL: str = os.getenv("STRIPE_PRICE_ANNUEL", "price_premium_yearly")
+
 # --- Serveur ---
 HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8000"))

@@ -14,12 +14,14 @@ import logging
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from PIL import Image, ImageEnhance, ImageFilter
 
 from app.config import DID_API_KEY, GEMINI_API_KEY, UPLOAD_DIR
 from app.db.database import (
+    creer_abonnement,
     creer_travail,
+    mettre_a_jour_abonnement,
     mettre_a_jour_travail,
     obtenir_travail,
     obtenir_travail_par_job_externe,
@@ -28,14 +30,23 @@ from app.models.schemas import (
     AnalyseReponse,
     AnimationReponse,
     AnimationRequete,
+    CheckoutReponse,
+    CheckoutRequete,
+    EtatAbonnement,
     ParametresRestauration,
     RestaurationReponse,
     SanteReponse,
     StatutAnimation,
     StatutAnimationReponse,
+    WebhookReponse,
 )
 from app.services.did_service import creer_animation, verifier_statut_animation
 from app.services.gemini_service import analyser_photo, obtenir_parametres_restauration
+from app.services.stripe_service import (
+    creer_session_paiement,
+    obtenir_abonnement_stripe,
+    traiter_webhook,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +57,10 @@ TAILLE_MAX_UPLOAD = 20 * 1024 * 1024
 
 # Formats d'image acceptés
 FORMATS_ACCEPTES = {"image/jpeg", "image/png", "image/webp", "image/tiff"}
+
+# URLs de redirection Stripe (frontend)
+URL_SUCCES_STRIPE = "http://localhost:3000/abonnement/succes"
+URL_ANNULATION_STRIPE = "http://localhost:3000/abonnement/annulation"
 
 
 # ---------------------------------------------------------------------------
@@ -439,4 +454,168 @@ async def statut_animation(job_id: str):
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors du suivi d'animation : {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Stripe — Paiements et abonnements
+# ---------------------------------------------------------------------------
+
+@router.post("/stripe/create-checkout", response_model=CheckoutReponse)
+async def creer_checkout(requete: CheckoutRequete):
+    """
+    Crée une session de paiement Stripe Checkout.
+
+    Le client choisit un plan parmi « decouverte », « premium » ou « annuel ».
+    Une session Stripe est créée et l'URL de paiement est retournée.
+
+    Args:
+        requete: Contient le plan choisi et l'email de l'utilisateur.
+
+    Returns:
+        L'URL de la session Checkout Stripe.
+    """
+    try:
+        resultat = await creer_session_paiement(
+            plan=requete.plan,
+            email_utilisateur=requete.email_utilisateur,
+            url_succes=URL_SUCCES_STRIPE,
+            url_annulation=URL_ANNULATION_STRIPE,
+        )
+        return CheckoutReponse(
+            checkout_url=resultat["checkout_url"],
+            session_id=resultat["session_id"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Erreur création checkout : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la création de la session de paiement.",
+        )
+
+
+@router.post("/stripe/webhook", response_model=WebhookReponse)
+async def webhook_stripe(request: Request):
+    """
+    Reçoit les événements webhook de Stripe.
+
+    Traite les événements tels que :
+    - checkout.session.completed : Paiement validé → création d'abonnement
+    - customer.subscription.deleted : Abonnement résilié
+    - customer.subscription.updated : Abonnement modifié
+    - invoice.payment_failed : Échec de paiement
+
+    Args:
+        request: La requête HTTP entrante (corps brut + en-tête Stripe-Signature).
+
+    Returns:
+        Le type d'événement reçu et un message de confirmation.
+    """
+    signature = request.headers.get("stripe-signature")
+    if not signature:
+        raise HTTPException(
+            status_code=400,
+            detail="En-tête « Stripe-Signature » manquant.",
+        )
+
+    corps = await request.body()
+
+    try:
+        resultat = await traiter_webhook(corps, signature)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Corps de webhook invalide.")
+    except Exception as e:
+        logger.exception(f"Erreur webhook : {e}")
+        raise HTTPException(
+            status_code=400,
+            detail="Signature de webhook invalide.",
+        )
+
+    type_evenement = resultat["type"]
+    donnees = resultat["data"]
+
+    # --- Traitement selon le type d'événement ---
+
+    if type_evenement == "checkout.session.completed":
+        # Paiement réussi : enregistrer l'abonnement
+        try:
+            creer_abonnement(
+                stripe_customer_id=donnees.get("customer"),
+                stripe_subscription_id=donnees.get("subscription"),
+                statut="actif",
+            )
+            logger.info(
+                f"Abonnement créé : client={donnees.get('customer')}, "
+                f"subscription={donnees.get('subscription')}"
+            )
+        except Exception as e:
+            logger.exception(f"Erreur création abonnement en base : {e}")
+
+    elif type_evenement == "customer.subscription.deleted":
+        # Abonnement résilié
+        try:
+            mettre_a_jour_abonnement(
+                stripe_subscription_id=donnees.get("id"),
+                statut="resilie",
+            )
+            logger.info(f"Abonnement résilié : {donnees.get('id')}")
+        except Exception as e:
+            logger.exception(f"Erreur mise à jour abonnement : {e}")
+
+    elif type_evenement == "customer.subscription.updated":
+        # Abonnement modifié
+        try:
+            mettre_a_jour_abonnement(
+                stripe_subscription_id=donnees.get("id"),
+                statut=donnees.get("status", "actif"),
+            )
+            logger.info(
+                f"Abonnement mis à jour : {donnees.get('id')} → "
+                f"statut={donnees.get('status')}"
+            )
+        except Exception as e:
+            logger.exception(f"Erreur mise à jour abonnement : {e}")
+
+    elif type_evenement == "invoice.payment_failed":
+        # Échec de paiement
+        logger.warning(
+            f"Échec de paiement : client={donnees.get('customer')}"
+        )
+        try:
+            mettre_a_jour_abonnement(
+                stripe_customer_id=donnees.get("customer"),
+                statut="impaye",
+            )
+        except Exception as e:
+            logger.exception(f"Erreur mise à jour abonnement impayé : {e}")
+
+    return WebhookReponse(
+        type_evenement=type_evenement,
+        message=f"Événement « {type_evenement} » traité avec succès.",
+    )
+
+
+@router.get("/stripe/subscription/{customer_id}", response_model=EtatAbonnement)
+async def consulter_abonnement(customer_id: str):
+    """
+    Récupère l'état de l'abonnement d'un client Stripe.
+
+    Args:
+        customer_id: L'identifiant client Stripe (ex: « cus_xxxx »).
+
+    Returns:
+        Les informations détaillées de l'abonnement.
+    """
+    try:
+        abonnement = await obtenir_abonnement_stripe(customer_id)
+        return EtatAbonnement(**abonnement)
+
+    except Exception as e:
+        logger.exception(f"Erreur consultation abonnement : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la consultation de l'abonnement.",
         )

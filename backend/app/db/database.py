@@ -1,8 +1,8 @@
 """
-Base de données SQLite pour le suivi des travaux (jobs).
+Base de données SQLite pour le suivi des travaux (jobs) et des abonnements.
 
-Utilise SQLite pour conserver l'historique des analyses, restaurations
-et animations dans un fichier local.
+Utilise SQLite pour conserver l'historique des analyses, restaurations,
+animations et abonnements Stripe dans un fichier local.
 """
 
 import sqlite3
@@ -44,11 +44,34 @@ def initialiser_base():
 
             CREATE INDEX IF NOT EXISTS idx_travaux_statut ON travaux(statut);
             CREATE INDEX IF NOT EXISTS idx_travaux_type  ON travaux(type);
+
+            CREATE TABLE IF NOT EXISTS abonnements (
+                id                      TEXT PRIMARY KEY,
+                stripe_customer_id      TEXT,
+                stripe_subscription_id  TEXT,
+                statut                  TEXT NOT NULL DEFAULT 'cree'
+                                        CHECK(statut IN ('cree', 'actif', 'impaye', 'resilie', 'expire')),
+                plan                    TEXT,
+                email_utilisateur       TEXT,
+                cree_le                 TEXT NOT NULL,
+                modifie_le              TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_abonnements_stripe_customer
+                ON abonnements(stripe_customer_id);
+            CREATE INDEX IF NOT EXISTS idx_abonnements_stripe_subscription
+                ON abonnements(stripe_subscription_id);
+            CREATE INDEX IF NOT EXISTS idx_abonnements_statut
+                ON abonnements(statut);
         """)
         conn.commit()
     finally:
         conn.close()
 
+
+# ---------------------------------------------------------------------------
+# Travaux (jobs)
+# ---------------------------------------------------------------------------
 
 def creer_travail(
     type_travail: str,
@@ -129,5 +152,160 @@ def obtenir_travail_par_job_externe(job_externe_id: str) -> Optional[dict]:
             "SELECT * FROM travaux WHERE job_externe_id = ?", (job_externe_id,)
         ).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Abonnements (Stripe)
+# ---------------------------------------------------------------------------
+
+def creer_abonnement(
+    stripe_customer_id: Optional[str] = None,
+    stripe_subscription_id: Optional[str] = None,
+    statut: str = "actif",
+    plan: Optional[str] = None,
+    email_utilisateur: Optional[str] = None,
+) -> str:
+    """
+    Crée un nouvel abonnement dans la base locale.
+
+    Args:
+        stripe_customer_id: Identifiant client Stripe.
+        stripe_subscription_id: Identifiant d'abonnement Stripe.
+        statut: Statut initial (par défaut « actif »).
+        plan: Nom du plan souscrit.
+        email_utilisateur: Email de l'utilisateur.
+
+    Returns:
+        L'identifiant unique de l'abonnement créé.
+    """
+    abonnement_id = str(uuid.uuid4())
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        conn.execute(
+            """INSERT INTO abonnements
+               (id, stripe_customer_id, stripe_subscription_id, statut, plan,
+                email_utilisateur, cree_le, modifie_le)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                abonnement_id,
+                stripe_customer_id,
+                stripe_subscription_id,
+                statut,
+                plan,
+                email_utilisateur,
+                maintenant,
+                maintenant,
+            ),
+        )
+        conn.commit()
+        return abonnement_id
+    finally:
+        conn.close()
+
+
+def obtenir_abonnement(
+    abonnement_id: Optional[str] = None,
+    stripe_customer_id: Optional[str] = None,
+    stripe_subscription_id: Optional[str] = None,
+) -> Optional[dict]:
+    """
+    Récupère un abonnement par son ID local, son ID client Stripe
+    ou son ID d'abonnement Stripe.
+
+    Args:
+        abonnement_id: Identifiant local de l'abonnement.
+        stripe_customer_id: Identifiant client Stripe.
+        stripe_subscription_id: Identifiant d'abonnement Stripe.
+
+    Returns:
+        Un dictionnaire représentant l'abonnement, ou None.
+    """
+    conn = _obtenir_connexion()
+    try:
+        if abonnement_id:
+            row = conn.execute(
+                "SELECT * FROM abonnements WHERE id = ?", (abonnement_id,)
+            ).fetchone()
+        elif stripe_subscription_id:
+            row = conn.execute(
+                "SELECT * FROM abonnements WHERE stripe_subscription_id = ?",
+                (stripe_subscription_id,),
+            ).fetchone()
+        elif stripe_customer_id:
+            row = conn.execute(
+                "SELECT * FROM abonnements WHERE stripe_customer_id = ? "
+                "ORDER BY cree_le DESC LIMIT 1",
+                (stripe_customer_id,),
+            ).fetchone()
+        else:
+            return None
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def mettre_a_jour_abonnement(
+    abonnement_id: Optional[str] = None,
+    stripe_customer_id: Optional[str] = None,
+    stripe_subscription_id: Optional[str] = None,
+    statut: Optional[str] = None,
+    plan: Optional[str] = None,
+    email_utilisateur: Optional[str] = None,
+) -> bool:
+    """
+    Met à jour les informations d'un abonnement existant.
+
+    L'abonnement peut être identifié par son ID local, son ID client Stripe
+    ou son ID d'abonnement Stripe.
+
+    Args:
+        abonnement_id: Identifiant local de l'abonnement.
+        stripe_customer_id: Identifiant client Stripe.
+        stripe_subscription_id: Identifiant d'abonnement Stripe.
+        statut: Nouveau statut.
+        plan: Nouveau plan.
+        email_utilisateur: Email de l'utilisateur.
+
+    Returns:
+        True si une ligne a été mise à jour, False sinon.
+    """
+    maintenant = datetime.now(timezone.utc).isoformat()
+    champs = ["modifie_le = ?"]
+    valeurs = [maintenant]
+
+    if statut is not None:
+        champs.append("statut = ?")
+        valeurs.append(statut)
+    if plan is not None:
+        champs.append("plan = ?")
+        valeurs.append(plan)
+    if email_utilisateur is not None:
+        champs.append("email_utilisateur = ?")
+        valeurs.append(email_utilisateur)
+
+    # Déterminer la clause WHERE selon l'identifiant fourni
+    if abonnement_id:
+        clause = "id = ?"
+        valeurs.append(abonnement_id)
+    elif stripe_subscription_id:
+        clause = "stripe_subscription_id = ?"
+        valeurs.append(stripe_subscription_id)
+    elif stripe_customer_id:
+        clause = "stripe_customer_id = ?"
+        valeurs.append(stripe_customer_id)
+    else:
+        return False
+
+    conn = _obtenir_connexion()
+    try:
+        cur = conn.execute(
+            f"UPDATE abonnements SET {', '.join(champs)} WHERE {clause}",
+            valeurs,
+        )
+        conn.commit()
+        return cur.rowcount > 0
     finally:
         conn.close()

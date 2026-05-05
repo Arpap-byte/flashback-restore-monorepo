@@ -141,3 +141,84 @@ class SanteReponse(BaseModel):
     did_disponible: bool = Field(
         default=True, description="Indique si l'API D-ID est configurée"
     )
+
+
+# ---------------------------------------------------------------------------
+# Stripe — Paiements et abonnements
+# ---------------------------------------------------------------------------
+
+class CheckoutRequete(BaseModel):
+    """Requête pour créer une session de paiement Stripe Checkout."""
+
+    plan: str = Field(
+        ...,
+        description="Plan choisi : « decouverte », « premium » ou « annuel »",
+        pattern="^(decouverte|premium|annuel)$",
+    )
+    email_utilisateur: str = Field(
+        ...,
+        description="Adresse email de l'utilisateur",
+    )
+
+
+class CheckoutReponse(BaseModel):
+    """Réponse après création d'une session Checkout Stripe."""
+
+    checkout_url: str = Field(
+        ...,
+        description="URL de la session de paiement Stripe",
+    )
+    session_id: str = Field(
+        ...,
+        description="Identifiant de la session Checkout",
+    )
+
+
+class WebhookReponse(BaseModel):
+    """Réponse après traitement d'un webhook Stripe."""
+
+    type_evenement: str = Field(
+        ...,
+        description="Type d'événement Stripe reçu",
+    )
+    message: str = Field(
+        default="Événement traité avec succès.",
+        description="Message de confirmation",
+    )
+
+
+class EtatAbonnement(BaseModel):
+    """État d'un abonnement client Stripe."""
+
+    statut: str = Field(
+        ...,
+        description="Statut de l'abonnement (actif, resilie, impaye, aucun, etc.)",
+    )
+    message: Optional[str] = Field(
+        default=None,
+        description="Message complémentaire",
+    )
+    abonnement_id: Optional[str] = Field(
+        default=None,
+        description="Identifiant de l'abonnement Stripe",
+    )
+    client_id: Optional[str] = Field(
+        default=None,
+        description="Identifiant client Stripe",
+    )
+    plan: Optional[str] = Field(
+        default=None,
+        description="Identifiant du plan souscrit",
+    )
+    debut_periode: Optional[int] = Field(
+        default=None,
+        description="Début de la période de facturation (timestamp Unix)",
+    )
+    fin_periode: Optional[int] = Field(
+        default=None,
+        description="Fin de la période de facturation (timestamp Unix)",
+    )
+    annulation_auto: Optional[bool] = Field(
+        default=None,
+        description="Indique si l'abonnement sera résilié en fin de période",
+    )
