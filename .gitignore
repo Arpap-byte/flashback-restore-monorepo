@@ -1,0 +1,78 @@
+# ============================================
+# Flashback Restore — .gitignore
+# Couvre Python, Node.js, Flutter, IDE & OS
+# ============================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.venv/
+venv/
+env/
+*.whl
+.pytest_cache/
+.coverage
+htmlcov/
+*.pyc
+
+# --- Node.js / Next.js ---
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# --- Flutter / Dart ---
+.dart_tool/
+.packages
+build/
+*.iml
+*.ipr
+*.iws
+.idea/
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
+android/key.properties
+ios/Podfile.lock
+ios/Pods/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-workspace
+*.sublime-project
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.directory
+
+# --- Docker ---
+docker-compose.override.yml
+
+# --- Environnement ---
+.env
+.env.local
+.env.*.local
+*.env
+!.env.example
+
+# --- CI/CD ---
+.github/workflows/.temp/
+
+# --- Logs ---
+*.log
+logs/

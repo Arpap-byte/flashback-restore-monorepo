@@ -1,0 +1,123 @@
+# ============================================
+# Flashback Restore — Docker Compose
+# Environnement de développement local
+# ============================================
+
+version: "3.9"
+
+services:
+  # --- Backend FastAPI (Python) ---
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: flashback-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - DID_API_KEY=${DID_API_KEY}
+      - DATABASE_URL=postgresql://flashback:flashback@db:5432/flashback
+      - REDIS_URL=redis://redis:6379/0
+      - ENVIRONMENT=development
+      - LOG_LEVEL=info
+    volumes:
+      - ./backend:/app
+      - uploads_data:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - flashback-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # --- Landing Page Next.js ---
+  landing:
+    build:
+      context: ./landing
+      dockerfile: Dockerfile
+    container_name: flashback-landing
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_SITE_URL=http://localhost
+    volumes:
+      - ./landing:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      - backend
+    networks:
+      - flashback-network
+
+  # --- Base de données PostgreSQL ---
+  db:
+    image: postgres:16-alpine
+    container_name: flashback-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=flashback
+      - POSTGRES_PASSWORD=flashback
+      - POSTGRES_DB=flashback
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - flashback-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flashback"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # --- Cache Redis ---
+  redis:
+    image: redis:7-alpine
+    container_name: flashback-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - flashback-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # --- Reverse Proxy Nginx ---
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: flashback-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - backend
+      - landing
+    networks:
+      - flashback-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads_data:
+
+networks:
+  flashback-network:
+    driver: bridge

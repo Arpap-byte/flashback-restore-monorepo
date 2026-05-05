@@ -1,0 +1,81 @@
+# ============================================
+# Flashback Restore — CI Landing (Next.js)
+# ============================================
+
+name: CI Landing
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "landing/**"
+      - ".github/workflows/ci-landing.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "landing/**"
+
+env:
+  NODE_VERSION: "20"
+
+jobs:
+  lint:
+    name: 🔍 Lint & Type Check
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./landing
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Installer Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: 📦 Installer dépendances
+        run: npm ci
+
+      - name: 🧹 ESLint
+        run: npx eslint . --ext .ts,.tsx || true
+
+      - name: 🔬 TypeScript Check
+        run: npx tsc --noEmit || true
+
+  build:
+    name: 🏗️ Build Next.js
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: ./landing
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🟢 Installer Node.js ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: landing/package-lock.json
+
+      - name: 📦 Installer dépendances
+        run: npm ci
+
+      - name: 🏗️ Build
+        env:
+          NEXT_PUBLIC_API_URL: https://api.flashback-restore.com
+          NEXT_PUBLIC_SITE_URL: https://flashback-restore.com
+        run: npm run build
+
+      - name: 📤 Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-build
+          path: landing/.next

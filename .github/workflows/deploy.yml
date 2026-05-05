@@ -1,0 +1,86 @@
+# ============================================
+# Flashback Restore — Déploiement Docker
+# Build & Push vers GitHub Container Registry
+# ============================================
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/arpap-byte/flashback-backend
+  LANDING_IMAGE: ghcr.io/arpap-byte/flashback-landing
+
+jobs:
+  build-and-push:
+    name: 🐳 Build & Push Docker Images
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: ./backend
+            image: ${{ env.BACKEND_IMAGE }}
+          - name: landing
+            context: ./landing
+            image: ${{ env.LANDING_IMAGE }}
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Metadata Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.service.image }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: 🔨 Build & Push
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: 🚀 Déploiement Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    environment: staging
+
+    steps:
+      - name: 📥 Checkout
+        uses: actions/checkout@v4
+
+      - name: 📋 Résumé du déploiement
+        run: |
+          echo "### 🚀 Déploiement Staging" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend:** \`${{ env.BACKEND_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Landing:** \`${{ env.LANDING_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Déclenché par:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+      # TODO: Ajouter le déploiement vers le serveur staging (SSH, k8s, etc.)
+      - name: 🔜 Déploiement (placeholder)
+        run: |
+          echo "🚧 Déploiement staging en attente de configuration cible"
+          echo "Images poussées avec succès sur ghcr.io"

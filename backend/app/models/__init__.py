@@ -1,0 +1,1 @@
+"""Module modèles — schémas Pydantic."""
