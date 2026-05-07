@@ -4,7 +4,7 @@ Routes de l'API Flaskback Restore.
 Endpoints :
 - POST /api/analyze   : Analyser les défauts d'une photo
 - POST /api/restore   : Restaurer une photo ancienne
-- POST /api/animate   : Créer une animation D-ID
+- POST /api/animate   : Créer une animation
 - GET  /api/animate/{id} : Suivre le statut d'une animation
 - GET  /api/health    : Vérifier la santé du service
 """
@@ -12,20 +12,31 @@ Endpoints :
 import json
 import logging
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from PIL import Image, ImageEnhance, ImageFilter
 
-from app.config import DID_API_KEY, GEMINI_API_KEY, UPLOAD_DIR
+from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, UPLOAD_DIR
+from app.auth import exiger_utilisateur
 from app.db.database import (
+    CREDITS_PAR_PLAN,
+    consommer_credit,
+    crediter_utilisateur,
     creer_abonnement,
     creer_travail,
+    enregistrer_achat_credits,
     mettre_a_jour_abonnement,
+    mettre_a_jour_attribution_credits,
+    mettre_a_jour_job_externe_id,
     mettre_a_jour_travail,
+    obtenir_abonnement,
     obtenir_travail,
     obtenir_travail_par_job_externe,
+    obtenir_utilisateur_par_email,
 )
+from app.limiter import limiter
 from app.models.schemas import (
     AnalyseReponse,
     AnimationReponse,
@@ -44,6 +55,7 @@ from app.services.did_service import creer_animation, verifier_statut_animation
 from app.services.gemini_service import analyser_photo, obtenir_parametres_restauration
 from app.services.stripe_service import (
     creer_session_paiement,
+    creer_session_paiement_credits,
     obtenir_abonnement_stripe,
     traiter_webhook,
 )
@@ -68,15 +80,44 @@ URL_ANNULATION_STRIPE = "http://localhost:3000/abonnement/annulation"
 # ---------------------------------------------------------------------------
 
 @router.get("/health", response_model=SanteReponse)
-async def sante():
+@limiter.limit("10/minute")
+async def sante(request: Request):
     """
     Vérification de l'état du service.
 
-    Retourne le statut de l'API et la disponibilité des services externes
-    (Gemini et D-ID).
+    Retourne le statut de l'API et teste réellement la connectivité
+    aux services externes (Gemini et le service d'animation).
     """
-    gemini_ok = bool(GEMINI_API_KEY and GEMINI_API_KEY != "placeholder")
-    did_ok = bool(DID_API_KEY and DID_API_KEY != "DID_API_KEY_PLACEHOLDER")
+    import httpx
+    from google import genai
+
+    # Test Gemini : tentative de listage des modèles
+    gemini_ok = False
+    if GEMINI_API_KEY:
+        try:
+            client = genai.Client(api_key=GEMINI_API_KEY)
+            # Tente de lister les modèles pour vérifier la connectivité
+            client.models.list()
+            gemini_ok = True
+        except Exception as e:
+            logger.warning(f"Test de connectivité Gemini échoué : {e}")
+
+    # Test D-ID : appel GET à l'API
+    did_ok = False
+    if DID_API_KEY:
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{DID_BASE_URL}/talks",
+                    headers={
+                        "Authorization": f"Basic {DID_API_KEY}",
+                        "Accept": "application/json",
+                    },
+                )
+                # Une réponse 200 ou 401 (auth OK mais pas de talks) indique que le service est joignable
+                did_ok = response.status_code in (200, 401)
+        except Exception as e:
+            logger.warning(f"Test de connectivité D-ID échoué : {e}")
 
     return SanteReponse(
         statut="OK",
@@ -91,11 +132,14 @@ async def sante():
 # ---------------------------------------------------------------------------
 
 @router.post("/analyze", response_model=AnalyseReponse)
-async def analyser(fichier: UploadFile = File(...)):
+async def analyser(
+    fichier: UploadFile = File(...),
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
     """
     Analyse une photo ancienne pour détecter ses défauts.
 
-    L'image est envoyée à Gemini qui identifie rayures, décoloration,
+    L'image est analysée par IA pour identifier rayures, décoloration,
     taches, déchirures, bruit et fournit des recommandations de restauration.
 
     Args:
@@ -126,7 +170,7 @@ async def analyser(fichier: UploadFile = File(...)):
     chemin.write_bytes(contenu)
 
     # Création du travail dans la base
-    travail_id = creer_travail("analyse", chemin_photo=str(chemin))
+    travail_id = creer_travail("analyse", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
     mettre_a_jour_travail(travail_id, statut="en_cours")
 
     try:
@@ -224,16 +268,21 @@ def _appliquer_restauration_pillow(
 
 
 @router.post("/restore", response_model=RestaurationReponse)
-async def restaurer(fichier: UploadFile = File(...)):
+async def restaurer(
+    fichier: UploadFile = File(...),
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
     """
-    Restaure une photo ancienne en utilisant l'IA Gemini et Pillow.
+    Restaure une photo ancienne en utilisant l'intelligence artificielle.
 
     Processus :
     1. La photo est d'abord analysée pour détecter ses défauts.
-    2. Gemini détermine les paramètres de restauration optimaux.
+    2. L'IA détermine les paramètres de restauration optimaux.
     3. Pillow applique ces paramètres (luminosité, contraste, saturation,
        netteté, débruitage, correction colorimétrique).
     4. L'image restaurée est retournée.
+
+    **Authentification requise** : un crédit ou essai gratuit est consommé.
 
     Args:
         fichier: Le fichier image à restaurer (JPEG, PNG, WebP, TIFF).
@@ -264,8 +313,21 @@ async def restaurer(fichier: UploadFile = File(...)):
     chemin_original.write_bytes(contenu)
 
     # Création du travail
-    travail_id = creer_travail("restauration", chemin_photo=str(chemin_original))
+    travail_id = creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
     mettre_a_jour_travail(travail_id, statut="en_cours")
+
+    # Vérification des crédits avant traitement
+    resultat_credit = consommer_credit(utilisateur["id"], "restauration", travail_id)
+    if not resultat_credit["succes"]:
+        mettre_a_jour_travail(
+            travail_id,
+            statut="erreur",
+            message_erreur=resultat_credit.get("raison", "Crédits insuffisants"),
+        )
+        raise HTTPException(
+            status_code=402,
+            detail=resultat_credit.get("raison", "Crédits insuffisants. Achetez des crédits pour continuer."),
+        )
 
     try:
         # Étape 1 : Analyse des défauts
@@ -322,14 +384,17 @@ async def restaurer(fichier: UploadFile = File(...)):
 async def animer(
     fichier: UploadFile = File(...),
     texte: str = Form("Bonjour ! Je suis un souvenir restauré."),
+    utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
-    Crée une animation de portrait parlant (style Harry Potter) avec D-ID.
+    Crée une animation de portrait parlant (style Harry Potter).
 
-    La photo est sauvegardée localement puis envoyée à D-ID pour générer
+    La photo est sauvegardée localement puis envoyée au service d'animation pour générer
     une vidéo où le visage s'anime et prononce le texte fourni.
 
-    **Important** : Pour que D-ID puisse accéder à la photo, celle-ci doit
+    **Authentification requise** : un crédit ou essai gratuit est consommé.
+
+    **Important** : Pour que le service d'animation puisse accéder à la photo, celle-ci doit
     être accessible via une URL publique. En développement, utilisez un
     service comme ngrok ou déployez le backend sur un serveur public.
 
@@ -338,7 +403,7 @@ async def animer(
         texte: Le texte que le portrait va prononcer (français).
 
     Returns:
-        L'identifiant du travail D-ID pour suivi ultérieur.
+        L'identifiant du travail d'animation pour suivi ultérieur.
     """
     # Validation
     if fichier.content_type and fichier.content_type not in FORMATS_ACCEPTES:
@@ -360,23 +425,38 @@ async def animer(
     chemin.write_bytes(contenu)
 
     # Création du travail
-    travail_id = creer_travail("animation", chemin_photo=str(chemin))
+    travail_id = creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
     mettre_a_jour_travail(travail_id, statut="en_cours")
+
+    # Vérification des crédits avant traitement
+    resultat_credit = consommer_credit(utilisateur["id"], "animation", travail_id)
+    if not resultat_credit["succes"]:
+        mettre_a_jour_travail(
+            travail_id,
+            statut="erreur",
+            message_erreur=resultat_credit.get("raison", "Crédits insuffisants"),
+        )
+        raise HTTPException(
+            status_code=402,
+            detail=resultat_credit.get("raison", "Crédits insuffisants. Achetez des crédits pour continuer."),
+        )
 
     try:
         # Construction de l'URL publique de la photo
         # En production, utilisez l'URL réelle de votre serveur
-        url_photo = f"http://localhost:8000/uploads/{nom_fichier}"
+        url_photo = f"http://148.230.116.52:8000/uploads/{nom_fichier}"
 
         job_did = await creer_animation(url_photo, texte=texte)
 
         # Association du job D-ID au travail local
+        # job_externe_id is stored in résultat_json and updated via a direct SQL call
         mettre_a_jour_travail(
             travail_id,
             statut="en_cours",
-            job_externe_id=job_did,
             resultat_json=json.dumps({"job_did": job_did}),
         )
+        # Also update the job_externe_id column separately
+        mettre_a_jour_job_externe_id(travail_id, job_did)
 
         return AnimationReponse(
             message="Animation créée avec succès. Vous pouvez suivre sa progression.",
@@ -399,13 +479,13 @@ async def animer(
 @router.get("/animate/{job_id}", response_model=StatutAnimationReponse)
 async def statut_animation(job_id: str):
     """
-    Vérifie le statut d'une animation D-ID.
+    Vérifie le statut d'une animation.
 
-    Interroge l'API D-ID pour connaître l'avancement d'une animation.
+    Interroge le service d'animation pour connaître l'avancement d'une animation.
     Lorsque le statut est « done », l'URL de la vidéo est retournée.
 
     Args:
-        job_id: L'identifiant du travail D-ID (retourné par POST /api/animate).
+        job_id: L'identifiant du travail d'animation (retourné par POST /api/animate).
 
     Returns:
         Le statut actuel et l'URL de la vidéo si terminée.
@@ -497,6 +577,42 @@ async def creer_checkout(requete: CheckoutRequete):
         )
 
 
+@router.post("/stripe/create-credit-checkout", response_model=CheckoutReponse)
+async def creer_checkout_credits(requete: CheckoutRequete):
+    """
+    Crée une session de paiement Stripe Checkout pour acheter des crédits.
+
+    Le client choisit un pack de crédits parmi « 30 », « 50 » ou « 110 ».
+    Une session Stripe en mode paiement unique est créée.
+
+    Args:
+        requete: Contient le plan (30, 50, 110) et l'email de l'utilisateur.
+
+    Returns:
+        L'URL de la session Checkout Stripe.
+    """
+    try:
+        resultat = await creer_session_paiement_credits(
+            plan=requete.plan,
+            email=requete.email_utilisateur,
+            url_succes=URL_SUCCES_STRIPE,
+            url_annulation=URL_ANNULATION_STRIPE,
+        )
+        return CheckoutReponse(
+            checkout_url=resultat["checkout_url"],
+            session_id=resultat["session_id"],
+        )
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.exception(f"Erreur création checkout crédits : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la création de la session de paiement crédits.",
+        )
+
+
 @router.post("/stripe/webhook", response_model=WebhookReponse)
 async def webhook_stripe(request: Request):
     """
@@ -540,19 +656,120 @@ async def webhook_stripe(request: Request):
     # --- Traitement selon le type d'événement ---
 
     if type_evenement == "checkout.session.completed":
-        # Paiement réussi : enregistrer l'abonnement
+        # Paiement réussi : vérifier si c'est un achat de crédits ou un abonnement
+        metadata = donnees.get("metadata", {})
+
+        if metadata.get("type") == "credits":
+            # --- Achat de crédits (paiement unique) ---
+            try:
+                email = metadata.get("email")
+                nb_credits = int(metadata.get("credits", 0))
+                session_id = donnees.get("id")
+                montant = (donnees.get("amount_total") or 0) / 100.0
+
+                utilisateur = obtenir_utilisateur_par_email(email) if email else None
+                if utilisateur:
+                    crediter_utilisateur(utilisateur["id"], nb_credits)
+                    enregistrer_achat_credits(
+                        utilisateur["id"], session_id, nb_credits, montant
+                    )
+                    logger.info(
+                        f"Crédits ajoutés : email={email}, credits={nb_credits}, "
+                        f"montant={montant}€, session={session_id}"
+                    )
+                else:
+                    logger.warning(
+                        f"Utilisateur introuvable pour créditation webhook : "
+                        f"email={email}, credits={nb_credits}"
+                    )
+            except Exception as e:
+                logger.exception(f"Erreur créditation webhook : {e}")
+        else:
+            # --- Abonnement (subscription) ---
+            try:
+                plan = metadata.get("plan", "inconnu")
+                email = metadata.get("email_utilisateur", "")
+                stripe_customer_id = donnees.get("customer")
+                stripe_subscription_id = donnees.get("subscription")
+                maintenant = datetime.now(timezone.utc).isoformat()
+
+                # Créer l'abonnement en base avec le plan et l'email
+                creer_abonnement(
+                    stripe_customer_id=stripe_customer_id,
+                    stripe_subscription_id=stripe_subscription_id,
+                    statut="actif",
+                    plan=plan,
+                    email_utilisateur=email,
+                    derniere_attribution=maintenant,
+                )
+
+                # Créditer l'utilisateur avec l'allocation mensuelle
+                nb_credits = CREDITS_PAR_PLAN.get(plan, 0)
+                if nb_credits > 0 and email:
+                    utilisateur = obtenir_utilisateur_par_email(email)
+                    if utilisateur:
+                        crediter_utilisateur(utilisateur["id"], nb_credits)
+                        logger.info(
+                            f"Crédits d'abonnement ajoutés : email={email}, "
+                            f"plan={plan}, credits={nb_credits}, "
+                            f"subscription={stripe_subscription_id}"
+                        )
+                    else:
+                        logger.warning(
+                            f"Utilisateur introuvable pour crédits abonnement : email={email}"
+                        )
+                else:
+                    logger.warning(f"Plan inconnu ou sans email : plan={plan}, email={email}")
+
+                logger.info(
+                    f"Abonnement créé : client={stripe_customer_id}, "
+                    f"subscription={stripe_subscription_id}, plan={plan}"
+                )
+            except Exception as e:
+                logger.exception(f"Erreur création abonnement en base : {e}")
+
+    elif type_evenement == "invoice.paid":
+        # --- Paiement de facture (renouvellement mensuel/annuel) ---
         try:
-            creer_abonnement(
-                stripe_customer_id=donnees.get("customer"),
-                stripe_subscription_id=donnees.get("subscription"),
-                statut="actif",
-            )
-            logger.info(
-                f"Abonnement créé : client={donnees.get('customer')}, "
-                f"subscription={donnees.get('subscription')}"
-            )
+            stripe_subscription_id = donnees.get("subscription")
+            if not stripe_subscription_id:
+                logger.warning("invoice.paid sans subscription_id, ignoré")
+            else:
+                # Récupérer l'abonnement local
+                abo = obtenir_abonnement(stripe_subscription_id=stripe_subscription_id)
+                if not abo:
+                    logger.warning(
+                        f"Abonnement introuvable pour invoice.paid : {stripe_subscription_id}"
+                    )
+                else:
+                    plan = abo.get("plan", "")
+                    email = abo.get("email_utilisateur", "")
+                    derniere_attr = abo.get("derniere_attribution_credits")
+                    maintenant = datetime.now(timezone.utc).isoformat()
+
+                    nb_credits = CREDITS_PAR_PLAN.get(plan, 0)
+                    if nb_credits > 0 and email:
+                        utilisateur = obtenir_utilisateur_par_email(email)
+                        if utilisateur:
+                            crediter_utilisateur(utilisateur["id"], nb_credits)
+                            mettre_a_jour_attribution_credits(stripe_subscription_id, maintenant)
+                            logger.info(
+                                f"Crédits renouvelés (invoice.paid) : email={email}, "
+                                f"plan={plan}, credits={nb_credits}, "
+                                f"subscription={stripe_subscription_id}, "
+                                f"dernière_attr={derniere_attr}"
+                            )
+                        else:
+                            logger.warning(
+                                f"Utilisateur introuvable pour renouvellement : email={email}"
+                            )
+                    else:
+                        logger.info(
+                            f"invoice.paid traité sans crédits : plan={plan}, "
+                            f"subscription={stripe_subscription_id}"
+                        )
         except Exception as e:
-            logger.exception(f"Erreur création abonnement en base : {e}")
+            logger.exception(f"Erreur traitement invoice.paid : {e}")
 
     elif type_evenement == "customer.subscription.deleted":
         # Abonnement résilié

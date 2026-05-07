@@ -33,13 +33,15 @@ def initialiser_base():
                 type            TEXT NOT NULL CHECK(type IN ('analyse', 'restauration', 'animation')),
                 statut          TEXT NOT NULL DEFAULT 'cree'
                                 CHECK(statut IN ('cree', 'en_cours', 'termine', 'erreur')),
+                utilisateur_id  TEXT,
                 chemin_photo    TEXT,
                 chemin_resultat TEXT,
                 resultat_json   TEXT,
                 job_externe_id  TEXT,
                 message_erreur  TEXT,
                 cree_le         TEXT NOT NULL,
-                modifie_le      TEXT NOT NULL
+                modifie_le      TEXT NOT NULL,
+                FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
             );
 
             CREATE INDEX IF NOT EXISTS idx_travaux_statut ON travaux(statut);
@@ -53,6 +55,7 @@ def initialiser_base():
                                         CHECK(statut IN ('cree', 'actif', 'impaye', 'resilie', 'expire')),
                 plan                    TEXT,
                 email_utilisateur       TEXT,
+                derniere_attribution_credits TEXT,
                 cree_le                 TEXT NOT NULL,
                 modifie_le              TEXT NOT NULL
             );
@@ -63,10 +66,85 @@ def initialiser_base():
                 ON abonnements(stripe_subscription_id);
             CREATE INDEX IF NOT EXISTS idx_abonnements_statut
                 ON abonnements(statut);
+
+            CREATE TABLE IF NOT EXISTS utilisateurs (
+                id                  TEXT PRIMARY KEY,
+                email               TEXT UNIQUE NOT NULL,
+                password_hash       TEXT NOT NULL,
+                essais_restants     INTEGER NOT NULL DEFAULT 3,
+                credits             INTEGER NOT NULL DEFAULT 0,
+                est_abonne          INTEGER NOT NULL DEFAULT 0,
+                cree_le             TEXT NOT NULL,
+                derniere_connexion  TEXT NOT NULL
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_utilisateurs_email ON utilisateurs(email);
+
+            CREATE TABLE IF NOT EXISTS essais_gratuits (
+                id              TEXT PRIMARY KEY,
+                utilisateur_id  TEXT NOT NULL,
+                type_travail    TEXT NOT NULL CHECK(type_travail IN ('analyse', 'restauration', 'animation')),
+                travail_id      TEXT,
+                cree_le         TEXT NOT NULL,
+                FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_essais_utilisateur ON essais_gratuits(utilisateur_id);
+
+            CREATE TABLE IF NOT EXISTS achats_credits (
+                id                  TEXT PRIMARY KEY,
+                utilisateur_id      TEXT NOT NULL,
+                stripe_session_id   TEXT,
+                nombre_credits      INTEGER NOT NULL,
+                montant_euros       REAL NOT NULL,
+                cree_le             TEXT NOT NULL,
+                FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_achats_utilisateur ON achats_credits(utilisateur_id);
+
+            CREATE TABLE IF NOT EXISTS consommation_credits (
+                id              TEXT PRIMARY KEY,
+                utilisateur_id  TEXT NOT NULL,
+                travail_id      TEXT NOT NULL,
+                type_operation  TEXT NOT NULL CHECK(type_operation IN ('restauration', 'animation')),
+                credits_utilises INTEGER NOT NULL DEFAULT 1,
+                cree_le         TEXT NOT NULL,
+                FOREIGN KEY (utilisateur_id) REFERENCES utilisateurs(id),
+                FOREIGN KEY (travail_id) REFERENCES travaux(id)
+            );
+
+            CREATE INDEX IF NOT EXISTS idx_consommation_utilisateur ON consommation_credits(utilisateur_id);
         """)
         conn.commit()
+        # --- Migrations pour bases existantes ---
+        _migrer_base(conn)
     finally:
         conn.close()
+
+
+def _migrer_base(conn: sqlite3.Connection) -> None:
+    """Applique les migrations nécessaires aux bases existantes."""
+    # Vérifier si la colonne derniere_attribution_credits existe
+    cur = conn.execute("PRAGMA table_info(abonnements)")
+    colonnes = [row[1] for row in cur.fetchall()]
+    if "derniere_attribution_credits" not in colonnes:
+        conn.execute(
+            "ALTER TABLE abonnements ADD COLUMN derniere_attribution_credits TEXT"
+        )
+        conn.commit()
+
+    # Vérifier si la colonne utilisateur_id existe dans travaux
+    cur = conn.execute("PRAGMA table_info(travaux)")
+    colonnes_travaux = [row[1] for row in cur.fetchall()]
+    if "utilisateur_id" not in colonnes_travaux:
+        conn.execute(
+            "ALTER TABLE travaux ADD COLUMN utilisateur_id TEXT REFERENCES utilisateurs(id)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_travaux_utilisateur ON travaux(utilisateur_id)"
+        )
+        conn.commit()
 
 
 # ---------------------------------------------------------------------------
@@ -77,6 +155,7 @@ def creer_travail(
     type_travail: str,
     chemin_photo: Optional[str] = None,
     job_externe_id: Optional[str] = None,
+    utilisateur_id: Optional[str] = None,
 ) -> str:
     """Crée une nouvelle entrée de travail et retourne son ID."""
     travail_id = str(uuid.uuid4())
@@ -84,9 +163,9 @@ def creer_travail(
     conn = _obtenir_connexion()
     try:
         conn.execute(
-            """INSERT INTO travaux (id, type, statut, chemin_photo, job_externe_id, cree_le, modifie_le)
-               VALUES (?, ?, 'cree', ?, ?, ?, ?)""",
-            (travail_id, type_travail, chemin_photo, job_externe_id, maintenant, maintenant),
+            """INSERT INTO travaux (id, type, statut, chemin_photo, job_externe_id, utilisateur_id, cree_le, modifie_le)
+               VALUES (?, ?, 'cree', ?, ?, ?, ?, ?)""",
+            (travail_id, type_travail, chemin_photo, job_externe_id, utilisateur_id, maintenant, maintenant),
         )
         conn.commit()
         return travail_id
@@ -156,6 +235,24 @@ def obtenir_travail_par_job_externe(job_externe_id: str) -> Optional[dict]:
         conn.close()
 
 
+def lister_travaux_par_utilisateur(utilisateur_id: str, limite: int = 50) -> list[dict]:
+    """Liste les travaux d'un utilisateur, du plus récent au plus ancien."""
+    conn = _obtenir_connexion()
+    try:
+        rows = conn.execute(
+            """SELECT id, type, statut, chemin_photo, chemin_resultat,
+                      resultat_json, message_erreur, cree_le, modifie_le
+               FROM travaux
+               WHERE utilisateur_id = ?
+               ORDER BY cree_le DESC
+               LIMIT ?""",
+            (utilisateur_id, limite),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
 # ---------------------------------------------------------------------------
 # Abonnements (Stripe)
 # ---------------------------------------------------------------------------
@@ -166,6 +263,7 @@ def creer_abonnement(
     statut: str = "actif",
     plan: Optional[str] = None,
     email_utilisateur: Optional[str] = None,
+    derniere_attribution: Optional[str] = None,
 ) -> str:
     """
     Crée un nouvel abonnement dans la base locale.
@@ -176,6 +274,7 @@ def creer_abonnement(
         statut: Statut initial (par défaut « actif »).
         plan: Nom du plan souscrit.
         email_utilisateur: Email de l'utilisateur.
+        derniere_attribution: Date ISO de dernière attribution de crédits.
 
     Returns:
         L'identifiant unique de l'abonnement créé.
@@ -187,8 +286,8 @@ def creer_abonnement(
         conn.execute(
             """INSERT INTO abonnements
                (id, stripe_customer_id, stripe_subscription_id, statut, plan,
-                email_utilisateur, cree_le, modifie_le)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                email_utilisateur, derniere_attribution_credits, cree_le, modifie_le)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 abonnement_id,
                 stripe_customer_id,
@@ -196,6 +295,7 @@ def creer_abonnement(
                 statut,
                 plan,
                 email_utilisateur,
+                derniere_attribution,
                 maintenant,
                 maintenant,
             ),
@@ -243,6 +343,155 @@ def obtenir_abonnement(
         else:
             return None
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def mettre_a_jour_job_externe_id(travail_id: str, job_externe_id: str) -> bool:
+    """Met à jour le job_externe_id d'un travail existant."""
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        cur = conn.execute(
+            "UPDATE travaux SET job_externe_id = ?, modifie_le = ? WHERE id = ?",
+            (job_externe_id, maintenant, travail_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Utilisateurs (auth)
+# ---------------------------------------------------------------------------
+
+def creer_utilisateur(email: str, password_hash: str) -> Optional[str]:
+    """Crée un nouvel utilisateur. Retourne l'ID ou None si l'email existe déjà."""
+    utilisateur_id = str(uuid.uuid4())
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        # Vérifier si l'email existe déjà
+        existing = conn.execute(
+            "SELECT id FROM utilisateurs WHERE email = ?", (email,)
+        ).fetchone()
+        if existing:
+            return None
+        conn.execute(
+            """INSERT INTO utilisateurs (id, email, password_hash, essais_restants, est_abonne, cree_le, derniere_connexion)
+               VALUES (?, ?, ?, 3, 0, ?, ?)""",
+            (utilisateur_id, email, password_hash, maintenant, maintenant),
+        )
+        conn.commit()
+        return utilisateur_id
+    finally:
+        conn.close()
+
+
+def obtenir_utilisateur_par_email(email: str) -> Optional[dict]:
+    """Récupère un utilisateur par son email."""
+    conn = _obtenir_connexion()
+    try:
+        row = conn.execute(
+            "SELECT * FROM utilisateurs WHERE email = ?", (email,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def obtenir_utilisateur_par_id(utilisateur_id: str) -> Optional[dict]:
+    """Récupère un utilisateur par son ID."""
+    conn = _obtenir_connexion()
+    try:
+        row = conn.execute(
+            "SELECT * FROM utilisateurs WHERE id = ?", (utilisateur_id,)
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def mettre_a_jour_derniere_connexion(utilisateur_id: str) -> bool:
+    """Met à jour la date de dernière connexion."""
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        cur = conn.execute(
+            "UPDATE utilisateurs SET derniere_connexion = ? WHERE id = ?",
+            (maintenant, utilisateur_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+def decrementer_essais(utilisateur_id: str) -> int:
+    """Décrémente le compteur d'essais. Retourne le nombre restant."""
+    conn = _obtenir_connexion()
+    try:
+        cur = conn.execute(
+            "UPDATE utilisateurs SET essais_restants = essais_restants - 1 WHERE id = ? AND essais_restants > 0",
+            (utilisateur_id,),
+        )
+        conn.commit()
+        if cur.rowcount == 0:
+            # Récupérer la valeur actuelle
+            row = conn.execute(
+                "SELECT essais_restants FROM utilisateurs WHERE id = ?", (utilisateur_id,)
+            ).fetchone()
+            return row["essais_restants"] if row else 0
+        row = conn.execute(
+            "SELECT essais_restants FROM utilisateurs WHERE id = ?", (utilisateur_id,)
+        ).fetchone()
+        return row["essais_restants"] if row else 0
+    finally:
+        conn.close()
+
+
+def obtenir_essais_restants(utilisateur_id: str) -> Optional[dict]:
+    """Récupère les essais restants et le statut d'abonnement."""
+    conn = _obtenir_connexion()
+    try:
+        row = conn.execute(
+            "SELECT essais_restants, est_abonne FROM utilisateurs WHERE id = ?",
+            (utilisateur_id,),
+        ).fetchone()
+        if row:
+            return {"essais_restants": row["essais_restants"], "est_abonne": bool(row["est_abonne"])}
+        return None
+    finally:
+        conn.close()
+
+
+def lister_essais_gratuits(utilisateur_id: str, limite: int = 20) -> list[dict]:
+    """Liste les essais gratuits d'un utilisateur."""
+    conn = _obtenir_connexion()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM essais_gratuits WHERE utilisateur_id = ? ORDER BY cree_le DESC LIMIT ?",
+            (utilisateur_id, limite),
+        ).fetchall()
+        return [dict(row) for row in rows]
+    finally:
+        conn.close()
+
+
+def enregistrer_essai(utilisateur_id: str, type_travail: str, travail_id: str) -> str:
+    """Enregistre un essai gratuit."""
+    essai_id = str(uuid.uuid4())
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        conn.execute(
+            """INSERT INTO essais_gratuits (id, utilisateur_id, type_travail, travail_id, cree_le)
+               VALUES (?, ?, ?, ?, ?)""",
+            (essai_id, utilisateur_id, type_travail, travail_id, maintenant),
+        )
+        conn.commit()
+        return essai_id
     finally:
         conn.close()
 
@@ -309,3 +558,123 @@ def mettre_a_jour_abonnement(
         return cur.rowcount > 0
     finally:
         conn.close()
+
+
+# ---------------------------------------------------------------------------
+# Crédits
+# ---------------------------------------------------------------------------
+
+def crediter_utilisateur(utilisateur_id: str, nombre: int) -> int:
+    """Ajoute des crédits à un utilisateur. Retourne le nouveau solde."""
+    conn = _obtenir_connexion()
+    try:
+        conn.execute(
+            "UPDATE utilisateurs SET credits = credits + ? WHERE id = ?",
+            (nombre, utilisateur_id),
+        )
+        conn.commit()
+        row = conn.execute(
+            "SELECT credits FROM utilisateurs WHERE id = ?", (utilisateur_id,)
+        ).fetchone()
+        return row["credits"] if row else 0
+    finally:
+        conn.close()
+
+
+def consommer_credit(utilisateur_id: str, type_operation: str, travail_id: str) -> dict:
+    """
+    Consomme un crédit pour une opération.
+    Priorité : essais gratuits puis crédits payants.
+    """
+    conn = _obtenir_connexion()
+    try:
+        user = conn.execute(
+            "SELECT credits, essais_restants FROM utilisateurs WHERE id = ?",
+            (utilisateur_id,),
+        ).fetchone()
+        if not user:
+            return {"succes": False, "raison": "Utilisateur introuvable"}
+
+        credits = user["credits"]
+        essais = user["essais_restants"]
+
+        if essais > 0:
+            conn.execute(
+                "UPDATE utilisateurs SET essais_restants = essais_restants - 1 WHERE id = ?",
+                (utilisateur_id,),
+            )
+            conn.commit()
+            return {"succes": True, "type": "essai", "credits_restants": credits, "essais_restants": essais - 1}
+
+        if credits > 0:
+            conn.execute(
+                "UPDATE utilisateurs SET credits = credits - 1 WHERE id = ?",
+                (utilisateur_id,),
+            )
+            conso_id = str(uuid.uuid4())
+            maintenant = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                """INSERT INTO consommation_credits (id, utilisateur_id, travail_id, type_operation, credits_utilises, cree_le)
+                   VALUES (?, ?, ?, ?, 1, ?)""",
+                (conso_id, utilisateur_id, travail_id, type_operation, maintenant),
+            )
+            conn.commit()
+            return {"succes": True, "type": "credit", "credits_restants": credits - 1, "essais_restants": 0}
+
+        return {"succes": False, "raison": "Plus de crédits ni d'essais gratuits"}
+    finally:
+        conn.close()
+
+
+def enregistrer_achat_credits(utilisateur_id: str, stripe_session_id: str, nombre_credits: int, montant_euros: float) -> str:
+    """Enregistre un achat de crédits. Retourne l'ID de l'achat."""
+    achat_id = str(uuid.uuid4())
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        conn.execute(
+            """INSERT INTO achats_credits (id, utilisateur_id, stripe_session_id, nombre_credits, montant_euros, cree_le)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (achat_id, utilisateur_id, stripe_session_id, nombre_credits, montant_euros, maintenant),
+        )
+        conn.commit()
+        return achat_id
+    finally:
+        conn.close()
+
+
+def obtenir_credits_restants(utilisateur_id: str) -> dict:
+    """Retourne les crédits et essais d'un utilisateur."""
+    conn = _obtenir_connexion()
+    try:
+        row = conn.execute(
+            "SELECT credits, essais_restants FROM utilisateurs WHERE id = ?",
+            (utilisateur_id,),
+        ).fetchone()
+        if row:
+            return {"credits": row["credits"], "essais_restants": row["essais_restants"]}
+        return {"credits": 0, "essais_restants": 0}
+    finally:
+        conn.close()
+
+
+def mettre_a_jour_attribution_credits(stripe_subscription_id: str, date_iso: str) -> bool:
+    """Met à jour la date de dernière attribution de crédits pour un abonnement."""
+    conn = _obtenir_connexion()
+    try:
+        cur = conn.execute(
+            "UPDATE abonnements SET derniere_attribution_credits = ?, modifie_le = ? WHERE stripe_subscription_id = ?",
+            (date_iso, datetime.now(timezone.utc).isoformat(), stripe_subscription_id),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
+
+
+# Mapping plan → crédits mensuels
+CREDITS_PAR_PLAN: dict[str, int] = {
+    "decouverte": 10,
+    "premium": 100,
+    "annuel": 100,
+}

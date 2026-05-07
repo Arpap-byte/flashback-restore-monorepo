@@ -148,13 +148,14 @@ export default function AnimatePage() {
   };
 
   const progress =
-    status?.status === "termine"
+    status?.progress ??
+    (status?.status === "termine"
       ? 100
       : status?.status === "en_cours"
         ? 66
         : status?.status === "en_attente"
           ? 33
-          : 0;
+          : 0);
 
   const handleDownloadVideo = async (url: string) => {
     try {
@@ -314,7 +315,7 @@ export default function AnimatePage() {
                       <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-4">
                         <p className="text-sm text-muted flex items-start gap-2">
                           <Sparkles className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
-                          L&apos;animation utilise D-ID pour créer un portrait
+                          L&apos;animation utilise notre technologie d&apos;animation pour créer un portrait
                           vivant avec des expressions faciales naturelles.
                           Résultat en vidéo MP4.
                         </p>

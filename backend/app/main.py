@@ -12,10 +12,21 @@ from pathlib import Path
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from app.api.auth import router as auth_router
 from app.api.routes import router
+from app.api.user import router as user_router
 from app.config import DEBUG, UPLOAD_DIR
 from app.db.database import initialiser_base
+from app.limiter import limiter
+
+# ---------------------------------------------------------------------------
+# Rate limiting
+# ---------------------------------------------------------------------------
+
+# limiter imported from app.limiter
 
 # ---------------------------------------------------------------------------
 # Configuration du logging
@@ -45,13 +56,17 @@ app = FastAPI(
     title="Flashback Restore API",
     description=(
         "API de restauration de photos anciennes par IA. "
-        "Analyse les défauts, restaure les images avec Gemini + Pillow, "
-        "et crée des animations de portraits parlants avec D-ID."
+        "Analyse les défauts, restaure les images par IA, "
+        "et crée des animations de portraits parlants."
     ),
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Rate limiting state and handler
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # ---------------------------------------------------------------------------
 # Middleware CORS
@@ -59,7 +74,12 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # À restreindre en production
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:8001",
+        "https://flashback-restore.com",
+        "https://www.flashback-restore.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -70,6 +90,8 @@ app.add_middleware(
 # ---------------------------------------------------------------------------
 
 app.include_router(router)
+app.include_router(auth_router)
+app.include_router(user_router)
 
 # ---------------------------------------------------------------------------
 # Fichiers statiques (uploads)

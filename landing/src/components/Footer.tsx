@@ -1,27 +1,28 @@
 "use client";
 
 import { Sparkles, Heart } from "lucide-react";
+import Link from "next/link";
 import { FaTwitter, FaInstagram, FaTiktok } from "react-icons/fa";
 
 const footerLinks = {
   Produit: [
-    { label: "Fonctionnalités", href: "#features" },
-    { label: "Comment ça marche", href: "#how-it-works" },
-    { label: "Tarifs", href: "#pricing" },
-    { label: "FAQ", href: "#faq" },
-    { label: "Télécharger", href: "#cta" },
+    { label: "Fonctionnalités", href: "/#features" },
+    { label: "Comment ça marche", href: "/#how-it-works" },
+    { label: "Tarifs", href: "/#pricing" },
+    { label: "FAQ", href: "/#faq" },
+    { label: "Restaurer une photo", href: "/upload" },
   ],
   Entreprise: [
-    { label: "À propos", href: "#" },
-    { label: "Blog", href: "#" },
-    { label: "Carrières", href: "#" },
-    { label: "Presse", href: "#" },
+    { label: "À propos", href: "/about" },
+    { label: "Restaurer", href: "/upload" },
+    { label: "Animer", href: "/animate" },
+    { label: "Nous contacter", href: "mailto:support@flashback-restore.com" },
   ],
   Légal: [
-    { label: "Confidentialité", href: "#" },
-    { label: "Conditions d'utilisation", href: "#" },
-    { label: "Cookies", href: "#" },
-    { label: "Mentions légales", href: "#" },
+    { label: "Confidentialité", href: "/privacy" },
+    { label: "Conditions d'utilisation", href: "/terms" },
+    { label: "Cookies", href: "/cookies" },
+    { label: "Mentions légales", href: "/terms" },
   ],
 };
 
@@ -32,7 +33,7 @@ export default function Footer() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-10">
           {/* Brand */}
           <div className="lg:col-span-2">
-            <a href="#" className="flex items-center gap-2.5 group mb-4">
+            <Link href="/" className="flex items-center gap-2.5 group mb-4">
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent to-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-lg shadow-accent/25">
                 <Sparkles className="w-5 h-5 text-white" />
               </div>
@@ -40,11 +41,11 @@ export default function Footer() {
                 Flashback{" "}
                 <span className="text-accent">Restore</span>
               </span>
-            </a>
+            </Link>
             <p className="text-muted text-sm leading-relaxed max-w-xs mb-6">
               Redonnez vie à vos souvenirs grâce à l&apos;intelligence
               artificielle. Restaurez et animez vos photos anciennes en quelques
-              secondes avec Gemini AI et D-ID.
+              secondes.
             </p>
             {/* Social */}
             <div className="flex items-center gap-2.5">
@@ -53,14 +54,14 @@ export default function Footer() {
                 { icon: FaInstagram, label: "Instagram" },
                 { icon: FaTiktok, label: "TikTok" },
               ].map(({ icon: Icon, label }) => (
-                <a
+                <Link
                   key={label}
                   href="#"
                   className="w-9 h-9 rounded-lg bg-surface border border-card-border flex items-center justify-center text-muted hover:text-accent hover:border-accent/30 hover:bg-accent/5 transition-all"
                   aria-label={label}
                 >
                   <Icon className="w-4 h-4" />
-                </a>
+                </Link>
               ))}
             </div>
           </div>
@@ -74,12 +75,12 @@ export default function Footer() {
               <ul className="space-y-3">
                 {links.map((link) => (
                   <li key={link.label}>
-                    <a
+                    <Link
                       href={link.href}
                       className="text-muted hover:text-accent text-sm transition-colors"
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   </li>
                 ))}
               </ul>

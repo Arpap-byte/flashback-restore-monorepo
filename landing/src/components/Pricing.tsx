@@ -2,7 +2,8 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Check, Sparkles, Zap, Crown, Gift, Building2, Mail } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Gift, Briefcase } from "lucide-react";
+import Link from "next/link";
 import StripeCheckoutButton from "@/components/StripeCheckoutButton";
 
 const plans = [
@@ -12,8 +13,9 @@ const plans = [
     price: "0€",
     period: "à vie",
     description: "Pour découvrir la magie de Flashback Restore.",
+    credits: "3 essais",
     features: [
-      "3 restaurations offertes",
+      "3 essais gratuits",
       "0 animation",
       "Qualité standard",
       "Galerie de base",
@@ -30,17 +32,17 @@ const plans = [
     name: "Découverte",
     icon: Sparkles,
     price: "4,99€",
-    period: "par mois",
-    description: "Pour les amateurs de souvenirs. Le meilleur rapport qualité-prix.",
+    period: "/mois",
+    description: "Idéal pour débuter avec la restauration HD.",
+    credits: "10 crédits/mois",
     features: [
-      "10 restaurations / mois",
-      "3 animations / mois",
-      "Qualité HD",
-      "Galerie cloud",
+      "10 restaurations HD/mois",
+      "2 animations/mois",
       "Sans filigrane",
-      "Support par email",
+      "Galerie cloud",
+      "Support email",
     ],
-    cta: "Essayer Découverte",
+    cta: "S'abonner",
     highlighted: true,
     gradient: "from-amber-500/20 via-amber-400/10 to-violet-600/10",
     border: "border-accent/50",
@@ -51,74 +53,72 @@ const plans = [
   },
   {
     name: "Premium",
-    icon: Crown,
+    icon: Zap,
     price: "29€",
-    period: "par mois",
-    description: "Pour les passionnés qui veulent le meilleur.",
+    period: "/mois",
+    description: "Pour les passionnés de souvenirs.",
+    credits: "100 crédits/mois",
     features: [
-      "100 restaurations / mois",
-      "30 animations / mois",
-      "Qualité HD premium",
-      "Galerie chiffrée cloud",
+      "100 restaurations HD/mois",
+      "25 animations/mois",
       "Sans filigrane",
-      "Support prioritaire 24/7",
-      "Colorisation automatique",
+      "Galerie cloud",
+      "Support prioritaire",
     ],
-    cta: "Devenir Premium",
+    cta: "S'abonner",
+    highlighted: false,
+    gradient: "from-amber-500/10 via-amber-400/5 to-violet-600/5",
+    border: "border-card-border",
+    buttonStyle:
+      "border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all",
+    plan: "premium",
+  },
+  {
+    name: "Annuel",
+    icon: Crown,
+    price: "249€",
+    period: "/an",
+    description: "100 crédits/mois — 2 mois offerts !",
+    credits: "100 crédits/mois",
+    features: [
+      "100 restaurations HD/mois",
+      "25 animations/mois",
+      "Sans filigrane",
+      "Galerie cloud",
+      "Support prioritaire",
+      "Économisez 99€/an",
+    ],
+    cta: "S'abonner",
     highlighted: false,
     gradient: "from-violet-600/20 to-violet-500/5",
     border: "border-violet-500/20",
     buttonStyle:
       "border-2 border-violet-500/30 text-foreground hover:bg-violet-500/10 hover:border-violet-400 transition-all font-semibold",
-    plan: "premium",
-  },
-  {
-    name: "Annuel",
-    icon: Zap,
-    price: "249€",
-    period: "par an",
-    description: "Tout le plan Premium avec 2 mois offerts.",
-    features: [
-      "100 restaurations / mois",
-      "30 animations / mois",
-      "Tous les avantages Premium",
-      "2 mois offerts (99€ d'économies)",
-      "Export vidéo HD",
-      "Accès anticipé nouveautés",
-      "Badge VIP communauté",
-    ],
-    cta: "S'abonner",
-    highlighted: false,
-    gradient: "from-emerald-600/20 to-emerald-500/5",
-    border: "border-emerald-500/20",
-    buttonStyle:
-      "border-2 border-emerald-500/30 text-foreground hover:bg-emerald-500/10 hover:border-emerald-400 transition-all font-semibold",
-    savings: "Économisez 99€",
     plan: "annuel",
+    savings: "2 mois offerts",
   },
   {
     name: "Pro",
-    icon: Building2,
+    icon: Briefcase,
     price: "Sur mesure",
     period: "",
-    description: "Pour les professionnels : photographes, archives, musées.",
+    description: "Pour les studios, archives et gros volumes.",
+    credits: "Crédits illimités",
     features: [
-      "Restaurations illimitées",
+      "Crédits illimités",
       "Animations illimitées",
-      "Qualité maximale",
       "API dédiée",
-      "Stockage prioritaire",
-      "Support dédié 24/7",
-      "Contrat SLA",
-      "Formation équipe",
+      "Support 24/7",
+      "Traitement par lot",
+      "SLA garanti",
     ],
-    cta: "Nous contacter",
+    cta: "Contactez-nous",
     highlighted: false,
-    gradient: "from-gray-500/10 to-gray-400/5",
-    border: "border-gray-500/20",
+    gradient: "from-blue-500/10 to-blue-400/5",
+    border: "border-blue-500/20",
     buttonStyle:
-      "border-2 border-gray-500/30 text-foreground hover:bg-gray-500/10 hover:border-gray-400 transition-all font-semibold inline-flex items-center gap-2 justify-center",
-    href: "mailto:contact@flashbackrestore.app",
+      "border-2 border-blue-500/30 text-foreground hover:bg-blue-500/10 hover:border-blue-400 transition-all font-semibold",
+    href: "mailto:contact@flashback-restore.fr",
   },
 ];
 
@@ -136,27 +136,26 @@ function PricingCard({
     // Free plan → link to /upload
     if (plan.name === "Gratuit") {
       return (
-        <a
-          href={plan.href}
+        <Link
+          href={plan.href || "/upload"}
           className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] inline-flex items-center justify-center gap-2 ${plan.buttonStyle}`}
         >
           {plan.cta}
-        </a>
+        </Link>
       );
     }
     // Pro plan → mailto link
     if (plan.name === "Pro") {
       return (
         <a
-          href={plan.href}
+          href={plan.href || "mailto:contact@flashback-restore.fr"}
           className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] inline-flex items-center justify-center gap-2 ${plan.buttonStyle}`}
         >
-          <Mail className="w-4 h-4" />
           {plan.cta}
         </a>
       );
     }
-    // Paid plans → Stripe checkout
+    // Subscription plans → Stripe checkout
     if (plan.plan) {
       return (
         <StripeCheckoutButton
@@ -200,6 +199,13 @@ function PricingCard({
           </div>
         )}
 
+        {/* Savings tag */}
+        {plan.savings && (
+          <div className="absolute top-4 right-4 px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-semibold rounded-full z-20">
+            {plan.savings}
+          </div>
+        )}
+
         <div className="relative z-10 flex flex-col flex-1">
           {/* Header */}
           <div className="flex items-center gap-3 mb-4">
@@ -220,22 +226,25 @@ function PricingCard({
           </div>
 
           {/* Price */}
-          <div className="mb-2">
+          <div className="mb-1">
             <span className="text-4xl font-bold text-foreground">
               {plan.price}
             </span>
             {plan.period && (
-              <span className="text-muted ml-2 text-sm">{plan.period}</span>
+              <span className="text-muted ml-1 text-sm">{plan.period}</span>
             )}
           </div>
 
-          {/* Savings badge */}
-          {plan.savings && (
-            <span className="text-xs font-semibold text-emerald-500 bg-emerald-500/10 px-2.5 py-1 rounded-full w-fit mb-4 inline-flex items-center gap-1">
-              <Zap className="w-3 h-3" />
-              {plan.savings}
+          {/* Credits highlight */}
+          <div className="mb-2">
+            <span className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${
+              plan.highlighted
+                ? "bg-accent/15 text-accent"
+                : "bg-surface text-muted"
+            }`}>
+              {plan.credits}
             </span>
-          )}
+          </div>
 
           <p className="text-muted text-sm mb-6">{plan.description}</p>
 
@@ -284,16 +293,16 @@ export default function Pricing() {
           <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mt-4 mb-6 font-[family-name:var(--font-playfair)]">
             Choisissez votre
             <br />
-            <span className="text-gradient">formule idéale</span>
+            <span className="text-gradient">abonnement</span>
           </h2>
           <p className="text-muted max-w-2xl mx-auto text-lg">
-            Du gratuit au sur-mesure, il y a une formule pour chaque besoin.
-            Sans engagement, annulez à tout moment.
+            Des abonnements flexibles avec crédits mensuels. 
+            Résiliez à tout moment, sans engagement.
           </p>
         </motion.div>
 
-        {/* Cards — 5 columns on xl, 3 on md, 1 on mobile */}
-        <div className="grid md:grid-cols-3 xl:grid-cols-5 gap-6 max-w-[90rem] mx-auto items-start">
+        {/* Cards — 5 columns on xl, 3 on lg, 2 on md, 1 on mobile */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-[90rem] mx-auto items-start">
           {plans.map((plan, index) => (
             <PricingCard key={plan.name} plan={plan} index={index} />
           ))}
@@ -306,7 +315,7 @@ export default function Pricing() {
           transition={{ duration: 0.6, delay: 0.5 }}
           className="text-center text-muted/70 text-sm mt-10"
         >
-          Tous les prix sont en euros TTC. Paiement sécurisé par Stripe.
+          Tous les prix sont en euros TTC. Paiement sécurisé par Stripe. Abonnement sans engagement, résiliez à tout moment.
         </motion.p>
       </div>
     </section>

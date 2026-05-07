@@ -90,7 +90,7 @@ async def analyser_photo(chemin_image: str) -> AnalyseReponse:
         ],
         config=types.GenerateContentConfig(
             temperature=0.2,
-            max_output_tokens=1024,
+            max_output_tokens=4096,
         ),
     )
 
@@ -108,13 +108,33 @@ async def analyser_photo(chemin_image: str) -> AnalyseReponse:
         if texte_brut.endswith("```"):
             texte_brut = texte_brut[:-3].strip()
 
+    # Tentative de parser
+    data = None
     try:
         data = json.loads(texte_brut)
-    except json.JSONDecodeError as e:
-        logger.error(f"Réponse Gemini invalide : {texte_brut}")
-        raise ValueError(
-            f"Impossible de parser la réponse de Gemini : {e}"
-        ) from e
+    except json.JSONDecodeError:
+        # Extraction robuste : trouver le premier { et le dernier }
+        debut = texte_brut.find("{")
+        fin = texte_brut.rfind("}")
+        if debut >= 0 and fin > debut:
+            fragment = texte_brut[debut:fin + 1]
+            try:
+                data = json.loads(fragment)
+            except json.JSONDecodeError:
+                # Nettoyage agressif : supprimer les sauts de ligne dans les chaînes
+                import re
+                fragment = re.sub(r'(?<!\\)"(?:(?<!\\)(?:\\\\)*\\"|[^"])*"', 
+                    lambda m: m.group(0).replace('\n', '\\n'), fragment)
+                try:
+                    data = json.loads(fragment)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Réponse Gemini invalide : {texte_brut[:500]}")
+                    raise ValueError(
+                        f"Impossible de parser la réponse de Gemini : {e}"
+                    ) from e
+        else:
+            logger.error(f"Réponse Gemini sans JSON : {texte_brut[:500]}")
+            raise ValueError("Réponse de Gemini ne contient pas de JSON valide")
 
     # Normalisation de l'état global
     etat = data.get("etat_global", "moyen")
@@ -208,7 +228,7 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
         ],
         config=types.GenerateContentConfig(
             temperature=0.3,
-            max_output_tokens=512,
+            max_output_tokens=2048,
         ),
     )
 
@@ -225,13 +245,31 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
         if texte_brut.endswith("```"):
             texte_brut = texte_brut[:-3].strip()
 
+    # Tentative de parser
+    data = None
     try:
         data = json.loads(texte_brut)
-    except json.JSONDecodeError as e:
-        logger.error(f"Réponse Gemini invalide pour restauration : {texte_brut}")
-        raise ValueError(
-            f"Impossible de parser la réponse de Gemini : {e}"
-        ) from e
+    except json.JSONDecodeError:
+        debut = texte_brut.find("{")
+        fin = texte_brut.rfind("}")
+        if debut >= 0 and fin > debut:
+            fragment = texte_brut[debut:fin + 1]
+            try:
+                data = json.loads(fragment)
+            except json.JSONDecodeError:
+                import re
+                fragment = re.sub(r'(?<!\\)"(?:(?<!\\)(?:\\\\)*\\"|[^"])*"',
+                    lambda m: m.group(0).replace('\n', '\\n'), fragment)
+                try:
+                    data = json.loads(fragment)
+                except json.JSONDecodeError as e:
+                    logger.error(f"Réponse Gemini invalide pour restauration : {texte_brut[:500]}")
+                    raise ValueError(
+                        f"Impossible de parser la réponse de Gemini : {e}"
+                    ) from e
+        else:
+            logger.error(f"Réponse Gemini sans JSON : {texte_brut[:500]}")
+            raise ValueError("Réponse de Gemini ne contient pas de JSON valide")
 
     params = ParametresRestauration(
         luminosite=float(data.get("luminosite", 1.0)),

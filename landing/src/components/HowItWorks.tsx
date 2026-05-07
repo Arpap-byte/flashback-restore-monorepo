@@ -21,7 +21,7 @@ const steps = [
     icon: Sparkles,
     title: "L'IA restaure et anime",
     description:
-      "Gemini corrige les défauts, D-ID donne vie au portrait. En quelques secondes, votre photo ancienne devient une animation fluide et naturelle.",
+      "Notre IA de restauration corrige les défauts, notre IA d&apos;animation donne vie au portrait. En quelques secondes, votre photo ancienne devient une animation fluide et naturelle.",
     color: "from-violet-500 to-violet-600",
     bg: "bg-violet-500/10",
     border: "border-violet-500/20",
@@ -188,7 +188,7 @@ export default function HowItWorks() {
 
                     {/* Steps indicators */}
                     <div className="space-y-2">
-                      {["Détection des visages ✓", "Restauration en cours...", "Animation D-ID..."].map(
+                      {["Détection des visages ✓", "Restauration en cours...", "Animation IA..."].map(
                         (label, i) => (
                           <div
                             key={i}
@@ -214,7 +214,7 @@ export default function HowItWorks() {
                 {/* Bottom bar */}
                 <div className="px-4 py-3 border-t border-card-border flex items-center justify-center">
                   <span className="text-[10px] text-muted/60">
-                    Propulsé par Gemini AI & D-ID
+                    Propulsé par l&apos;intelligence artificielle
                   </span>
                 </div>
               </div>

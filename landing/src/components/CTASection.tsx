@@ -2,7 +2,8 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Apple, Play, Sparkles, Shield, Star } from "lucide-react";
+import Link from "next/link";
+import { Zap, Rocket, Sparkles, Shield, Star } from "lucide-react";
 
 export default function CTASection() {
   const ref = useRef(null);
@@ -53,29 +54,23 @@ export default function CTASection() {
             transition={{ duration: 0.6, delay: 0.3 }}
             className="flex flex-col sm:flex-row items-center justify-center gap-4"
           >
-            {/* App Store */}
-            <a
+            {/* Essayer maintenant */}
+            <Link
               href="/upload"
-              className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-foreground text-background font-semibold hover:opacity-90 transition-all hover:shadow-2xl hover:shadow-foreground/10 active:scale-[0.97] w-full sm:w-auto justify-center"
+              className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-2xl hover:shadow-accent/30 active:scale-[0.97] w-full sm:w-auto justify-center"
             >
-              <Apple className="w-7 h-7" />
-              <div className="text-left">
-                <div className="text-xs opacity-70">Télécharger sur</div>
-                <div className="text-base font-bold">App Store</div>
-              </div>
-            </a>
+              <Zap className="w-6 h-6" />
+              <span className="text-base font-bold">Essayer maintenant</span>
+            </Link>
 
-            {/* Google Play */}
-            <a
+            {/* Commencer gratuitement */}
+            <Link
               href="/upload"
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-foreground text-background font-semibold hover:opacity-90 transition-all hover:shadow-2xl hover:shadow-foreground/10 active:scale-[0.97] w-full sm:w-auto justify-center"
             >
-              <Play className="w-7 h-7 fill-background" />
-              <div className="text-left">
-                <div className="text-xs opacity-70">Disponible sur</div>
-                <div className="text-base font-bold">Google Play</div>
-              </div>
-            </a>
+              <Rocket className="w-6 h-6" />
+              <span className="text-base font-bold">Commencer gratuitement</span>
+            </Link>
           </motion.div>
 
           {/* Trust signals */}

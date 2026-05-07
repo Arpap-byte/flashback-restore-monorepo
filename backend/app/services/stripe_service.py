@@ -13,6 +13,9 @@ import stripe
 from app.config import (
     STRIPE_API_KEY,
     STRIPE_PRICE_ANNUEL,
+    STRIPE_PRICE_CREDITS_30,
+    STRIPE_PRICE_CREDITS_50,
+    STRIPE_PRICE_CREDITS_110,
     STRIPE_PRICE_DECOUVERTE,
     STRIPE_PRICE_PREMIUM,
     STRIPE_WEBHOOK_SECRET,
@@ -31,6 +34,12 @@ PLAN_VERS_PRIX: dict[str, str] = {
     "decouverte": STRIPE_PRICE_DECOUVERTE,
     "premium": STRIPE_PRICE_PREMIUM,
     "annuel": STRIPE_PRICE_ANNUEL,
+}
+
+CREDIT_PLAN_VERS_PRIX: dict[str, str] = {
+    "30": STRIPE_PRICE_CREDITS_30,
+    "50": STRIPE_PRICE_CREDITS_50,
+    "110": STRIPE_PRICE_CREDITS_110,
 }
 
 
@@ -102,6 +111,79 @@ async def creer_session_paiement(
 
 
 # ---------------------------------------------------------------------------
+# Session de paiement pour crédits (one-time payment)
+# ---------------------------------------------------------------------------
+
+async def creer_session_paiement_credits(
+    plan: str,
+    email: str,
+    url_succes: str,
+    url_annulation: str,
+) -> dict:
+    """
+    Crée une session de paiement Stripe Checkout pour un pack de crédits.
+
+    Args:
+        plan: Nombre de crédits souhaité (« 30 », « 50 » ou « 110 »).
+        email: Adresse email de l'utilisateur.
+        url_succes: URL de redirection après paiement réussi.
+        url_annulation: URL de redirection en cas d'annulation.
+
+    Returns:
+        Un dictionnaire contenant l'URL de la session Checkout et l'ID de session.
+
+    Raises:
+        ValueError: Si le plan demandé n'existe pas.
+    """
+    prix_id = CREDIT_PLAN_VERS_PRIX.get(plan)
+    if not prix_id:
+        plans_valides = ", ".join(CREDIT_PLAN_VERS_PRIX.keys())
+        raise ValueError(
+            f"Pack de crédits « {plan} » inconnu. Packs disponibles : {plans_valides}"
+        )
+
+    try:
+        credits_count = int(plan)
+    except (TypeError, ValueError):
+        raise ValueError(f"Plan de crédits invalide : {plan}")
+
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            customer_email=email,
+            line_items=[
+                {
+                    "price": prix_id,
+                    "quantity": 1,
+                }
+            ],
+            success_url=url_succes + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=url_annulation,
+            locale="fr",
+            metadata={
+                "type": "credits",
+                "credits": str(credits_count),
+                "email": email,
+            },
+        )
+
+        logger.info(
+            f"Session Checkout crédits créée pour {email} — "
+            f"credits={credits_count}, session_id={session.id}"
+        )
+
+        return {
+            "checkout_url": session.url,
+            "session_id": session.id,
+        }
+
+    except stripe.error.StripeError as e:
+        logger.exception(f"Erreur Stripe lors de la création de session crédits : {e}")
+        raise
+
+
+# ---------------------------------------------------------------------------
 # Traitement des webhooks Stripe
 # ---------------------------------------------------------------------------
 
@@ -153,6 +235,7 @@ async def traiter_webhook(
             "status": donnees.get("status"),
             "amount_total": donnees.get("amount_total"),
             "currency": donnees.get("currency"),
+            "metadata": donnees.get("metadata", {}),
         },
     }
 

@@ -2,13 +2,14 @@
 
 import { useState, useRef } from "react";
 import { motion, useInView, AnimatePresence } from "framer-motion";
+import Link from "next/link";
 import { ChevronDown, HelpCircle } from "lucide-react";
 
 const faqs = [
   {
     question: "Comment fonctionne la restauration de photos ?",
     answer:
-      "Notre IA (Gemini) analyse votre photo pour détecter automatiquement les défauts : rayures, taches, déchirures, décoloration. Elle reconstruit ensuite les zones endommagées en s'appuyant sur le contexte de l'image. Le processus prend moins de 10 secondes.",
+      "Notre IA de restauration analyse votre photo pour détecter automatiquement les défauts : rayures, taches, déchirures, décoloration. Elle reconstruit ensuite les zones endommagées en s&apos;appuyant sur le contexte de l&apos;image. Le processus prend moins de 10 secondes.",
   },
   {
     question: "Mes photos sont-elles conservées en sécurité ?",
@@ -28,12 +29,12 @@ const faqs = [
   {
     question: "L'animation fonctionne-t-elle sur toutes les photos ?",
     answer:
-      "L'animation D-ID est optimisée pour les portraits et les photos de personnes. L'IA détecte les visages et applique des expressions naturelles. Pour les paysages ou objets sans visage, l'animation sera plus subtile mais apporte tout de même une touche de vie.",
+      "L&apos;animation IA est optimisée pour les portraits et les photos de personnes. L&apos;IA détecte les visages et applique des expressions naturelles. Pour les paysages ou objets sans visage, l&apos;animation sera plus subtile mais apporte tout de même une touche de vie.",
   },
   {
-    question: "Quelle est la différence entre Gemini et D-ID ?",
+    question: "Quelle est la différence entre la restauration et l&apos;animation ?",
     answer:
-      "Gemini (Google) est notre moteur de restauration : il analyse, nettoie et répare vos photos anciennes. D-ID est notre moteur d'animation : il transforme vos portraits restaurés en vidéos animées avec des expressions faciales réalistes, comme les portraits magiques d'Harry Potter.",
+      "Notre IA de restauration analyse, nettoie et répare vos photos anciennes. Notre IA d&apos;animation transforme vos portraits restaurés en vidéos animées avec des expressions faciales réalistes, comme les portraits magiques d&apos;Harry Potter.",
   },
 ];
 
@@ -133,9 +134,9 @@ export default function FAQ() {
           </h2>
           <p className="text-muted text-lg">
             Vous ne trouvez pas votre réponse ?{" "}
-            <a href="#cta" className="text-accent hover:underline">
+            <Link href="/#cta" className="text-accent hover:underline">
               Contactez-nous
-            </a>
+            </Link>
           </p>
         </motion.div>
 

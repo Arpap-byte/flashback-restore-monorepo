@@ -1,13 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, Sun, Moon } from "lucide-react";
+import { Menu, X, Sparkles, Sun, Moon, User, LogOut, History } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAuth } from "@/context/AuthContext";
 
 const navLinks = [
   { label: "Accueil", href: "/" },
-  { label: "Restaurer", href: "/upload" },
+  { label: "Restaurer", href: "/restore" },
   { label: "Tarifs", href: "/#pricing" },
 ];
 
@@ -15,6 +17,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
+  const { user, logout } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -38,7 +41,7 @@ export default function Navbar() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <a href="#" className="flex items-center gap-2.5 group">
+          <Link href="/" className="flex items-center gap-2.5 group">
             <div className="relative w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-amber-600 dark:from-amber-400 dark:to-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-lg shadow-amber-500/25">
               <Sparkles className="w-5 h-5 text-white" />
               <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-amber-400/40 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -47,18 +50,18 @@ export default function Navbar() {
               <span className="text-foreground">Flashback</span>{" "}
               <span className="text-accent">Restore</span>
             </span>
-          </a>
+          </Link>
 
           {/* Desktop nav */}
           <div className="hidden lg:flex items-center gap-1">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 className="text-sm text-muted hover:text-accent transition-colors font-medium px-3 py-2 rounded-lg hover:bg-accent/5"
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </div>
 
@@ -77,14 +80,44 @@ export default function Navbar() {
               )}
             </button>
 
+            {user ? (
+              <>
+                <Link
+                  href="/historique"
+                  className="text-sm text-muted hover:text-accent transition-colors font-medium px-3 py-2 rounded-lg hover:bg-accent/5 flex items-center gap-1.5"
+                >
+                  <History className="w-4 h-4" />
+                  Historique
+                </Link>
+                <span className="text-sm text-foreground px-3 py-2 flex items-center gap-1.5">
+                  <User className="w-4 h-4 text-accent" />
+                  {user.email.split("@")[0]}
+                </span>
+                <button
+                  onClick={logout}
+                  className="text-sm text-muted hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-500/5 flex items-center gap-1.5"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/auth"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-card-border text-foreground hover:bg-surface text-sm font-medium transition-all"
+              >
+                <User className="w-4 h-4" />
+                Connexion
+              </Link>
+            )}
+
             {/* CTA */}
-            <a
-              href="/upload"
+            <Link
+              href="/restore"
               className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent text-white dark:text-gray-950 text-sm font-semibold hover:brightness-110 transition-all hover:shadow-lg hover:shadow-accent/25 active:scale-95"
             >
               <Sparkles className="w-4 h-4" />
               Restaurer une photo
-            </a>
+            </Link>
           </div>
 
           {/* Mobile menu button */}
@@ -127,23 +160,51 @@ export default function Navbar() {
           >
             <div className="px-4 py-4 space-y-1">
               {navLinks.map((link) => (
-                <a
+                <Link
                   key={link.href}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
                   className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
                 >
                   {link.label}
-                </a>
+                </Link>
               ))}
-              <a
-                href="/upload"
+              {user ? (
+                <>
+                  <Link
+                    href="/historique"
+                    onClick={() => setMobileOpen(false)}
+                    className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
+                  >
+                    Historique
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setMobileOpen(false);
+                    }}
+                    className="block w-full text-left py-2.5 px-3 text-red-400 hover:bg-red-500/5 rounded-lg transition-colors font-medium"
+                  >
+                    Déconnexion
+                  </button>
+                </>
+              ) : (
+                <Link
+                  href="/auth"
+                  onClick={() => setMobileOpen(false)}
+                  className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
+                >
+                  Connexion
+                </Link>
+              )}
+              <Link
+                href="/restore"
                 onClick={() => setMobileOpen(false)}
                 className="mt-2 inline-flex items-center gap-2 px-5 py-3 rounded-full bg-accent text-white dark:text-gray-950 text-sm font-semibold hover:brightness-110 transition-all w-full justify-center"
               >
                 <Sparkles className="w-4 h-4" />
                 Restaurer une photo
-              </a>
+              </Link>
             </div>
           </motion.div>
         )}

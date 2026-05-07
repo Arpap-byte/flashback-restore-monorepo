@@ -9,9 +9,9 @@ const features = [
     icon: Brain,
     techIcon: Sparkles,
     title: "Restauration IA",
-    tech: "Gemini AI",
+    tech: "IA de restauration",
     description:
-      "Notre IA analyse et répare automatiquement les défauts de vos photos : rayures, déchirures, taches et couleurs délavées. Propulsé par Gemini, le modèle détecte chaque imperfection et la corrige avec une précision bluffante.",
+      "Notre IA analyse et répare automatiquement les défauts de vos photos : rayures, déchirures, taches et couleurs délavées. Notre moteur de restauration détecte chaque imperfection et la corrige avec une précision bluffante.",
     gradient: "from-amber-500/20 to-amber-400/5",
     border: "border-amber-500/20",
     iconBg: "bg-amber-500/10",
@@ -23,9 +23,9 @@ const features = [
     icon: Bot,
     techIcon: Film,
     title: "Animation magique",
-    tech: "D-ID",
+    tech: "IA d&apos;animation",
     description:
-      "Donnez vie à vos photos comme dans Harry Potter. Notre technologie D-ID transforme vos clichés en portraits animés avec des expressions naturelles : sourires, clignements, mouvements subtils. Un effet saisissant.",
+      "Donnez vie à vos photos comme dans Harry Potter. Notre IA d&apos;animation transforme vos clichés en portraits animés avec des expressions naturelles : sourires, clignements, mouvements subtils. Un effet saisissant.",
     gradient: "from-violet-600/20 to-violet-500/5",
     border: "border-violet-500/20",
     iconBg: "bg-violet-500/10",
@@ -138,7 +138,7 @@ export default function Features() {
             <span className="text-gradient">au service de vos souvenirs</span>
           </h2>
           <p className="text-muted max-w-2xl mx-auto text-lg">
-            Flashback Restore combine Gemini AI et D-ID pour offrir une
+            Flashback Restore combine intelligence artificielle de pointe pour offrir une
             restauration et une animation d&apos;une qualité exceptionnelle,
             accessible à tous.
           </p>

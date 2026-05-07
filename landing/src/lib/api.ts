@@ -2,24 +2,34 @@ const API_BASE =
   process.env.NEXT_PUBLIC_API_URL || "http://148.230.116.52:8000";
 
 export interface AnalysisResult {
-  scratches: number;
-  fading: number;
-  stains: number;
-  tears: number;
-  noise: number;
-  condition: string;
-  estimated_age: string;
-  recommendations: string[];
+  rayures: boolean;
+  decoloration: boolean;
+  taches: boolean;
+  dechirures: boolean;
+  bruit: boolean;
+  etat_global: string;
+  age_estime: string;
+  recommandations: string[];
 }
 
 export interface RestoreResult {
-  success: boolean;
-  filename: string;
-  url: string;
+  message: string;
+  analyse: AnalysisResult;
+  parametres: {
+    luminosite: number;
+    contraste: number;
+    saturation: number;
+    nettete: number;
+    debruitage: number;
+    correction_rouge: number;
+    correction_vert: number;
+    correction_bleu: number;
+  };
+  url_image: string;
 }
 
 export interface AnimateResult {
-  success: boolean;
+  message: string;
   job_id: string;
 }
 
@@ -34,31 +44,73 @@ export interface CheckoutResult {
   checkout_url: string;
 }
 
+export interface TravailHistorique {
+  id: string;
+  type: string;
+  statut: string;
+  chemin_photo: string | null;
+  chemin_resultat: string | null;
+  message_erreur: string | null;
+  cree_le: string;
+}
+
+function getToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem("flashback_auth");
+    if (stored) return JSON.parse(stored).token;
+  } catch {}
+  return null;
+}
+
 async function apiFetch<T>(
   endpoint: string,
-  options?: RequestInit
+  options?: RequestInit,
+  timeoutMs: number = 10000
 ): Promise<T> {
-  const url = `${API_BASE}${endpoint}`;
-  const res = await fetch(url, options);
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!res.ok) {
-    const body = await res.text();
-    let message: string;
-    try {
-      const json = JSON.parse(body);
-      message = json.detail || json.message || body;
-    } catch {
-      message = body || `Erreur ${res.status}`;
-    }
-    throw new Error(message);
+  const token = getToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  if (options?.headers) {
+    const optHeaders = options.headers as Record<string, string>;
+    Object.assign(headers, optHeaders);
+    delete options.headers;
   }
 
-  return res.json();
+  try {
+    const url = `${API_BASE}${endpoint}`;
+    const res = await fetch(url, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.text();
+      let message: string;
+      try {
+        const json = JSON.parse(body);
+        message = json.detail || json.message || body;
+      } catch {
+        message = body || `Erreur ${res.status}`;
+      }
+      throw new Error(message);
+    }
+
+    return res.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 export async function analyzePhoto(file: File): Promise<AnalysisResult> {
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("fichier", file);
   return apiFetch<AnalysisResult>("/api/analyze", {
     method: "POST",
     body: formData,
@@ -67,15 +119,20 @@ export async function analyzePhoto(file: File): Promise<AnalysisResult> {
 
 export async function restorePhoto(file: File): Promise<RestoreResult> {
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("fichier", file);
   return apiFetch<RestoreResult>("/api/restore", {
     method: "POST",
     body: formData,
-  });
+  }, 30000);
 }
 
-export function getRestoredImageUrl(filename: string): string {
-  return `${API_BASE}/uploads/${filename}`;
+export function getRestoredImageUrl(urlImage: string): string {
+  return `${API_BASE}${urlImage}`;
+}
+
+export function getPhotoUrl(chemin: string): string {
+  if (chemin.startsWith("http")) return chemin;
+  return `${API_BASE}/uploads/${chemin.split("/").pop()}`;
 }
 
 export async function animatePhoto(
@@ -83,12 +140,12 @@ export async function animatePhoto(
   text: string
 ): Promise<AnimateResult> {
   const formData = new FormData();
-  formData.append("file", file);
-  formData.append("text", text);
+  formData.append("fichier", file);
+  formData.append("texte", text);
   return apiFetch<AnimateResult>("/api/animate", {
     method: "POST",
     body: formData,
-  });
+  }, 30000);
 }
 
 export async function checkAnimationStatus(
@@ -104,8 +161,12 @@ export async function createCheckout(
   return apiFetch<CheckoutResult>("/api/stripe/create-checkout", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ plan, user_email: userEmail }),
+    body: JSON.stringify({ plan, email_utilisateur: userEmail }),
   });
+}
+
+export async function getUserHistory(): Promise<{ travaux: TravailHistorique[] }> {
+  return apiFetch<{ travaux: TravailHistorique[] }>("/api/user/history");
 }
 
 export async function healthCheck(): Promise<{ status: string }> {

@@ -8,8 +8,13 @@ de configuration pour tous les services.
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 # Chemins
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# Charge les variables d'environnement depuis .env
+load_dotenv(BASE_DIR.parent / ".env")
 UPLOAD_DIR = BASE_DIR / "uploads"
 DB_PATH = BASE_DIR / "flashback.db"
 
@@ -17,40 +22,36 @@ DB_PATH = BASE_DIR / "flashback.db"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- API Gemini ---
-GEMINI_API_KEY: str = os.getenv(
-    "GEMINI_API_KEY",
-    "AIzaSyC33Y8WS6_voVPaMY2RCIsy_35bkxdsV-w",
-)
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
+if not GEMINI_API_KEY:
+    raise RuntimeError("GEMINI_API_KEY must be set in environment or .env file")
 GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # --- API D-ID ---
-DID_API_KEY: str = os.getenv(
-    "DID_API_KEY",
-    "DID_API_KEY_PLACEHOLDER",
-)
+DID_API_KEY: str = os.getenv("DID_API_KEY", "")
+if not DID_API_KEY:
+    raise RuntimeError("DID_API_KEY must be set in environment or .env file")
 DID_BASE_URL: str = os.getenv(
     "DID_BASE_URL",
     "https://api.d-id.com",
 )
 
 # --- Sécurité ---
-SECRET_KEY: str = os.getenv(
-    "SECRET_KEY",
-    "fe5cdce1484b7677d2c7dec478d57389ccbee8b1c999a13ca690b2deea001a09",
-)
-
-# --- Base de données ---
-DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "postgresql://flashback:flashback@db:5432/flashback",
-)
+SECRET_KEY: str = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY must be set in environment or .env file")
 
 # --- Stripe (paiements) ---
-STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "sk_test_placeholder")
+STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "")
+# STRIPE_API_KEY can be empty if Stripe is not used; no hard error
+STRIPE_PUBLISHABLE_KEY: str = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
 STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_placeholder")
 STRIPE_PRICE_DECOUVERTE: str = os.getenv("STRIPE_PRICE_DECOUVERTE", "price_decouverte_monthly")
 STRIPE_PRICE_PREMIUM: str = os.getenv("STRIPE_PRICE_PREMIUM", "price_premium_monthly")
 STRIPE_PRICE_ANNUEL: str = os.getenv("STRIPE_PRICE_ANNUEL", "price_premium_yearly")
+STRIPE_PRICE_CREDITS_30: str = os.getenv("STRIPE_PRICE_CREDITS_30", "price_credits_30")
+STRIPE_PRICE_CREDITS_50: str = os.getenv("STRIPE_PRICE_CREDITS_50", "price_credits_50")
+STRIPE_PRICE_CREDITS_110: str = os.getenv("STRIPE_PRICE_CREDITS_110", "price_credits_110")
 
 # --- Serveur ---
 HOST: str = os.getenv("HOST", "0.0.0.0")

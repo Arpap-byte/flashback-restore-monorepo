@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -10,7 +11,6 @@ import {
   X,
   Download,
   Play,
-  Check,
   RefreshCw,
   Image as ImageIcon,
   ArrowLeftRight,
@@ -20,14 +20,8 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { restorePhoto, getRestoredImageUrl, RestoreResult } from "@/lib/api";
 
-const steps = [
-  { key: "analyse", label: "Analyse de l'image" },
-  { key: "parametres", label: "Paramètres de restauration" },
-  { key: "restauration", label: "Restauration IA" },
-  { key: "rendu", label: "Rendu final" },
-];
-
 export default function RestorePage() {
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -36,7 +30,6 @@ export default function RestorePage() {
   );
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
-  const [currentStep, setCurrentStep] = useState(0);
   const [showAfter, setShowAfter] = useState(true);
   const [sliderPos, setSliderPos] = useState(50);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -86,25 +79,13 @@ export default function RestorePage() {
     [handleFile]
   );
 
-  // Animate fake progress steps
-  useEffect(() => {
-    if (!restoring) return;
-    const intervals = [1500, 3000, 5500, 8000];
-    const timers = intervals.map((delay, i) =>
-      setTimeout(() => setCurrentStep(i + 1), delay)
-    );
-    return () => timers.forEach(clearTimeout);
-  }, [restoring]);
-
   const handleRestore = async () => {
     if (!file) return;
     setRestoring(true);
-    setCurrentStep(1);
     setError(null);
     try {
       const result = await restorePhoto(file);
       setRestoreResult(result);
-      setCurrentStep(4);
     } catch (err) {
       setError(
         err instanceof Error
@@ -121,13 +102,12 @@ export default function RestorePage() {
     setPreview(null);
     setRestoreResult(null);
     setError(null);
-    setCurrentStep(0);
     sessionStorage.removeItem("flashback_photo");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const restoredUrl = restoreResult
-    ? getRestoredImageUrl(restoreResult.filename)
+    ? getRestoredImageUrl(restoreResult.url_image)
     : null;
 
   // Download handler
@@ -148,27 +128,48 @@ export default function RestorePage() {
     }
   };
 
-  // Slider drag
+  // Slider drag (mouse + touch)
+  const handleSliderStart = useCallback(
+    (clientX: number) => {
+      const startX = clientX;
+      const startPos = sliderPos;
+
+      const onMove = (ev: MouseEvent | TouchEvent) => {
+        const cx =
+          "touches" in ev ? ev.touches[0].clientX : ev.clientX;
+        const dx = cx - startX;
+        const rect = sliderRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const newPos = Math.max(
+          0,
+          Math.min(100, startPos + (dx / rect.width) * 100)
+        );
+        setSliderPos(newPos);
+      };
+
+      const onUp = () => {
+        document.removeEventListener("mousemove", onMove as EventListener);
+        document.removeEventListener("mouseup", onUp);
+        document.removeEventListener("touchmove", onMove as EventListener);
+        document.removeEventListener("touchend", onUp);
+      };
+
+      document.addEventListener("mousemove", onMove as EventListener);
+      document.addEventListener("mouseup", onUp);
+      document.addEventListener("touchmove", onMove as EventListener, { passive: false });
+      document.addEventListener("touchend", onUp);
+    },
+    [sliderPos]
+  );
+
   const handleSliderMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
-    const startX = e.clientX;
-    const startPos = sliderPos;
+    handleSliderStart(e.clientX);
+  };
 
-    const onMove = (ev: MouseEvent) => {
-      const dx = ev.clientX - startX;
-      const rect = sliderRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const newPos = Math.max(0, Math.min(100, startPos + (dx / rect.width) * 100));
-      setSliderPos(newPos);
-    };
-
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
+  const handleSliderTouchStart = (e: React.TouchEvent) => {
+    e.preventDefault();
+    handleSliderStart(e.touches[0].clientX);
   };
 
   return (
@@ -190,7 +191,7 @@ export default function RestorePage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-6">
               <Sparkles className="w-4 h-4" />
-              Étape 2 — Restauration
+              Restauration
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 font-[family-name:var(--font-playfair)]">
               Restauration
@@ -291,8 +292,8 @@ export default function RestorePage() {
                 </div>
               </div>
             ) : restoring ? (
-              /* Restoring progress */
-              <div className="max-w-lg mx-auto text-center py-8">
+              /* Restoring — simple spinner */
+              <div className="max-w-lg mx-auto text-center py-12">
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{
@@ -302,48 +303,18 @@ export default function RestorePage() {
                   }}
                   className="w-20 h-20 rounded-full border-2 border-accent/30 border-t-accent mx-auto mb-8"
                 />
-                <h3 className="text-xl font-semibold text-foreground mb-6">
+                <h3 className="text-xl font-semibold text-foreground mb-2">
                   Restauration en cours...
                 </h3>
-                <div className="space-y-3 max-w-xs mx-auto">
-                  {steps.map((step, i) => (
-                    <div
-                      key={step.key}
-                      className="flex items-center gap-3"
-                    >
-                      <div
-                        className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-bold transition-all duration-300 ${
-                          i < currentStep
-                            ? "bg-emerald-500 text-white"
-                            : i === currentStep
-                            ? "bg-accent text-white animate-pulse"
-                            : "bg-surface text-muted"
-                        }`}
-                      >
-                        {i < currentStep ? (
-                          <Check className="w-3.5 h-3.5" />
-                        ) : (
-                          i + 1
-                        )}
-                      </div>
-                      <span
-                        className={`text-sm transition-colors ${
-                          i <= currentStep ? "text-foreground" : "text-muted"
-                        }`}
-                      >
-                        {step.label}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <p className="text-muted">
+                  L'IA analyse et répare votre photo. Cela prend quelques secondes.
+                </p>
                 <div className="mt-8 w-full max-w-xs mx-auto h-1.5 rounded-full bg-surface overflow-hidden">
                   <motion.div
                     className="h-full rounded-full bg-gradient-to-r from-accent to-violet-500"
                     initial={{ width: "0%" }}
-                    animate={{
-                      width: `${(currentStep / steps.length) * 100}%`,
-                    }}
-                    transition={{ duration: 1 }}
+                    animate={{ width: "100%" }}
+                    transition={{ duration: 3, repeat: Infinity }}
                   />
                 </div>
               </div>
@@ -386,6 +357,7 @@ export default function RestorePage() {
                   ref={sliderRef}
                   className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-2xl cursor-col-resize select-none"
                   onMouseDown={handleSliderMouseDown}
+                  onTouchStart={handleSliderTouchStart}
                 >
                   <div className="relative w-full max-h-[500px] aspect-[4/3] overflow-hidden">
                     {/* After (full) */}
@@ -459,7 +431,7 @@ export default function RestorePage() {
                       if (restoredUrl) {
                         sessionStorage.setItem("flashback_photo", restoredUrl);
                       }
-                      window.location.href = "/animate";
+                      router.push("/animate");
                     }}
                     className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full border-2 border-violet-500/30 text-foreground hover:bg-violet-500/10 hover:border-violet-400 font-semibold transition-all active:scale-[0.97]"
                   >
@@ -474,12 +446,30 @@ export default function RestorePage() {
                     Nouvelle photo
                   </button>
                 </div>
+
+                {/* Error toast */}
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3"
+                  >
+                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <p className="text-red-400 text-sm">{error}</p>
+                    <button
+                      onClick={() => setError(null)}
+                      className="ml-auto text-red-400/60 hover:text-red-400"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </motion.div>
+                )}
               </div>
             ) : null}
 
-            {/* Error toast */}
+            {/* Error toast (for upload errors) */}
             <AnimatePresence>
-              {error && (
+              {error && !restoreResult && (
                 <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}

@@ -152,8 +152,8 @@ class CheckoutRequete(BaseModel):
 
     plan: str = Field(
         ...,
-        description="Plan choisi : « decouverte », « premium » ou « annuel »",
-        pattern="^(decouverte|premium|annuel)$",
+        description="Plan choisi : « decouverte », « premium », « annuel », « 30 », « 50 », « 110 »",
+        pattern="^(decouverte|premium|annuel|30|50|110)$",
     )
     email_utilisateur: str = Field(
         ...,

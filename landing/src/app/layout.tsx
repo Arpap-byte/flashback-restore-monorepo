@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { AuthProvider } from "@/context/AuthContext";
 import "./globals.css";
 
 const inter = Inter({
@@ -27,8 +28,6 @@ export const metadata: Metadata = {
     "photos anciennes",
     "souvenirs de famille",
     "Flashback Restore",
-    "Gemini AI",
-    "D-ID",
   ],
   openGraph: {
     title: "Flashback Restore — Redonnez vie à vos souvenirs",
@@ -59,7 +58,9 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background text-foreground font-sans transition-colors">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <AuthProvider>{children}</AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

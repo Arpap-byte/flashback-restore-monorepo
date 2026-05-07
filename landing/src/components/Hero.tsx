@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { ArrowRight, Play, Sparkles, Star, Shield, Zap } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -49,57 +50,57 @@ function BeforeAfterDemo() {
       {/* Main card */}
       <div className="relative rounded-2xl overflow-hidden border border-card-border shadow-2xl shadow-black/20 bg-card">
         {/* Split before/after */}
-        <div className="relative aspect-[4/3] overflow-hidden">
+        <div className="relative aspect-[4/3] overflow-hidden bg-surface-alt">
           {/* Before side */}
-          <div className="absolute inset-y-0 left-0 w-1/2 bg-surface-alt flex flex-col items-center justify-center p-4">
-            <div className="text-center mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted bg-surface px-3 py-1 rounded-full border border-card-border">
+          <div className="absolute inset-y-0 left-0 w-1/2 overflow-hidden">
+            <img
+              src="/demo/before.jpg"
+              alt="Photo avant restauration"
+              className="w-full h-full object-cover"
+            />
+            {/* Sepia overlay for aged effect */}
+            <div className="absolute inset-0 bg-gradient-to-r from-amber-900/30 to-transparent pointer-events-none" />
+            {/* Label */}
+            <div className="absolute top-3 left-3">
+              <span className="inline-block text-xs font-semibold uppercase tracking-wider text-white/90 bg-black/50 backdrop-blur-sm px-3 py-1 rounded-full border border-white/10">
                 Avant
               </span>
-            </div>
-            <div className="w-full max-w-[140px] aspect-[3/4] rounded-lg bg-gradient-to-b from-gray-400/40 to-gray-500/30 flex items-center justify-center relative overflow-hidden border border-card-border">
-              {/* Simulated damaged photo */}
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-3xl opacity-40">📷</div>
-              </div>
-              <div className="absolute top-3 left-4 w-12 h-[1px] bg-gray-400/40 rotate-12" />
-              <div className="absolute top-10 right-6 w-8 h-[1px] bg-gray-400/30 -rotate-6" />
-              <div className="absolute bottom-8 left-3 w-3 h-3 rounded-full bg-gray-400/20" />
-              <div className="absolute inset-0 bg-[repeating-linear-gradient(0deg,transparent,transparent_2px,rgba(0,0,0,0.03)_2px,rgba(0,0,0,0.03)_4px)]" />
             </div>
           </div>
 
           {/* Divider */}
           <div className="absolute inset-y-0 left-1/2 w-[2px] bg-gradient-to-b from-accent via-accent to-transparent z-10" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-accent text-white dark:text-gray-950 flex items-center justify-center z-20 shadow-lg shadow-accent/40">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 rounded-full bg-accent text-white dark:text-gray-950 flex items-center justify-center z-20 shadow-lg shadow-accent/40">
             <span className="text-xs font-bold">VS</span>
           </div>
 
           {/* After side */}
-          <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-br from-accent/5 to-violet-500/5 flex flex-col items-center justify-center p-4">
-            <div className="text-center mb-3">
-              <span className="text-xs font-semibold uppercase tracking-wider bg-accent/10 text-accent px-3 py-1 rounded-full border border-accent/20 inline-flex items-center gap-1">
+          <div className="absolute inset-y-0 right-0 w-1/2 overflow-hidden">
+            <img
+              src="/demo/after.jpg"
+              alt="Photo après restauration"
+              className="w-full h-full object-cover"
+            />
+            {/* Brightness overlay for restored effect */}
+            <div className="absolute inset-0 bg-gradient-to-t from-accent/10 to-transparent pointer-events-none" />
+            {/* Label */}
+            <div className="absolute top-3 right-3">
+              <span className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wider bg-accent/90 text-white dark:text-gray-950 px-3 py-1 rounded-full border border-accent shadow-lg shadow-accent/20">
                 <Sparkles className="w-3 h-3" />
                 Après
               </span>
             </div>
-            <div className="w-full max-w-[140px] aspect-[3/4] rounded-lg bg-gradient-to-b from-amber-200/30 to-amber-100/20 flex items-center justify-center relative overflow-hidden border border-accent/20 animate-pulse-glow">
-              <div className="text-4xl opacity-70">✨</div>
-              <div className="absolute inset-0 bg-gradient-to-t from-accent/5 to-transparent" />
-              <motion.div
-                className="absolute inset-0"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [0, 0.5, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                <div className="absolute inset-0 bg-gradient-to-t from-accent/10 to-transparent" />
-              </motion.div>
-            </div>
+            {/* Subtle glow pulse on restored side */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-t from-accent/15 to-transparent pointer-events-none"
+              animate={{ opacity: [0.3, 0.6, 0.3] }}
+              transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+            />
           </div>
         </div>
 
         {/* Bottom info bar */}
-        <div className="px-4 py-3 border-t border-card-border flex items-center justify-between text-xs text-muted">
+        <div className="px-4 py-3 border-t border-card-border flex items-center justify-between text-xs text-muted bg-card">
           <span className="flex items-center gap-1">
             <Zap className="w-3 h-3 text-accent" />
             Restauration en 5 secondes
@@ -141,7 +142,7 @@ export default function Hero() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-8">
                 <Sparkles className="w-4 h-4" />
-                Propulsé par Gemini AI & D-ID
+                Propulsé par l&apos;intelligence artificielle
               </div>
             </motion.div>
 
@@ -174,20 +175,20 @@ export default function Hero() {
               transition={{ duration: 0.8, delay: 0.65 }}
               className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start"
             >
-              <a
+              <Link
                 href="/upload"
                 className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97] w-full sm:w-auto justify-center"
               >
                 Commencer gratuitement
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-              </a>
-              <a
-                href="#how-it-works"
+              </Link>
+              <Link
+                href="/#how-it-works"
                 className="group inline-flex items-center gap-2 px-8 py-4 rounded-full border border-card-border text-foreground font-semibold text-base hover:bg-card transition-all hover:border-accent/30 active:scale-[0.97] w-full sm:w-auto justify-center"
               >
                 <Play className="w-5 h-5 text-accent" />
                 Comment ça marche
-              </a>
+              </Link>
             </motion.div>
 
             {/* Stats */}
