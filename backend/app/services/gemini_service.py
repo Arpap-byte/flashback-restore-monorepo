@@ -284,3 +284,129 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
 
     logger.info(f"Paramètres obtenus : luminosite={params.luminosite}, contraste={params.contraste}")
     return params
+
+
+# ---------------------------------------------------------------------------
+# Colorisation
+# ---------------------------------------------------------------------------
+
+PROMPT_COLORISATION = (
+    "Colorise cette photo en noir et blanc de façon naturelle et réaliste. "
+    "Conserve tous les détails restaurés. Produis une image en couleurs naturelles."
+)
+
+
+async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
+    """
+    Colorise une photo via Gemini (image generation), avec fallback Pillow.
+
+    La clé Gemini pouvant être invalide (leaked), on essaye d'abord l'API.
+    Si elle échoue, on applique un filtre de colorisation automatique avec Pillow
+    (augmentation saturation, ajustement balance des couleurs).
+
+    Args:
+        chemin_image: Chemin local vers l'image à coloriser.
+        chemin_sortie: Chemin local où sauvegarder l'image colorisée.
+
+    Returns:
+        Le chemin de l'image colorisée (identique à chemin_sortie).
+
+    Raises:
+        Exception: Si ni Gemini ni Pillow ne peut produire une image.
+    """
+    logger.info(f"Tentative de colorisation pour : {chemin_image}")
+
+    # --- Essai 1 : Gemini ---
+    try:
+        import base64
+        import httpx
+
+        image_bytes = Path(chemin_image).read_bytes()
+        image_b64 = base64.b64encode(image_bytes).decode("ascii")
+
+        async with httpx.AsyncClient(timeout=60.0) as http_client:
+            response = await http_client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
+                params={"key": GEMINI_API_KEY},
+                json={
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": PROMPT_COLORISATION},
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/jpeg",
+                                        "data": image_b64,
+                                    }
+                                },
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.4,
+                        "maxOutputTokens": 8192,
+                        "responseModalities": ["TEXT", "IMAGE"],
+                    },
+                },
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                # Extraire l'image de la réponse Gemini
+                for candidate in data.get("candidates", []):
+                    for part in candidate.get("content", {}).get("parts", []):
+                        if "inlineData" in part:
+                            img_data = base64.b64decode(part["inlineData"]["data"])
+                            Path(chemin_sortie).write_bytes(img_data)
+                            logger.info(f"Colorisation Gemini réussie : {chemin_sortie}")
+                            return chemin_sortie
+
+            logger.warning(
+                f"Gemini colorisation échouée (status={response.status_code}), "
+                f"fallback Pillow"
+            )
+    except Exception as e:
+        logger.warning(f"Gemini colorisation exception : {e}, fallback Pillow")
+
+    # --- Fallback : Pillow colorisation automatique ---
+    _colorisation_pillow(chemin_image, chemin_sortie)
+    logger.info(f"Colorisation Pillow appliquée : {chemin_sortie}")
+    return chemin_sortie
+
+
+def _colorisation_pillow(chemin_source: str, chemin_destination: str) -> None:
+    """
+    Applique une colorisation automatique via Pillow.
+
+    Technique :
+    1. Convertir en RGB
+    2. Augmenter fortement la saturation (×2.5) pour raviver les couleurs
+    3. Ajuster la balance des blancs (auto-contraste)
+    4. Appliquer une légère correction de teinte chaude
+    """
+    from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+
+    image = Image.open(chemin_source).convert("RGB")
+
+    # 1. Auto-contraste (égalisation d'histogramme) pour corriger la balance
+    image = ImageOps.autocontrast(image, cutoff=2)
+
+    # 2. Augmentation forte de la saturation
+    ameliorateur = ImageEnhance.Color(image)
+    image = ameliorateur.enhance(2.5)
+
+    # 3. Légère augmentation du contraste
+    ameliorateur = ImageEnhance.Contrast(image)
+    image = ameliorateur.enhance(1.15)
+
+    # 4. Réchauffement léger : booster rouge, réduire bleu
+    r, g, b = image.split()
+    r = r.point(lambda p: min(255, int(p * 1.08)))
+    b = b.point(lambda p: min(255, int(p * 0.92)))
+    image = Image.merge("RGB", (r, g, b))
+
+    # 5. Légère netteté
+    ameliorateur = ImageEnhance.Sharpness(image)
+    image = ameliorateur.enhance(1.2)
+
+    image.save(chemin_destination, quality=95)

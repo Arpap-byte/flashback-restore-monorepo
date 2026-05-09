@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   ArrowLeftRight,
   Zap,
+  Palette,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -37,6 +38,7 @@ export default function RestorePage() {
   const [dragOver, setDragOver] = useState(false);
   const [showAfter, setShowAfter] = useState(true);
   const [sliderPos, setSliderPos] = useState(50);
+  const [colorize, setColorize] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
@@ -89,7 +91,7 @@ export default function RestorePage() {
     setRestoring(true);
     setError(null);
     try {
-      const result = await restorePhoto(file);
+      const result = await restorePhoto(file, colorize);
       setRestoreResult(result);
     } catch (err) {
       setError(
@@ -348,6 +350,21 @@ export default function RestorePage() {
                     de votre photo. Cliquez sur le bouton ci-dessous pour lancer
                     la magie.
                   </p>
+                  <div className="mb-6 p-4 rounded-xl border border-card-border bg-surface/50">
+                    <label className="flex items-start gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={colorize}
+                        onChange={(e) => setColorize(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded border-card-border text-accent focus:ring-accent"
+                      />
+                      <div className="text-left">
+                        <span className="text-foreground text-sm font-medium">Coloriser la photo</span>
+                        <span className="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">1 crédit</span>
+                        <p className="text-muted text-xs mt-1">Transforme une photo noir & blanc en couleur naturelle. Idéal pour les photos anciennes.</p>
+                      </div>
+                    </label>
+                  </div>
                   <button
                     onClick={handleRestore}
                     className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"

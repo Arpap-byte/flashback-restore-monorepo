@@ -55,7 +55,7 @@ from app.models.schemas import (
     WebhookReponse,
 )
 from app.services.did_service import creer_animation, verifier_statut_animation
-from app.services.gemini_service import analyser_photo, obtenir_parametres_restauration
+from app.services.gemini_service import analyser_photo, obtenir_parametres_restauration, coloriser_photo
 from app.services.stripe_service import (
     creer_session_paiement,
     creer_session_paiement_credits,
@@ -325,6 +325,7 @@ def _appliquer_restauration_pillow(
 @router.post("/restore", response_model=RestaurationReponse)
 async def restaurer(
     fichier: UploadFile = File(...),
+    coloriser: bool = Form(False),
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
@@ -335,16 +336,24 @@ async def restaurer(
     2. L'IA détermine les paramètres de restauration optimaux.
     3. Pillow applique ces paramètres (luminosité, contraste, saturation,
        netteté, débruitage, correction colorimétrique).
-    4. L'image restaurée est retournée.
+    4. Si coloriser=True, l'image est colorisée (Gemini avec fallback Pillow).
+    5. L'image restaurée (et éventuellement colorisée) est retournée.
 
-    **Authentification requise** : un crédit ou essai gratuit est consommé.
+    **Authentification requise** : un crédit (ou 2 si colorisation) est consommé.
 
     Args:
         fichier: Le fichier image à restaurer (JPEG, PNG, WebP, TIFF).
+        coloriser: Si True, applique une colorisation après restauration
+                   (consomme 1 crédit supplémentaire).
 
     Returns:
-        L'analyse, les paramètres appliqués, et le chemin de l'image restaurée.
+        L'analyse, les paramètres appliqués, le chemin de l'image finale,
+        et le nombre de crédits consommés.
     """
+    nb_credits_total = 1  # restauration de base = 1 crédit
+    if coloriser:
+        nb_credits_total = 2
+
     # Validation
     if fichier.content_type and fichier.content_type not in FORMATS_ACCEPTES:
         raise HTTPException(
@@ -371,7 +380,7 @@ async def restaurer(
     travail_id = creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
     mettre_a_jour_travail(travail_id, statut="en_cours")
 
-    # Vérification des crédits avant traitement
+    # Vérification des crédits avant traitement (crédit n°1 : restauration)
     resultat_credit = consommer_credit(utilisateur["id"], "restauration", travail_id)
     if not resultat_credit["succes"]:
         mettre_a_jour_travail(
@@ -383,6 +392,24 @@ async def restaurer(
             status_code=402,
             detail=resultat_credit.get("raison", "Crédits insuffisants. Achetez des crédits pour continuer."),
         )
+
+    # --- Si colorisation demandée, vérifier le 2e crédit AVANT de restaurer ---
+    if coloriser:
+        resultat_credit2 = consommer_credit(utilisateur["id"], "restauration", travail_id)
+        if not resultat_credit2["succes"]:
+            # Rembourser le premier crédit (via crediter_utilisateur)
+            from app.db.database import crediter_utilisateur
+            crediter_utilisateur(utilisateur["id"], 1)
+            mettre_a_jour_travail(
+                travail_id,
+                statut="erreur",
+                message_erreur="Crédits insuffisants pour la colorisation (1 crédit supplémentaire requis).",
+            )
+            raise HTTPException(
+                status_code=402,
+                detail="Crédits insuffisants pour la colorisation. "
+                       "La colorisation consomme 1 crédit supplémentaire.",
+            )
 
     try:
         # Étape 1 : Analyse des défauts
@@ -400,12 +427,23 @@ async def restaurer(
             params,
         )
 
+        # Étape 4 : Colorisation (optionnelle)
+        url_image = f"/uploads/{nom_restaure}"
+        if coloriser:
+            nom_colorise = f"{nom_base}_colorized.jpg"
+            chemin_colorise = UPLOAD_DIR / nom_colorise
+            await coloriser_photo(str(chemin_restaure), str(chemin_colorise))
+            url_image = f"/uploads/{nom_colorise}"
+            chemin_restaure = chemin_colorise  # pour le résultat final
+
         # Succès
         resultat = RestaurationReponse(
-            message="Photo restaurée avec succès !",
+            message="Photo restaurée avec succès !"
+                    + (" (colorisée)" if coloriser else ""),
             analyse=analyse,
             parametres=params,
-            url_image=f"/uploads/{nom_restaure}",
+            url_image=url_image,
+            credits_consommes=nb_credits_total,
         )
         mettre_a_jour_travail(
             travail_id,
@@ -414,6 +452,8 @@ async def restaurer(
             resultat_json=json.dumps({
                 "analyse": analyse.model_dump(),
                 "parametres": params.model_dump(),
+                "colorise": coloriser,
+                "credits_consommes": nb_credits_total,
             }),
         )
         return resultat

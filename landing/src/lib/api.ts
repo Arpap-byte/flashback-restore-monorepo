@@ -130,13 +130,16 @@ export async function analyzePhoto(file: File): Promise<AnalysisResult> {
   });
 }
 
-export async function restorePhoto(file: File): Promise<RestoreResult> {
+export async function restorePhoto(file: File, colorize?: boolean): Promise<RestoreResult> {
   const formData = new FormData();
   formData.append("fichier", file);
+  if (colorize) {
+    formData.append("coloriser", "true");
+  }
   return apiFetch<RestoreResult>("/api/restore", {
     method: "POST",
     body: formData,
-  }, 30000);
+  }, 60000);
 }
 
 export function getRestoredImageUrl(urlImage: string): string {

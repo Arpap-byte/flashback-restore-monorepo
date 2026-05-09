@@ -79,6 +79,7 @@ class RestaurationReponse(BaseModel):
     analyse: AnalyseReponse
     parametres: ParametresRestauration
     url_image: str = Field(..., description="URL ou chemin de l'image restaurée")
+    credits_consommes: int = Field(default=1, description="Nombre de crédits consommés")
 
 
 # ---------------------------------------------------------------------------
