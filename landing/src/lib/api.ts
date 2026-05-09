@@ -54,13 +54,28 @@ export interface TravailHistorique {
   cree_le: string;
 }
 
-function getToken(): string | null {
-  if (typeof window === "undefined") return null;
+/** Get the NextAuth JWT for authenticating API calls */
+async function getAuthHeader(): Promise<Record<string, string>> {
+  if (typeof window === "undefined") return {};
+
+  try {
+    const { getSession } = await import("next-auth/react");
+    const session = await getSession();
+    const jwt = (session as any)?.jwt;
+    if (jwt) {
+      return { Authorization: `Bearer ${jwt}` };
+    }
+  } catch {}
+
+  // Fallback: localStorage token (legacy email/password auth)
   try {
     const stored = localStorage.getItem("flashback_auth");
-    if (stored) return JSON.parse(stored).token;
+    if (stored) {
+      return { Authorization: `Bearer ${JSON.parse(stored).token}` };
+    }
   } catch {}
-  return null;
+
+  return {};
 }
 
 async function apiFetch<T>(
@@ -71,11 +86,9 @@ async function apiFetch<T>(
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
-  const token = getToken();
-  const headers: Record<string, string> = {};
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  const authHeaders = await getAuthHeader();
+  const headers: Record<string, string> = { ...authHeaders };
+
   if (options?.headers) {
     const optHeaders = options.headers as Record<string, string>;
     Object.assign(headers, optHeaders);

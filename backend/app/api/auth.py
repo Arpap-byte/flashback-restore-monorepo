@@ -8,18 +8,22 @@ Endpoints :
 """
 
 import logging
+from typing import Optional
 
 import bcrypt
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 
 from app.auth import creer_token, exiger_utilisateur
+from app.config import INTERNAL_API_KEY
 from app.db.database import (
     creer_utilisateur,
+    creer_utilisateur_oauth,
     mettre_a_jour_derniere_connexion,
     obtenir_essais_restants,
     obtenir_utilisateur_par_email,
     obtenir_utilisateur_par_id,
+    obtenir_utilisateur_par_oauth,
 )
 from app.limiter import limiter
 
@@ -47,6 +51,13 @@ class LoginRequest(BaseModel):
 class AuthResponse(BaseModel):
     token: str = Field(..., description="Token JWT")
     utilisateur: dict = Field(..., description="Informations utilisateur")
+
+
+class OAuthRequest(BaseModel):
+    provider: str = Field(..., description="Fournisseur OAuth (google, facebook, etc.)")
+    provider_id: str = Field(..., description="Identifiant utilisateur chez le fournisseur")
+    email: str = Field(..., description="Email de l'utilisateur")
+    name: Optional[str] = Field(None, description="Nom affiché")
 
 
 class UserResponse(BaseModel):
@@ -133,6 +144,68 @@ async def login(request: Request, body: LoginRequest):
     logger.info(f"Connexion réussie : {utilisateur['email']}")
 
     # Récupérer les essais
+    essais = obtenir_essais_restants(utilisateur["id"]) or {
+        "essais_restants": 0,
+        "est_abonne": False,
+    }
+
+    return AuthResponse(
+        token=token,
+        utilisateur={
+            "id": utilisateur["id"],
+            "email": utilisateur["email"],
+            "essais_restants": essais["essais_restants"],
+            "est_abonne": essais["est_abonne"],
+            "credits": utilisateur.get("credits", 0),
+        },
+    )
+
+
+@router.post("/oauth", response_model=AuthResponse)
+@limiter.limit("10/minute")
+async def oauth_login(
+    request: Request,
+    body: OAuthRequest,
+    x_internal_key: str = Header(None, alias="X-Internal-Key"),
+):
+    """
+    Connecte ou crée un utilisateur via un fournisseur OAuth (Google, Facebook, etc.).
+
+    Si l'utilisateur existe déjà via ce fournisseur, il est connecté.
+    Sinon, un nouveau compte est créé et lié au fournisseur OAuth.
+    Retourne un token JWT.
+
+    Réservé à NextAuth (interne) — nécessite X-Internal-Key.
+    """
+    if x_internal_key != INTERNAL_API_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    # 1. Chercher par provider + provider_id
+    utilisateur = obtenir_utilisateur_par_oauth(body.provider, body.provider_id)
+
+    # 2. Sinon, chercher par email (compte existant à lier)
+    if not utilisateur:
+        utilisateur = obtenir_utilisateur_par_email(body.email)
+
+    # 3. Si toujours pas trouvé, créer un nouveau compte
+    if not utilisateur:
+        nouvel_id = creer_utilisateur_oauth(body.email, body.provider, body.provider_id)
+        if nouvel_id is None:
+            raise HTTPException(
+                status_code=409,
+                detail="Un compte avec cet email existe déjà.",
+            )
+        utilisateur = obtenir_utilisateur_par_id(nouvel_id)
+
+    if utilisateur is None:
+        raise HTTPException(status_code=500, detail="Erreur lors de l'authentification.")
+
+    # Mettre à jour la dernière connexion
+    mettre_a_jour_derniere_connexion(utilisateur["id"])
+
+    # Créer le token JWT
+    token = creer_token(utilisateur["id"], utilisateur["email"])
+    logger.info(f"Connexion OAuth ({body.provider}) : {utilisateur['email']}")
+
     essais = obtenir_essais_restants(utilisateur["id"]) or {
         "essais_restants": 0,
         "est_abonne": False,

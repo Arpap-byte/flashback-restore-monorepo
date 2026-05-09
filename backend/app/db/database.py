@@ -146,6 +146,15 @@ def _migrer_base(conn: sqlite3.Connection) -> None:
         )
         conn.commit()
 
+    # Vérifier si les colonnes OAuth existent dans utilisateurs
+    cur = conn.execute("PRAGMA table_info(utilisateurs)")
+    colonnes_users = [row[1] for row in cur.fetchall()]
+    if "oauth_provider" not in colonnes_users:
+        conn.execute("ALTER TABLE utilisateurs ADD COLUMN oauth_provider TEXT")
+        conn.execute("ALTER TABLE utilisateurs ADD COLUMN oauth_provider_id TEXT")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_oauth_provider ON utilisateurs(oauth_provider, oauth_provider_id)")
+        conn.commit()
+
 
 # ---------------------------------------------------------------------------
 # Travaux (jobs)
@@ -397,6 +406,40 @@ def obtenir_utilisateur_par_email(email: str) -> Optional[dict]:
             "SELECT * FROM utilisateurs WHERE email = ?", (email,)
         ).fetchone()
         return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def obtenir_utilisateur_par_oauth(provider: str, provider_id: str) -> Optional[dict]:
+    """Récupère un utilisateur par son compte OAuth."""
+    conn = _obtenir_connexion()
+    try:
+        row = conn.execute(
+            "SELECT * FROM utilisateurs WHERE oauth_provider = ? AND oauth_provider_id = ?",
+            (provider, provider_id),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def creer_utilisateur_oauth(email: str, provider: str, provider_id: str) -> Optional[str]:
+    """Crée un utilisateur lié à un compte OAuth (Google/Facebook/etc)."""
+    utilisateur_id = str(uuid.uuid4())
+    maintenant = datetime.now(timezone.utc).isoformat()
+    conn = _obtenir_connexion()
+    try:
+        conn.execute(
+            """INSERT INTO utilisateurs
+               (id, email, password_hash, essais_restants, credits, est_abonne,
+                oauth_provider, oauth_provider_id, cree_le, derniere_connexion)
+               VALUES (?, ?, ?, 3, 0, 0, ?, ?, ?, ?)""",
+            (utilisateur_id, email, "", provider, provider_id, maintenant, maintenant),
+        )
+        conn.commit()
+        return utilisateur_id
+    except sqlite3.IntegrityError:
+        return None
     finally:
         conn.close()
 

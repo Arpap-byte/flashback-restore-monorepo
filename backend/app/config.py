@@ -40,6 +40,10 @@ DID_BASE_URL: str = os.getenv(
 SECRET_KEY: str = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set in environment or .env file")
+AUTH_SECRET: str = os.getenv("AUTH_SECRET", "")
+INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY")
+if not INTERNAL_API_KEY:
+    raise RuntimeError("INTERNAL_API_KEY must be set in environment or .env file")
 
 # --- Stripe (paiements) ---
 STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "")
