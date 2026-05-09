@@ -2,12 +2,15 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
   Sparkles,
   ArrowRight,
   AlertTriangle,
+  Shield,
+  LogIn,
   X,
   Download,
   Play,
@@ -18,10 +21,12 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/context/AuthContext";
 import { restorePhoto, getRestoredImageUrl, RestoreResult } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -171,6 +176,68 @@ export default function RestorePage() {
     e.preventDefault();
     handleSliderStart(e.touches[0].clientX);
   };
+
+  if (authLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center pt-24 pb-16">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+            className="w-12 h-12 rounded-full border-2 border-accent/30 border-t-accent"
+          />
+        </div>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <div className="flex-1 flex items-center justify-center pt-24 pb-16">
+          {/* Background glow */}
+          <div className="fixed inset-0 pointer-events-none">
+            <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-violet-600/6 rounded-full blur-[120px]" />
+            <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px]" />
+          </div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative z-10 max-w-md mx-auto px-4 text-center"
+          >
+            <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-6">
+              <Shield className="w-10 h-10 text-accent" />
+            </div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3 font-[family-name:var(--font-playfair)]">
+              Connectez-vous pour restaurer vos photos
+            </h1>
+            <p className="text-muted mb-8">
+              Créez un compte gratuit pour commencer à restaurer vos souvenirs.
+            </p>
+            <div className="flex flex-col gap-3">
+              <Link
+                href="/auth?callbackUrl=/restore"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
+              >
+                <LogIn className="w-5 h-5" />
+                Se connecter
+              </Link>
+              <Link
+                href="/auth?callbackUrl=/restore"
+                className="text-sm text-muted hover:text-foreground transition-colors underline underline-offset-4"
+              >
+                Créer un compte
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">

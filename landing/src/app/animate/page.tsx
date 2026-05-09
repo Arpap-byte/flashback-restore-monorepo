@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
 import {
   Upload,
   Sparkles,
@@ -35,6 +37,8 @@ const statusLabels: Record<string, string> = {
 };
 
 export default function AnimatePage() {
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [text, setText] = useState("Bonjour ! Je suis un souvenir restauré.");
@@ -173,6 +177,50 @@ export default function AnimatePage() {
       window.open(url, "_blank");
     }
   };
+
+  // Auth check
+  if (authLoading) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            className="w-12 h-12 rounded-full border-2 border-violet-500/30 border-t-violet-500"
+          />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="flex flex-col min-h-screen bg-background">
+        <Navbar />
+        <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
+          <div className="text-center px-4">
+            <Film className="w-16 h-16 text-muted mx-auto mb-4 opacity-50" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">
+              Connectez-vous pour animer vos photos
+            </h2>
+            <p className="text-muted mb-6 max-w-md mx-auto">
+              Transformez vos souvenirs en portraits animés avec notre
+              technologie d&apos;animation.
+            </p>
+            <a
+              href="/auth?callbackUrl=/animate"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all"
+            >
+              Se connecter
+            </a>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
