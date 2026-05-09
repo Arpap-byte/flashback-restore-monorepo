@@ -182,6 +182,24 @@ export async function getUserHistory(): Promise<{ travaux: TravailHistorique[] }
   return apiFetch<{ travaux: TravailHistorique[] }>("/api/user/history");
 }
 
+export interface UserMe {
+  id: string;
+  email: string;
+  nom: string | null;
+  plan: string;
+  credits: number;
+  credits_utilises: number;
+  photos_restaurees_mois: number;
+  animations_creees: number;
+  date_renouvellement: string | null;
+  est_abonne: boolean;
+  essais_restants: number;
+}
+
+export async function getUserMe(): Promise<UserMe> {
+  return apiFetch<UserMe>("/api/user/me");
+}
+
 export async function healthCheck(): Promise<{ status: string }> {
   return apiFetch<{ status: string }>("/api/health");
 }

@@ -45,6 +45,10 @@ INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY")
 if not INTERNAL_API_KEY:
     raise RuntimeError("INTERNAL_API_KEY must be set in environment or .env file")
 
+# --- Admin ---
+ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
+# Clé pour les endpoints admin (stats, etc.) — pas de valeur par défaut
+
 # --- Stripe (paiements) ---
 STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "")
 # STRIPE_API_KEY can be empty if Stripe is not used; no hard error

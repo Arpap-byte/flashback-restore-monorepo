@@ -2,7 +2,7 @@ import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
 // Pages that require authentication
-const PROTECTED = ["/restore", "/animate", "/historique"]
+const PROTECTED = ["/restore", "/animate", "/historique", "/dashboard"]
 
 export default auth((req) => {
   const { pathname } = req.nextUrl
@@ -18,5 +18,5 @@ export default auth((req) => {
 })
 
 export const config = {
-  matcher: ["/restore", "/animate", "/historique"],
+  matcher: ["/restore", "/animate", "/historique", "/dashboard"],
 }

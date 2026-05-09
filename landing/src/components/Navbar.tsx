@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, Sun, Moon, User, LogOut, History } from "lucide-react";
+import { Menu, X, Sparkles, Sun, Moon, User, LogOut, History, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/context/AuthContext";
 
@@ -88,6 +88,13 @@ export default function Navbar() {
                 >
                   <History className="w-4 h-4" />
                   Historique
+                </Link>
+                <Link
+                  href="/dashboard"
+                  className="text-sm text-muted hover:text-accent transition-colors font-medium px-3 py-2 rounded-lg hover:bg-accent/5 flex items-center gap-1.5"
+                >
+                  <LayoutDashboard className="w-4 h-4" />
+                  Dashboard
                 </Link>
                 <span className="text-sm text-foreground px-3 py-2 flex items-center gap-1.5">
                   <User className="w-4 h-4 text-accent" />
@@ -177,6 +184,13 @@ export default function Navbar() {
                     className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
                   >
                     Historique
+                  </Link>
+                  <Link
+                    href="/dashboard"
+                    onClick={() => setMobileOpen(false)}
+                    className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
+                  >
+                    Dashboard
                   </Link>
                   <button
                     onClick={() => {

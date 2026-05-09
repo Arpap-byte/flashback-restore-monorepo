@@ -136,10 +136,30 @@ class SanteReponse(BaseModel):
     statut: str = Field(default="OK", description="Statut du service")
     version: str = Field(default="1.0.0", description="Version de l'API")
     gemini_disponible: bool = Field(
-        default=True, description="Indique si l'API Gemini est configurée"
+        default=True, description="Indique si l'API Gemini est accessible"
     )
     did_disponible: bool = Field(
-        default=True, description="Indique si l'API D-ID est configurée"
+        default=True, description="Indique si la clé API D-ID est configurée"
+    )
+    db_disponible: bool = Field(
+        default=True, description="Indique si la base de données est accessible"
+    )
+    stripe_disponible: bool = Field(
+        default=True, description="Indique si la clé API Stripe est configurée"
+    )
+
+
+class StatsReponse(BaseModel):
+    """Réponse du endpoint de statistiques (admin)."""
+
+    nombre_total_utilisateurs: int = Field(
+        default=0, description="Nombre total d'utilisateurs inscrits"
+    )
+    nombre_total_restaurations: int = Field(
+        default=0, description="Nombre total de restaurations effectuées"
+    )
+    nombre_total_animations: int = Field(
+        default=0, description="Nombre total d'animations créées"
     )
 
 

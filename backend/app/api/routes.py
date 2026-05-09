@@ -6,7 +6,8 @@ Endpoints :
 - POST /api/restore   : Restaurer une photo ancienne
 - POST /api/animate   : Créer une animation
 - GET  /api/animate/{id} : Suivre le statut d'une animation
-- GET  /api/health    : Vérifier la santé du service
+- GET  /api/health    : Vérifier la santé du service (Gemini, D-ID, DB, Stripe)
+- GET  /api/stats     : Statistiques globales (protégé par X-Admin-Key)
 """
 
 import json
@@ -18,10 +19,11 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from PIL import Image, ImageEnhance, ImageFilter
 
-from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, UPLOAD_DIR
+from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR
 from app.auth import exiger_utilisateur
 from app.db.database import (
     CREDITS_PAR_PLAN,
+    _obtenir_connexion,
     consommer_credit,
     crediter_utilisateur,
     creer_abonnement,
@@ -47,6 +49,7 @@ from app.models.schemas import (
     ParametresRestauration,
     RestaurationReponse,
     SanteReponse,
+    StatsReponse,
     StatutAnimation,
     StatutAnimationReponse,
     WebhookReponse,
@@ -85,45 +88,97 @@ async def sante(request: Request):
     """
     Vérification de l'état du service.
 
-    Retourne le statut de l'API et teste réellement la connectivité
-    aux services externes (Gemini et le service d'animation).
+    Teste RÉELLEMENT la connectivité aux services externes :
+    - Gemini : appel API pour lister les modèles (timeout 5s)
+    - D-ID : vérifie que la clé API est configurée
+    - Base de données : exécute un SELECT 1 sur SQLite
+    - Stripe : vérifie que la clé API est configurée
     """
     import httpx
-    from google import genai
 
-    # Test Gemini : tentative de listage des modèles
+    # --- Test Gemini : appel réel à l'API de listage des modèles ---
     gemini_ok = False
     if GEMINI_API_KEY:
         try:
-            client = genai.Client(api_key=GEMINI_API_KEY)
-            # Tente de lister les modèles pour vérifier la connectivité
-            client.models.list()
-            gemini_ok = True
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                response = await client.get(
+                    f"https://generativelanguage.googleapis.com/v1beta/models",
+                    params={"key": GEMINI_API_KEY},
+                )
+                gemini_ok = response.status_code == 200
         except Exception as e:
             logger.warning(f"Test de connectivité Gemini échoué : {e}")
 
-    # Test D-ID : appel GET à l'API
-    did_ok = False
-    if DID_API_KEY:
+    # --- Test D-ID : vérification simple de la présence de la clé ---
+    did_ok = bool(DID_API_KEY)
+
+    # --- Test Base de données : SELECT 1 ---
+    db_ok = False
+    try:
+        conn = _obtenir_connexion()
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{DID_BASE_URL}/talks",
-                    headers={
-                        "Authorization": f"Basic {DID_API_KEY}",
-                        "Accept": "application/json",
-                    },
-                )
-                # Une réponse 200 ou 401 (auth OK mais pas de talks) indique que le service est joignable
-                did_ok = response.status_code in (200, 401)
-        except Exception as e:
-            logger.warning(f"Test de connectivité D-ID échoué : {e}")
+            conn.execute("SELECT 1")
+            db_ok = True
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.warning(f"Test de connectivité DB échoué : {e}")
+
+    # --- Test Stripe : vérification simple de la présence de la clé ---
+    stripe_ok = bool(STRIPE_API_KEY)
 
     return SanteReponse(
         statut="OK",
         version="1.0.0",
         gemini_disponible=gemini_ok,
         did_disponible=did_ok,
+        db_disponible=db_ok,
+        stripe_disponible=stripe_ok,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Statistiques (Admin)
+# ---------------------------------------------------------------------------
+
+@router.get("/stats", response_model=StatsReponse)
+async def statistiques(request: Request):
+    """
+    Retourne les statistiques globales de l'application.
+
+    **Protégé par token admin** : nécessite l'en-tête X-Admin-Key.
+    """
+    # Vérification du token admin
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé. Token admin requis.")
+
+    # Requêtes de statistiques
+    try:
+        conn = _obtenir_connexion()
+        try:
+            nb_utilisateurs = conn.execute(
+                "SELECT COUNT(*) FROM utilisateurs"
+            ).fetchone()[0]
+            nb_restaurations = conn.execute(
+                "SELECT COUNT(*) FROM travaux WHERE type = 'restauration'"
+            ).fetchone()[0]
+            nb_animations = conn.execute(
+                "SELECT COUNT(*) FROM travaux WHERE type = 'animation'"
+            ).fetchone()[0]
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.exception(f"Erreur lors de la récupération des statistiques : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la récupération des statistiques.",
+        )
+
+    return StatsReponse(
+        nombre_total_utilisateurs=nb_utilisateurs,
+        nombre_total_restaurations=nb_restaurations,
+        nombre_total_animations=nb_animations,
     )
 
 
