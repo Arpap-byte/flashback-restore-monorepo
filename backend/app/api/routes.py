@@ -576,6 +576,12 @@ async def restaurer(
     if coloriser:
         nb_credits_total = 2
 
+    # Vérifier les crédits AVANT de sauvegarder le fichier
+    for i in range(nb_credits_total):
+        peut, raison = peut_restaurer(utilisateur["id"])
+        if not peut:
+            raise HTTPException(status_code=402, detail=raison)
+
     # Validation et sauvegarde
     contenu = await fichier.read()
     nom_original = _valider_upload(fichier, contenu)
@@ -592,24 +598,8 @@ async def restaurer(
     travail_id = creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
     mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Vérification et consommation des crédits (check-then-consume)
+    # Consommation des crédits (déjà vérifiés avant la sauvegarde du fichier)
     for i in range(nb_credits_total):
-        peut, raison = peut_restaurer(utilisateur["id"])
-        if not peut:
-            # Rembourser les crédits déjà consommés dans ce batch
-            if i > 0:
-                crediter_utilisateur(utilisateur["id"], i)
-            message_err = (
-                "Crédits insuffisants pour la colorisation (1 crédit supplémentaire requis)."
-                if i == 1
-                else raison
-            )
-            mettre_a_jour_travail(
-                travail_id,
-                statut="erreur",
-                message_erreur=message_err,
-            )
-            raise HTTPException(status_code=402, detail=raison)
         consommer_operation(utilisateur["id"], "restauration", travail_id)
 
     try:
@@ -827,9 +817,14 @@ async def animer(
 
 
 @router.get("/animate/{job_id}", response_model=StatutAnimationReponse)
-async def statut_animation(job_id: str):
+async def statut_animation(
+    job_id: str,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
     """
     Vérifie le statut d'une animation.
+
+    **Authentification requise** : l'utilisateur doit être propriétaire du travail.
 
     Interroge le service d'animation pour connaître l'avancement d'une animation.
     Lorsque le statut est « done », l'URL de la vidéo est retournée.
@@ -840,6 +835,12 @@ async def statut_animation(job_id: str):
     Returns:
         Le statut actuel et l'URL de la vidéo si terminée.
     """
+    # Vérifier que le job appartient à l'utilisateur
+    travail = obtenir_travail_par_job_externe(job_id)
+    if travail is None:
+        raise HTTPException(status_code=404, detail="Travail introuvable.")
+    if travail.get("utilisateur_id") != utilisateur["id"]:
+        raise HTTPException(status_code=403, detail="Ce travail ne vous appartient pas.")
     try:
         data = await verifier_statut_animation(job_id)
 
@@ -1172,9 +1173,14 @@ async def webhook_stripe(request: Request):
 
 
 @router.get("/stripe/subscription/{customer_id}", response_model=EtatAbonnement)
-async def consulter_abonnement(customer_id: str):
+async def consulter_abonnement(
+    customer_id: str,
+    request: Request,
+):
     """
     Récupère l'état de l'abonnement d'un client Stripe.
+
+    **Protégé par token admin** : nécessite l'en-tête X-Admin-Key.
 
     Args:
         customer_id: L'identifiant client Stripe (ex: « cus_xxxx »).
@@ -1182,6 +1188,9 @@ async def consulter_abonnement(customer_id: str):
     Returns:
         Les informations détaillées de l'abonnement.
     """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
     try:
         abonnement = await obtenir_abonnement_stripe(customer_id)
         return EtatAbonnement(**abonnement)

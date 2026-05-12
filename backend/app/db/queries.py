@@ -680,15 +680,17 @@ async def obtenir_credits_restants(utilisateur_id: str) -> dict:
 async def creer_token_reinitialisation(
     utilisateur_id: str, token: str, duree_minutes: int = 30
 ) -> str:
-    """Crée un token de réinitialisation de mot de passe. Retourne l'ID."""
+    """Crée un token de réinitialisation de mot de passe. Stocke uniquement le hash SHA-256 du token."""
+    import hashlib
     maintenant = _utcnow()
     expire = maintenant + timedelta(minutes=duree_minutes)
     token_id = _new_uuid()
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
     async with async_session() as session:
         entry = ReinitialisationMdp(
             id=token_id,
             utilisateur_id=utilisateur_id,
-            token=token,
+            token=token_hash,  # Stocker le hash, pas le token brut
             expire_le=expire,
             utilise=0,
             cree_le=maintenant,
@@ -699,11 +701,13 @@ async def creer_token_reinitialisation(
 
 
 async def verifier_token_reinitialisation(token: str) -> Optional[dict]:
-    """Vérifie un token de réinitialisation. Retourne l'entrée si valide, None sinon."""
+    """Vérifie un token de réinitialisation (comparaison par hash SHA-256). Retourne l'entrée si valide, None sinon."""
+    import hashlib
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
     async with async_session() as session:
         stmt = select(ReinitialisationMdp).where(
             and_(
-                ReinitialisationMdp.token == token,
+                ReinitialisationMdp.token == token_hash,
                 ReinitialisationMdp.utilise == 0,
             )
         )
