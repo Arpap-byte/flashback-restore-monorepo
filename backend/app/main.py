@@ -6,27 +6,26 @@ et le montage des routes.
 """
 
 import logging
+import os
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 
 from app.api.auth import router as auth_router
 from app.api.routes import router
 from app.api.user import router as user_router
-from app.config import DEBUG, UPLOAD_DIR
+from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT
 from app.db.database import initialiser_base
-from app.limiter import limiter
+from app.db.session import init_db as async_initialiser_base
+from app.rate_limit_middleware import check_rate_limit
 
 # ---------------------------------------------------------------------------
-# Rate limiting
+# Rate limiting — voir middleware HTTP plus bas
 # ---------------------------------------------------------------------------
-
-# limiter imported from app.limiter
 
 # ---------------------------------------------------------------------------
 # Configuration du logging
@@ -64,26 +63,67 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# Rate limiting state and handler
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+# Rate limiting — middleware HTTP custom (voir rate_limit_middleware.py)
+
+
+@app.middleware("http")
+async def rate_limit_middleware(request: Request, call_next):
+    try:
+        check_rate_limit(request)
+    except HTTPException as e:
+        return JSONResponse(
+            status_code=e.status_code,
+            content={"detail": e.detail},
+        )
+    return await call_next(request)
 
 # ---------------------------------------------------------------------------
 # Middleware CORS
 # ---------------------------------------------------------------------------
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
+# Origines autorisées : depuis .env en production, sinon fallback dev
+if ALLOWED_ORIGINS.strip():
+    _cors_origins = [o.strip() for o in ALLOWED_ORIGINS.split(",") if o.strip()]
+else:
+    _cors_origins = [
         "http://localhost:3000",
         "http://localhost:8001",
         "https://flashback-restore.com",
         "https://www.flashback-restore.com",
-    ],
+    ]
+
+# En production, NE PAS inclure localhost
+if ENVIRONMENT == "production":
+    _cors_origins = [o for o in _cors_origins if "localhost" not in o]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ---------------------------------------------------------------------------
+# Middleware de sécurité (headers)
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def ajouter_headers_securite(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000"
+    return response
+
+
+@app.middleware("http")
+async def ajouter_cache_control_uploads(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/uploads/"):
+        response.headers["Cache-Control"] = "public, max-age=86400"
+    return response
+
 
 # ---------------------------------------------------------------------------
 # Routes API
@@ -108,7 +148,7 @@ app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 async def demarrage():
     """Initialise la base de données au démarrage."""
     logger.info("Démarrage de Flashback Restore API...")
-    initialiser_base()
+    await async_initialiser_base()
     logger.info(f"Répertoire d'upload : {UPLOAD_DIR}")
     logger.info("Base de données initialisée.")
     logger.info("API prête à recevoir des requêtes.")

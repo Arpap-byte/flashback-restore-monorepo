@@ -13,6 +13,10 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
+        protocol: "https",
+        hostname: "flashback-restore.com",
+      },
+      {
         protocol: "http",
         hostname: "148.230.116.52",
         port: "8000",

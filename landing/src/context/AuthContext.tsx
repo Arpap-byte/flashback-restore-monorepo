@@ -1,7 +1,7 @@
 "use client";
 
 import { SessionProvider, useSession, signOut as nextAuthSignOut } from "next-auth/react";
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useMemo, useCallback } from "react";
 
 export interface User {
   id: string;
@@ -28,23 +28,27 @@ const AuthContext = createContext<AuthState>({
 function AuthInner({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
 
-  const user = (session?.user as any)?.id
-    ? (session?.user as User)
-    : null;
+  const user = useMemo(() => {
+    const id = (session?.user as any)?.id;
+    if (!id) return null;
+    return session?.user as User;
+  }, [(session?.user as any)?.id]);
 
-  const token = (session as any)?.apiToken || null;
+  const token = useMemo(() => {
+    return (session as any)?.apiToken || null;
+  }, [(session as any)?.apiToken]);
 
-  const logout = () => nextAuthSignOut({ callbackUrl: "/" });
+  const logout = useCallback(() => nextAuthSignOut({ callbackUrl: "/" }), []);
+
+  const value = useMemo(() => ({
+    user,
+    token,
+    loading: status === "loading",
+    logout,
+  }), [user, token, status, logout]);
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token: token,
-        loading: status === "loading",
-        logout,
-      }}
-    >
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

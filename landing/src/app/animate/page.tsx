@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import {
@@ -27,7 +28,8 @@ import {
   AnimationStatus,
 } from "@/lib/api";
 
-const POLL_INTERVAL = 5000; // 5 seconds
+const POLL_TIMEOUT = 120_000; // 2 minutes max
+const POLL_DELAYS = [5_000, 8_000, 12_000, 20_000]; // backoff exponentiel (5s → 8s → 12s → 20s)
 
 const statusLabels: Record<string, string> = {
   en_attente: "En attente",
@@ -41,13 +43,16 @@ export default function AnimatePage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
-  const [text, setText] = useState("Bonjour ! Je suis un souvenir restauré.");
+  const [text, setText] = useState("");
+  const [selectedPreset, setSelectedPreset] = useState<string | null>(null);
   const [animating, setAnimating] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<AnimationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const pollRef = useRef<NodeJS.Timeout | null>(null);
+  const pollAttempts = useRef(0);
+  const pollStartTime = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // On mount, check for photo passed from restore page
@@ -65,28 +70,55 @@ export default function AnimatePage() {
     }
   }, []);
 
-  // Polling
+  // Polling avec timeout + backoff exponentiel
   useEffect(() => {
     if (!jobId || status?.status === "termine" || status?.status === "erreur")
       return;
 
+    // Démarrer le chronomètre
+    if (pollAttempts.current === 0) {
+      pollStartTime.current = Date.now();
+    }
+
+    let cancelled = false;
+
     const poll = async () => {
+      if (cancelled) return;
+
+      const elapsed = Date.now() - pollStartTime.current;
+      if (elapsed >= POLL_TIMEOUT) {
+        setStatus({ status: "erreur", message: "L'animation a pris trop de temps. Veuillez réessayer." });
+        return;
+      }
+
       try {
         const result = await checkAnimationStatus(jobId);
+        if (cancelled) return;
         setStatus(result);
+
         if (result.status === "termine" || result.status === "erreur") {
-          if (pollRef.current) clearInterval(pollRef.current);
+          return; // Arrêter le polling
         }
-      } catch {
-        // Silently ignore polling errors
+
+        // Planifier le prochain poll avec backoff
+        const delay = POLL_DELAYS[Math.min(pollAttempts.current, POLL_DELAYS.length - 1)];
+        pollAttempts.current += 1;
+        pollRef.current = setTimeout(poll, delay);
+      } catch (pollErr) {
+        if (cancelled) return;
+        console.error("Erreur de polling D-ID:", pollErr);
+        // Continuer malgré l'erreur réseau — ne pas ignorer silencieusement
+        const delay = POLL_DELAYS[Math.min(pollAttempts.current, POLL_DELAYS.length - 1)];
+        pollAttempts.current += 1;
+        pollRef.current = setTimeout(poll, delay);
       }
     };
 
-    poll(); // immediate first poll
-    pollRef.current = setInterval(poll, POLL_INTERVAL);
+    poll(); // premier poll immédiat
 
     return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
+      cancelled = true;
+      if (pollRef.current) clearTimeout(pollRef.current);
     };
   }, [jobId, status?.status]);
 
@@ -94,10 +126,12 @@ export default function AnimatePage() {
     const validTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!validTypes.includes(f.type)) {
       setError("Format non supporté. Utilisez JPG, PNG ou WebP.");
+      setTimeout(() => setError(null), 6000);
       return;
     }
     if (f.size > 20 * 1024 * 1024) {
       setError("Fichier trop volumineux (max 20 Mo).");
+      setTimeout(() => setError(null), 6000);
       return;
     }
     setError(null);
@@ -124,6 +158,8 @@ export default function AnimatePage() {
     setAnimating(true);
     setError(null);
     setStatus({ status: "en_attente" });
+    pollAttempts.current = 0;
+    pollStartTime.current = 0;
     try {
       const result = await animatePhoto(file, text);
       setJobId(result.job_id);
@@ -146,8 +182,12 @@ export default function AnimatePage() {
     setStatus(null);
     setJobId(null);
     setError(null);
+    setSelectedPreset(null);
+    setText("");
+    pollAttempts.current = 0;
+    pollStartTime.current = 0;
     sessionStorage.removeItem("flashback_photo");
-    if (pollRef.current) clearInterval(pollRef.current);
+    if (pollRef.current) clearTimeout(pollRef.current);
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -308,11 +348,13 @@ export default function AnimatePage() {
               <div className="grid lg:grid-cols-5 gap-8">
                 {/* Preview */}
                 <div className="lg:col-span-2">
-                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl">
-                    <img
+                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl aspect-[3/4]">
+                    <Image
                       src={preview}
                       alt="Aperçu de la photo"
-                      className="w-full aspect-[3/4] object-contain bg-surface-alt"
+                      fill
+                      className="object-contain bg-surface-alt"
+                      sizes="(max-width: 1024px) 100vw, 40vw"
                     />
                     {!animating && !status && (
                       <button
@@ -329,33 +371,85 @@ export default function AnimatePage() {
                 <div className="lg:col-span-3 flex flex-col gap-6">
                   {!animating && !status && (
                     <>
-                      {/* Text input */}
+                      {/* Preset animation choices */}
                       <div className="bg-card border border-card-border rounded-2xl p-6">
                         <div className="flex items-center gap-2 mb-3">
-                          <MessageSquare className="w-4 h-4 text-violet-400" />
-                          <label
-                            htmlFor="animation-text"
-                            className="text-sm font-semibold text-foreground"
-                          >
-                            Que dira le portrait ?
-                          </label>
+                          <Sparkles className="w-4 h-4 text-violet-400" />
+                          <span className="text-sm font-semibold text-foreground">
+                            Choisissez un style d&apos;animation
+                          </span>
                         </div>
-                        <textarea
-                          id="animation-text"
-                          value={text}
-                          onChange={(e) => setText(e.target.value)}
-                          rows={3}
-                          maxLength={200}
-                          className="w-full bg-surface border border-card-border rounded-xl p-4 text-foreground placeholder:text-muted text-sm resize-none focus:outline-none focus:border-violet-500/50 transition-colors"
-                          placeholder="Entrez le texte que le portrait animé dira..."
-                        />
-                        <div className="flex items-center justify-between mt-2">
-                          <span className="text-xs text-muted">
-                            {text.length}/200 caractères
-                          </span>
-                          <span className="text-xs text-muted flex items-center gap-1">
-                            <Clock className="w-3 h-3" />~30 secondes
-                          </span>
+                        <p className="text-xs text-muted mb-4">
+                          Notre IA donne vie à votre photo selon le style choisi.
+                        </p>
+                        <div className="flex flex-col gap-3">
+                          {/* Option 1: Saluer et sourire */}
+                          <button
+                            onClick={() => {
+                              setText("The person looks at the camera, raises their hand and waves hello with a warm, genuine smile spreading across their face. Their eyes crinkle naturally, and after the greeting they relax into a calm, content expression. The motion is smooth and lifelike — as if greeting an old friend.");
+                              setSelectedPreset("wave");
+                            }}
+                            className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                              selectedPreset === "wave"
+                                ? "border-violet-500 bg-violet-500/10 shadow-lg shadow-violet-500/10"
+                                : "border-card-border hover:border-violet-500/30 hover:bg-violet-500/5"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${
+                                selectedPreset === "wave"
+                                  ? "bg-violet-500/20"
+                                  : "bg-violet-500/10"
+                              }`}>
+                                👋
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-foreground">
+                                  Saluer et sourire
+                                </p>
+                                <p className="text-xs text-muted mt-0.5">
+                                  La personne vous salue de la main avec un sourire chaleureux
+                                </p>
+                              </div>
+                              {selectedPreset === "wave" && (
+                                <Check className="w-5 h-5 text-violet-400 ml-auto flex-shrink-0" />
+                              )}
+                            </div>
+                          </button>
+
+                          {/* Option 2: Animer simplement */}
+                          <button
+                            onClick={() => {
+                              setText("Subtle, natural facial animation: the person blinks gently, their head tilts ever so slightly, a soft smile appears and fades naturally. Their eyes have a lifelike sparkle, and small micro-expressions play across their face — as if they are truly alive and present in the moment, looking at you with quiet warmth.");
+                              setSelectedPreset("natural");
+                            }}
+                            className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 ${
+                              selectedPreset === "natural"
+                                ? "border-violet-500 bg-violet-500/10 shadow-lg shadow-violet-500/10"
+                                : "border-card-border hover:border-violet-500/30 hover:bg-violet-500/5"
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${
+                                selectedPreset === "natural"
+                                  ? "bg-violet-500/20"
+                                  : "bg-violet-500/10"
+                              }`}>
+                                ✨
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-foreground">
+                                  Animer simplement
+                                </p>
+                                <p className="text-xs text-muted mt-0.5">
+                                  Mouvements subtils et naturels — clignement, sourire léger, présence vivante
+                                </p>
+                              </div>
+                              {selectedPreset === "natural" && (
+                                <Check className="w-5 h-5 text-violet-400 ml-auto flex-shrink-0" />
+                              )}
+                            </div>
+                          </button>
                         </div>
                       </div>
 
@@ -363,7 +457,7 @@ export default function AnimatePage() {
                       <div className="bg-violet-500/5 border border-violet-500/10 rounded-xl p-4">
                         <p className="text-sm text-muted flex items-start gap-2">
                           <Sparkles className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
-                          L&apos;animation utilise notre technologie d&apos;animation pour créer un portrait
+                          L&apos;animation utilise notre technologie pour créer un portrait
                           vivant avec des expressions faciales naturelles.
                           Résultat en vidéo MP4.
                         </p>
@@ -372,7 +466,12 @@ export default function AnimatePage() {
                       {/* Action */}
                       <button
                         onClick={handleAnimate}
-                        className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-gradient-to-r from-violet-500 to-violet-600 text-white font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-violet-500/25 active:scale-[0.97]"
+                        disabled={!selectedPreset}
+                        className={`w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-gradient-to-r from-violet-500 to-violet-600 text-white font-semibold text-base transition-all active:scale-[0.97] ${
+                          selectedPreset
+                            ? "hover:brightness-110 hover:shadow-xl hover:shadow-violet-500/25"
+                            : "opacity-50 cursor-not-allowed"
+                        }`}
                       >
                         <Play className="w-5 h-5" />
                         Créer l&apos;animation

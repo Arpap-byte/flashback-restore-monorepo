@@ -17,6 +17,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 UPLOAD_DIR = BASE_DIR / "uploads"
 DB_PATH = BASE_DIR / "flashback.db"
+DATABASE_URL: str = os.getenv(
+    "DATABASE_URL",
+    "postgresql+asyncpg://flashback:flashback@localhost:5432/flashback",
+)
 
 # Création automatique du répertoire d'upload
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -53,7 +57,13 @@ ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
 STRIPE_API_KEY: str = os.getenv("STRIPE_API_KEY", "")
 # STRIPE_API_KEY can be empty if Stripe is not used; no hard error
 STRIPE_PUBLISHABLE_KEY: str = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
-STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "whsec_placeholder")
+STRIPE_WEBHOOK_SECRET: str = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+# Ne pas démarrer avec le placeholder : plante volontairement au boot
+if not STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET == "whsec_placeholder":
+    raise ValueError(
+        "STRIPE_WEBHOOK_SECRET is missing or still set to 'whsec_placeholder'. "
+        "Set your real Stripe webhook secret in .env before starting the server."
+    )
 STRIPE_PRICE_DECOUVERTE: str = os.getenv("STRIPE_PRICE_DECOUVERTE", "price_decouverte_monthly")
 STRIPE_PRICE_PREMIUM: str = os.getenv("STRIPE_PRICE_PREMIUM", "price_premium_monthly")
 STRIPE_PRICE_ANNUEL: str = os.getenv("STRIPE_PRICE_ANNUEL", "price_premium_yearly")
@@ -66,3 +76,15 @@ HOST: str = os.getenv("HOST", "0.0.0.0")
 PORT: int = int(os.getenv("PORT", "8000"))
 DEBUG: bool = os.getenv("DEBUG", "false").lower() == "true"
 ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
+
+# --- URLs publiques ---
+PUBLIC_BACKEND_URL: str = os.getenv("PUBLIC_BACKEND_URL", "http://localhost:8000")
+ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
+
+# --- Email (SMTP) ---
+SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER: str = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM: str = os.getenv("SMTP_FROM", "")
+SITE_URL: str = os.getenv("SITE_URL", "https://flashback-restore.com")

@@ -46,7 +46,7 @@ services:
     container_name: flashback-landing
     restart: unless-stopped
     ports:
-      - "3000:3000"
+      - "8001:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
       - NEXT_PUBLIC_SITE_URL=http://localhost

@@ -8,6 +8,7 @@ Utilise le modèle gemini-2.5-flash pour :
 Toutes les interactions sont en français.
 """
 
+import asyncio
 import json
 import logging
 from pathlib import Path
@@ -31,6 +32,72 @@ def _obtenir_client() -> genai.Client:
     if _client is None:
         _client = genai.Client(api_key=GEMINI_API_KEY)
     return _client
+
+
+def _parser_json_gemini(texte_brut: str) -> dict:
+    """
+    Parse la réponse texte de Gemini en dictionnaire JSON.
+
+    Gère le nettoyage des blocs markdown (```json ... ```) et applique
+    un fallback robuste : extraction entre accolades, puis correction
+    des sauts de ligne dans les chaînes.
+
+    Args:
+        texte_brut: Le texte brut retourné par l'API Gemini.
+
+    Returns:
+        Le dictionnaire parsé.
+
+    Raises:
+        ValueError: Si le texte ne contient aucun JSON valide.
+    """
+    texte = texte_brut.strip()
+
+    # Nettoyage des blocs markdown éventuels
+    if texte.startswith("```"):
+        texte = texte.split("\n", 1)[-1]
+        if texte.endswith("```"):
+            texte = texte[:-3]
+        texte = texte.strip()
+
+    if texte.startswith("```json"):
+        texte = texte[7:].strip()
+        if texte.endswith("```"):
+            texte = texte[:-3].strip()
+
+    # Tentative de parser directement
+    try:
+        return json.loads(texte)
+    except json.JSONDecodeError:
+        pass
+
+    # Fallback : extraire entre le premier { et le dernier }
+    debut = texte.find("{")
+    fin = texte.rfind("}")
+    if debut >= 0 and fin > debut:
+        fragment = texte[debut:fin + 1]
+        try:
+            return json.loads(fragment)
+        except json.JSONDecodeError:
+            pass
+
+        # Nettoyage agressif : échapper les sauts de ligne dans les chaînes
+        import re
+        fragment = re.sub(
+            r'(?<!\\)"(?:(?<!\\)(?:\\\\\\)*\\"|[^"\n])*"',
+            lambda m: m.group(0).replace('\n', '\\n'),
+            fragment,
+        )
+        try:
+            return json.loads(fragment)
+        except json.JSONDecodeError as e:
+            logger.error(f"Réponse Gemini JSON invalide : {texte_brut[:500]}")
+            raise ValueError(
+                f"Impossible de parser la réponse de Gemini : {e}"
+            ) from e
+    else:
+        logger.error(f"Réponse Gemini sans JSON : {texte_brut[:500]}")
+        raise ValueError("Réponse de Gemini ne contient pas de JSON valide")
 
 
 # ---------------------------------------------------------------------------
@@ -81,8 +148,9 @@ async def analyser_photo(chemin_image: str) -> AnalyseReponse:
     # Lecture de l'image
     image_bytes = Path(chemin_image).read_bytes()
 
-    # Appel à Gemini avec le prompt d'analyse
-    response = client.models.generate_content(
+    # Appel à Gemini avec le prompt d'analyse (offloadé hors de l'event loop)
+    response = await asyncio.to_thread(
+        client.models.generate_content,
         model=GEMINI_MODEL,
         contents=[
             PROMPT_ANALYSE,
@@ -95,46 +163,7 @@ async def analyser_photo(chemin_image: str) -> AnalyseReponse:
     )
 
     texte_brut = response.text.strip() if response.text else ""
-
-    # Nettoyage de la réponse (suppression des blocs markdown éventuels)
-    if texte_brut.startswith("```"):
-        texte_brut = texte_brut.split("\n", 1)[-1]
-        if texte_brut.endswith("```"):
-            texte_brut = texte_brut[:-3]
-        texte_brut = texte_brut.strip()
-
-    if texte_brut.startswith("```json"):
-        texte_brut = texte_brut[7:].strip()
-        if texte_brut.endswith("```"):
-            texte_brut = texte_brut[:-3].strip()
-
-    # Tentative de parser
-    data = None
-    try:
-        data = json.loads(texte_brut)
-    except json.JSONDecodeError:
-        # Extraction robuste : trouver le premier { et le dernier }
-        debut = texte_brut.find("{")
-        fin = texte_brut.rfind("}")
-        if debut >= 0 and fin > debut:
-            fragment = texte_brut[debut:fin + 1]
-            try:
-                data = json.loads(fragment)
-            except json.JSONDecodeError:
-                # Nettoyage agressif : supprimer les sauts de ligne dans les chaînes
-                import re
-                fragment = re.sub(r'(?<!\\)"(?:(?<!\\)(?:\\\\)*\\"|[^"])*"', 
-                    lambda m: m.group(0).replace('\n', '\\n'), fragment)
-                try:
-                    data = json.loads(fragment)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Réponse Gemini invalide : {texte_brut[:500]}")
-                    raise ValueError(
-                        f"Impossible de parser la réponse de Gemini : {e}"
-                    ) from e
-        else:
-            logger.error(f"Réponse Gemini sans JSON : {texte_brut[:500]}")
-            raise ValueError("Réponse de Gemini ne contient pas de JSON valide")
+    data = _parser_json_gemini(texte_brut)
 
     # Normalisation de l'état global
     etat = data.get("etat_global", "moyen")
@@ -220,7 +249,8 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
     client = _obtenir_client()
     image_bytes = Path(chemin_image).read_bytes()
 
-    response = client.models.generate_content(
+    response = await asyncio.to_thread(
+        client.models.generate_content,
         model=GEMINI_MODEL,
         contents=[
             PROMPT_RESTAURATION,
@@ -233,43 +263,7 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
     )
 
     texte_brut = response.text.strip() if response.text else ""
-
-    # Nettoyage
-    if texte_brut.startswith("```"):
-        texte_brut = texte_brut.split("\n", 1)[-1]
-        if texte_brut.endswith("```"):
-            texte_brut = texte_brut[:-3]
-        texte_brut = texte_brut.strip()
-    if texte_brut.startswith("```json"):
-        texte_brut = texte_brut[7:].strip()
-        if texte_brut.endswith("```"):
-            texte_brut = texte_brut[:-3].strip()
-
-    # Tentative de parser
-    data = None
-    try:
-        data = json.loads(texte_brut)
-    except json.JSONDecodeError:
-        debut = texte_brut.find("{")
-        fin = texte_brut.rfind("}")
-        if debut >= 0 and fin > debut:
-            fragment = texte_brut[debut:fin + 1]
-            try:
-                data = json.loads(fragment)
-            except json.JSONDecodeError:
-                import re
-                fragment = re.sub(r'(?<!\\)"(?:(?<!\\)(?:\\\\)*\\"|[^"])*"',
-                    lambda m: m.group(0).replace('\n', '\\n'), fragment)
-                try:
-                    data = json.loads(fragment)
-                except json.JSONDecodeError as e:
-                    logger.error(f"Réponse Gemini invalide pour restauration : {texte_brut[:500]}")
-                    raise ValueError(
-                        f"Impossible de parser la réponse de Gemini : {e}"
-                    ) from e
-        else:
-            logger.error(f"Réponse Gemini sans JSON : {texte_brut[:500]}")
-            raise ValueError("Réponse de Gemini ne contient pas de JSON valide")
+    data = _parser_json_gemini(texte_brut)
 
     params = ParametresRestauration(
         luminosite=float(data.get("luminosite", 1.0)),
@@ -327,7 +321,7 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
         async with httpx.AsyncClient(timeout=60.0) as http_client:
             response = await http_client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
-                params={"key": GEMINI_API_KEY},
+                headers={"x-goog-api-key": GEMINI_API_KEY},
                 json={
                     "contents": [
                         {
@@ -408,5 +402,139 @@ def _colorisation_pillow(chemin_source: str, chemin_destination: str) -> None:
     # 5. Légère netteté
     ameliorateur = ImageEnhance.Sharpness(image)
     image = ameliorateur.enhance(1.2)
+
+    image.save(chemin_destination, quality=95)
+
+
+# ---------------------------------------------------------------------------
+# Restauration IA par Gemini Image Model
+# ---------------------------------------------------------------------------
+
+GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview"  # latest banana flash
+
+PROMPT_RESTAURATION_IA = (
+    "Restaure cette photo ancienne en haute qualité. "
+    "Actions obligatoires : "
+    "1. Supprime complètement toutes les pliures, fissures et marques de pliage sur l'image. "
+    "2. Élimine toutes les rayures, taches, poussières et défauts de vieillissement. "
+    "3. Corrige tout le flou — rends chaque détail parfaitement net et précis. "
+    "4. Améliore le contraste, la luminosité et la profondeur. "
+    "5. Restaure les textures, les visages et l'arrière-plan avec précision. "
+    "6. Conserve le style et l'ambiance d'origine. "
+    "Ne retourne QUE l'image restaurée. Aucun texte."
+)
+
+
+async def restaurer_photo_ia(chemin_image: str, chemin_sortie: str) -> str:
+    """
+    Restaure une photo via Gemini Image Model (image→image),
+    avec fallback Pillow avancé en cas d'échec.
+
+    Args:
+        chemin_image: Chemin local vers l'image à restaurer.
+        chemin_sortie: Chemin local où sauvegarder l'image restaurée.
+
+    Returns:
+        Le chemin de l'image restaurée.
+    """
+    logger.info(f"Restauration IA ({GEMINI_IMAGE_MODEL}) pour : {chemin_image}")
+
+    # --- Essai 1 : Gemini Image Model ---
+    try:
+        import base64
+        import httpx
+
+        image_bytes = Path(chemin_image).read_bytes()
+        image_b64 = base64.b64encode(image_bytes).decode("ascii")
+
+        async with httpx.AsyncClient(timeout=120.0) as http_client:
+            response = await http_client.post(
+                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_IMAGE_MODEL}:generateContent",
+                headers={"x-goog-api-key": GEMINI_API_KEY},
+                json={
+                    "contents": [
+                        {
+                            "parts": [
+                                {"text": PROMPT_RESTAURATION_IA},
+                                {
+                                    "inlineData": {
+                                        "mimeType": "image/jpeg",
+                                        "data": image_b64,
+                                    }
+                                },
+                            ]
+                        }
+                    ],
+                    "generationConfig": {
+                        "temperature": 0.1,
+                        "maxOutputTokens": 8192,
+                        "responseModalities": ["IMAGE"],
+                    },
+                },
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                for candidate in data.get("candidates", []):
+                    for part in candidate.get("content", {}).get("parts", []):
+                        if "inlineData" in part:
+                            img_data = base64.b64decode(part["inlineData"]["data"])
+                            Path(chemin_sortie).write_bytes(img_data)
+                            taille = len(img_data)
+                            logger.info(
+                                f"Restauration IA réussie : {chemin_sortie} "
+                                f"({taille} octets)"
+                            )
+                            return chemin_sortie
+
+            logger.warning(
+                f"Gemini restauration IA échouée "
+                f"(status={response.status_code}, body={response.text[:300]}), "
+                f"fallback Pillow"
+            )
+    except Exception as e:
+        logger.warning(
+            f"Gemini restauration IA exception : {e}, fallback Pillow"
+        )
+
+    # --- Fallback : Pillow avancé ---
+    _restauration_pillow_avancee(chemin_image, chemin_sortie)
+    logger.info(f"Restauration Pillow avancée : {chemin_sortie}")
+    return chemin_sortie
+
+
+def _restauration_pillow_avancee(chemin_source: str, chemin_destination: str) -> None:
+    """
+    Restauration avancée via Pillow (fallback si Gemini échoue).
+
+    Applique : auto-contraste, débruitage, netteté agressive,
+    correction de contraste/luminosité, UnsharpMask.
+    """
+    from PIL import Image, ImageEnhance, ImageFilter, ImageOps
+
+    image = Image.open(chemin_source).convert("RGB")
+
+    # 1. Auto-contraste
+    image = ImageOps.autocontrast(image, cutoff=3)
+
+    # 2. Débruitage léger
+    image = image.filter(ImageFilter.MedianFilter(size=3))
+
+    # 3. Netteté agressive (×2.5)
+    ameliorateur = ImageEnhance.Sharpness(image)
+    image = ameliorateur.enhance(2.5)
+
+    # 4. Contraste
+    ameliorateur = ImageEnhance.Contrast(image)
+    image = ameliorateur.enhance(1.25)
+
+    # 5. Luminosité
+    ameliorateur = ImageEnhance.Brightness(image)
+    image = ameliorateur.enhance(1.05)
+
+    # 6. UnsharpMask pour les détails fins
+    image = image.filter(
+        ImageFilter.UnsharpMask(radius=1.5, percent=150, threshold=2)
+    )
 
     image.save(chemin_destination, quality=95)

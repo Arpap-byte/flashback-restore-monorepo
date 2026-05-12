@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Upload,
@@ -19,11 +20,12 @@ import {
   ArrowLeftRight,
   Zap,
   Palette,
+  Loader2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
-import { restorePhoto, getRestoredImageUrl, RestoreResult } from "@/lib/api";
+import { restorePhoto, colorizePhoto, getRestoredImageUrl, RestoreResult } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
@@ -39,6 +41,7 @@ export default function RestorePage() {
   const [showAfter, setShowAfter] = useState(true);
   const [sliderPos, setSliderPos] = useState(50);
   const [colorize, setColorize] = useState(false);
+  const [colorizing, setColorizing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
@@ -62,10 +65,12 @@ export default function RestorePage() {
     const validTypes = ["image/jpeg", "image/png", "image/webp"];
     if (!validTypes.includes(f.type)) {
       setError("Format non supporté. Utilisez JPG, PNG ou WebP.");
+      setTimeout(() => setError(null), 6000);
       return;
     }
     if (f.size > 20 * 1024 * 1024) {
       setError("Fichier trop volumineux (max 20 Mo).");
+      setTimeout(() => setError(null), 6000);
       return;
     }
     setError(null);
@@ -99,6 +104,7 @@ export default function RestorePage() {
           ? err.message
           : "Erreur lors de la restauration. Veuillez réessayer."
       );
+      setTimeout(() => setError(null), 6000);
     } finally {
       setRestoring(false);
     }
@@ -111,6 +117,29 @@ export default function RestorePage() {
     setError(null);
     sessionStorage.removeItem("flashback_photo");
     if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
+  const handleColorize = async () => {
+    if (!file || !restoreResult) return;
+    setColorizing(true);
+    setError(null);
+    try {
+      // Fetch the restored image as a File
+      const res = await fetch(restoredUrl!);
+      const blob = await res.blob();
+      const f = new File([blob], "restored.jpg", { type: "image/jpeg" });
+      const result = await colorizePhoto(f);
+      setRestoreResult(result);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de la colorisation. Veuillez réessayer."
+      );
+      setTimeout(() => setError(null), 6000);
+    } finally {
+      setColorizing(false);
+    }
   };
 
   const restoredUrl = restoreResult
@@ -326,11 +355,13 @@ export default function RestorePage() {
               /* Photo loaded, ready to restore */
               <div className="grid lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-2">
-                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl">
-                    <img
+                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl aspect-[4/3]">
+                    <Image
                       src={preview}
                       alt="Photo à restaurer"
-                      className="w-full aspect-[4/3] object-contain bg-surface-alt"
+                      fill
+                      className="object-contain bg-surface-alt"
+                      sizes="(max-width: 1024px) 100vw, 40vw"
                     />
                     <button
                       onClick={handleClear}
@@ -445,23 +476,26 @@ export default function RestorePage() {
                 >
                   <div className="relative w-full max-h-[500px] aspect-[4/3] overflow-hidden">
                     {/* After (full) */}
-                    <img
+                    <Image
                       src={restoredUrl!}
                       alt="Photo restaurée"
-                      className="absolute inset-0 w-full h-full object-contain bg-surface-alt"
+                      fill
+                      unoptimized
+                      className="object-contain bg-surface-alt"
+                      sizes="100vw"
                     />
-                    {/* Before (clipped) */}
+                    {/* Before (clipped via clip-path) */}
                     <div
-                      className="absolute inset-0 overflow-hidden"
-                      style={{ width: `${sliderPos}%` }}
+                      className="absolute inset-0"
+                      style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
                     >
-                      <img
+                      <Image
                         src={preview!}
                         alt="Photo originale"
-                        className="absolute inset-0 w-full h-full object-contain bg-surface-alt"
-                        style={{
-                          width: `${(100 / sliderPos) * 100}%`,
-                        }}
+                        fill
+                        unoptimized
+                        className="object-contain bg-surface-alt"
+                        sizes="100vw"
                       />
                     </div>
                     {/* Slider handle */}
@@ -486,11 +520,13 @@ export default function RestorePage() {
 
                 {/* Mobile fallback: toggle view */}
                 <div className="lg:hidden">
-                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl">
-                    <img
+                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl aspect-[4/3]">
+                    <Image
                       src={!showAfter ? preview! : restoredUrl!}
                       alt={!showAfter ? "Avant" : "Après"}
-                      className="w-full aspect-[4/3] object-contain bg-surface-alt"
+                      fill
+                      className="object-contain bg-surface-alt"
+                      sizes="100vw"
                     />
                     <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur text-white text-xs font-medium">
                       {!showAfter ? "Avant" : "Après ✨"}
@@ -509,6 +545,18 @@ export default function RestorePage() {
                   >
                     <Download className="w-5 h-5" />
                     Télécharger la photo restaurée
+                  </button>
+                  <button
+                    onClick={handleColorize}
+                    disabled={colorizing}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-amber-500 text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-xl hover:shadow-amber-500/30 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {colorizing ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <Palette className="w-5 h-5" />
+                    )}
+                    {colorizing ? "Colorisation..." : "Coloriser"}
                   </button>
                   <button
                     onClick={() => {

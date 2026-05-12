@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowRight, Play, Sparkles, Star, Shield, Zap } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 
@@ -53,10 +54,12 @@ function BeforeAfterDemo() {
         <div className="relative aspect-[4/3] overflow-hidden bg-surface-alt">
           {/* Before side */}
           <div className="absolute inset-y-0 left-0 w-1/2 overflow-hidden">
-            <img
+            <Image
               src="/demo/before.jpg"
               alt="Photo avant restauration"
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="50vw"
             />
             {/* Sepia overlay for aged effect */}
             <div className="absolute inset-0 bg-gradient-to-r from-amber-900/30 to-transparent pointer-events-none" />
@@ -76,10 +79,12 @@ function BeforeAfterDemo() {
 
           {/* After side */}
           <div className="absolute inset-y-0 right-0 w-1/2 overflow-hidden">
-            <img
+            <Image
               src="/demo/after.jpg"
               alt="Photo après restauration"
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="50vw"
             />
             {/* Brightness overlay for restored effect */}
             <div className="absolute inset-0 bg-gradient-to-t from-accent/10 to-transparent pointer-events-none" />
@@ -176,7 +181,7 @@ export default function Hero() {
               className="flex flex-col sm:flex-row items-center gap-4 justify-center lg:justify-start"
             >
               <Link
-                href="/upload"
+                href="/auth?mode=register"
                 className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97] w-full sm:w-auto justify-center"
               >
                 Commencer gratuitement

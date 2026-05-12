@@ -1,8 +1,7 @@
 "use client";
 
-import { Sparkles, Heart } from "lucide-react";
+import { Sparkles, Heart, Camera, MessageCircle, Music } from "lucide-react";
 import Link from "next/link";
-import { FaTwitter, FaInstagram, FaTiktok } from "react-icons/fa";
 
 const footerLinks = {
   Produit: [
@@ -50,9 +49,9 @@ export default function Footer() {
             {/* Social */}
             <div className="flex items-center gap-2.5">
               {[
-                { icon: FaTwitter, label: "Twitter" },
-                { icon: FaInstagram, label: "Instagram" },
-                { icon: FaTiktok, label: "TikTok" },
+                { icon: MessageCircle, label: "Twitter" },
+                { icon: Camera, label: "Instagram" },
+                { icon: Music, label: "TikTok" },
               ].map(({ icon: Icon, label }) => (
                 <Link
                   key={label}

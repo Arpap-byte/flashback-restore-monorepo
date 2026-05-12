@@ -1,19 +1,85 @@
 "use client";
 
+import { useState, useEffect, FormEvent } from "react";
 import { motion } from "framer-motion";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Mail, Lock, User, AlertCircle } from "lucide-react";
 import { signIn } from "next-auth/react";
-import { useSearchParams } from "next/navigation";
-import Navbar from "@/components/Navbar";
-import Footer from "@/components/Footer";
+import { useRouter, useSearchParams } from "next/navigation";
+
+const BACKEND_URL = typeof window === "undefined"
+  ? (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
+  : (process.env.NEXT_PUBLIC_API_URL || "");
 
 export default function AuthPage() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/restore";
+  const router = useRouter();
+  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const errorParam = searchParams.get("error");
+  const modeParam = searchParams.get("mode");
+
+  const [isRegister, setIsRegister] = useState(modeParam === "register");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  // Show error from URL param (CredentialsSignin, etc.)
+  useEffect(() => {
+    if (errorParam) {
+      setError("Email ou mot de passe incorrect.");
+    }
+  }, [errorParam]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+
+    try {
+      if (isRegister) {
+        // 1. Créer le compte via le backend
+        const res = await fetch(`${BACKEND_URL}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.detail || "Erreur lors de l'inscription.");
+        }
+
+        // 2. Rediriger vers le formulaire de login (l'utilisateur se reconnecte)
+        setIsRegister(false);
+        setError("");
+        setPassword("");
+        setLoading(false);
+        return;
+      }
+
+      // Login: utiliser signIn("credentials") de NextAuth
+      const result = await signIn("credentials", {
+        email: email,
+        password: password,
+        redirect: false,
+      });
+
+      if (result?.error) {
+        setError("Email ou mot de passe incorrect.");
+        setLoading(false);
+        return;
+      }
+
+      router.push(callbackUrl || "/dashboard");
+    } catch (err: any) {
+      setError(err.message);
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
-      <Navbar />
       <main className="flex-1 pt-24 pb-16 flex items-center justify-center">
         <div className="fixed inset-0 pointer-events-none">
           <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-violet-600/6 rounded-full blur-[120px]" />
@@ -31,15 +97,133 @@ export default function AuthPage() {
                 <Sparkles className="w-6 h-6 text-accent" />
               </div>
               <h1 className="text-2xl font-bold text-foreground font-[family-name:var(--font-playfair)]">
-                Connexion
+                {isRegister ? "Créer un compte" : "Connexion"}
               </h1>
               <p className="text-muted text-sm mt-2">
-                Connectez-vous pour restaurer vos photos.
+                {isRegister
+                  ? "Inscrivez-vous pour restaurer vos photos."
+                  : "Connectez-vous pour restaurer vos photos."}
               </p>
             </div>
 
+            {/* Error message */}
+            {error && (
+              <div className="mb-6 p-3 rounded-lg bg-red-500/10 border border-red-500/20 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
+                <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+              </div>
+            )}
+
+            {/* Email/password form */}
+            <form onSubmit={handleSubmit} className="space-y-4 mb-6">
+              {isRegister && (
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1.5">
+                    Nom
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                    <input
+                      type="text"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Votre nom"
+                      className="w-full pl-10 pr-4 py-3 rounded-xl border border-card-border bg-surface text-foreground placeholder:text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Email
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="vous@exemple.com"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-card-border bg-surface text-foreground placeholder:text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1.5">
+                  Mot de passe
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted" />
+                  <input
+                    type="password"
+                    required
+                    minLength={8}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl border border-card-border bg-surface text-foreground placeholder:text-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition-all"
+                  />
+                </div>
+                {isRegister && (
+                  <p className="text-xs text-muted mt-1">Minimum 8 caractères</p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 rounded-xl bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all hover:shadow-lg hover:shadow-accent/25 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading
+                  ? "Chargement…"
+                  : isRegister
+                    ? "Créer mon compte"
+                    : "Se connecter"}
+              </button>
+
+              {!isRegister && (
+                <p className="text-right">
+                  <a
+                    href="/auth/forgot-password"
+                    className="text-xs text-muted hover:text-accent transition-colors"
+                  >
+                    Mot de passe oublié ?
+                  </a>
+                </p>
+              )}
+            </form>
+
+            {/* Toggle login/register */}
+            <p className="text-center text-sm text-muted mb-6">
+              {isRegister ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
+              <button
+                onClick={() => {
+                  setIsRegister(!isRegister);
+                  setError("");
+                }}
+                className="text-accent hover:underline font-medium"
+              >
+                {isRegister ? "Se connecter" : "S'inscrire"}
+              </button>
+            </p>
+
+            {/* Separator */}
+            <div className="relative mb-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-card-border" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-card px-4 text-xs text-muted uppercase tracking-wider">
+                  ou continuer avec
+                </span>
+              </div>
+            </div>
+
+            {/* OAuth buttons */}
             <div className="space-y-3">
-              {/* Google */}
               <button
                 onClick={() => signIn("google", { callbackUrl })}
                 className="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl border border-card-border bg-white hover:bg-gray-50 text-gray-800 font-medium transition-all hover:shadow-md active:scale-[0.98]"
@@ -53,7 +237,6 @@ export default function AuthPage() {
                 Continuer avec Google
               </button>
 
-              {/* Facebook */}
               <button
                 onClick={() => signIn("facebook", { callbackUrl })}
                 className="w-full flex items-center justify-center gap-3 px-6 py-3.5 rounded-xl bg-[#1877F2] hover:bg-[#166fe5] text-white font-medium transition-all hover:shadow-md active:scale-[0.98]"
@@ -72,7 +255,6 @@ export default function AuthPage() {
           </div>
         </motion.div>
       </main>
-      <Footer />
     </div>
   );
 }

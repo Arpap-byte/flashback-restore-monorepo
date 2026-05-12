@@ -9,6 +9,7 @@ python-multipart>=0.0.9
 
 # Validation
 pydantic>=2.7,<3.0
+email-validator>=2.0,<3.0
 
 # HTTP client (D-ID)
 httpx>=0.27,<1.0
@@ -20,7 +21,8 @@ Pillow>=10.3,<12.0
 google-genai>=1.0,<2.0
 
 # Base de données
-# SQLite intégré à Python — aucune dépendance supplémentaire
+sqlalchemy>=2.0,<3.0
+aiosqlite>=0.19,<1.0
 
 # Paiements
 stripe>=9.0,<11.0
@@ -31,6 +33,7 @@ bcrypt>=4.1,<5.0
 
 # Rate limiting
 slowapi>=0.1,<1.0
+redis>=4.0,<6.0
 
 # Environment
 python-dotenv>=1.0,<2.0

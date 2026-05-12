@@ -56,7 +56,7 @@ export default function CTASection() {
           >
             {/* Essayer maintenant */}
             <Link
-              href="/upload"
+              href="/restore"
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-2xl hover:shadow-accent/30 active:scale-[0.97] w-full sm:w-auto justify-center"
             >
               <Zap className="w-6 h-6" />
@@ -65,7 +65,7 @@ export default function CTASection() {
 
             {/* Commencer gratuitement */}
             <Link
-              href="/upload"
+              href="/auth?mode=register"
               className="group inline-flex items-center gap-3 px-8 py-4 rounded-2xl bg-foreground text-background font-semibold hover:opacity-90 transition-all hover:shadow-2xl hover:shadow-foreground/10 active:scale-[0.97] w-full sm:w-auto justify-center"
             >
               <Rocket className="w-6 h-6" />

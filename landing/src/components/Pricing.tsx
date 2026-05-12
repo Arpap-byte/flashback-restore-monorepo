@@ -26,7 +26,7 @@ const plans = [
     border: "border-card-border",
     buttonStyle:
       "border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all",
-    href: "/upload",
+    href: "/auth?mode=register",
   },
   {
     name: "Découverte",
@@ -43,12 +43,11 @@ const plans = [
       "Support email",
     ],
     cta: "S'abonner",
-    highlighted: true,
-    gradient: "from-amber-500/20 via-amber-400/10 to-violet-600/10",
-    border: "border-accent/50",
+    highlighted: false,
+    gradient: "from-amber-500/10 via-amber-400/5 to-violet-600/5",
+    border: "border-card-border",
     buttonStyle:
-      "bg-accent text-white dark:text-gray-950 hover:brightness-110 shadow-xl shadow-accent/25 font-semibold",
-    badge: "⭐ Le plus populaire",
+      "border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all",
     plan: "decouverte",
   },
   {
@@ -66,11 +65,12 @@ const plans = [
       "Support prioritaire",
     ],
     cta: "S'abonner",
-    highlighted: false,
-    gradient: "from-amber-500/10 via-amber-400/5 to-violet-600/5",
-    border: "border-card-border",
+    highlighted: true,
+    gradient: "from-amber-500/20 via-amber-400/10 to-violet-600/10",
+    border: "border-accent/50",
     buttonStyle:
-      "border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all",
+      "bg-accent text-white dark:text-gray-950 hover:brightness-110 shadow-xl shadow-accent/25 font-semibold",
+    badge: "⭐ Le plus populaire",
     plan: "premium",
   },
   {
@@ -180,6 +180,13 @@ function PricingCard({
           : ""
       }`}
     >
+      {/* Badge — outside overflow-hidden so it doesn't get clipped */}
+      {plan.badge && (
+        <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-950 text-xs font-bold rounded-full shadow-lg shadow-amber-500/25 whitespace-nowrap z-20">
+          {plan.badge}
+        </div>
+      )}
+
       <div
         className={`relative bg-card rounded-2xl border ${plan.border} p-6 lg:p-8 flex flex-col h-full transition-all duration-300 ${
           plan.highlighted
@@ -191,13 +198,6 @@ function PricingCard({
         <div
           className={`absolute inset-0 bg-gradient-to-br ${plan.gradient} opacity-60`}
         />
-
-        {/* Badge */}
-        {plan.badge && (
-          <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 px-4 py-1 bg-gradient-to-r from-amber-400 to-amber-500 text-gray-950 text-xs font-bold rounded-full shadow-lg shadow-amber-500/25 whitespace-nowrap z-20">
-            {plan.badge}
-          </div>
-        )}
 
         {/* Savings tag */}
         {plan.savings && (

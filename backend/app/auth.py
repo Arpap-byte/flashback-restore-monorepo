@@ -91,20 +91,8 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
             mettre_a_jour_derniere_connexion(u["id"])
             return u
 
-        # Créer automatiquement l'utilisateur OAuth
-        provider = payload.get("provider", "nextauth")
-        provider_id = payload.get("providerAccountId", email)
-        nouvel_id = creer_utilisateur_oauth(email, provider, provider_id)
-        if nouvel_id:
-            u = obtenir_utilisateur_par_id(nouvel_id)
-            if u:
-                return u
-        else:
-            # L'email existe déjà (compte email/password) — retourner celui-ci
-            u = obtenir_utilisateur_par_email(email)
-            if u:
-                mettre_a_jour_derniere_connexion(u["id"])
-                return u
+        # Ne plus créer automatiquement d'utilisateur — rejeter les emails inconnus
+        logger.warning("Tentative de connexion avec email inconnu: %s", email)
 
     return None
 

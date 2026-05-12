@@ -8,6 +8,7 @@ http:
       service: flashback-api-svc
       middlewares:
         - flashback-cors
+        - flashback-security
         - flashback-basic-auth
 
     flashback-uploads:
@@ -16,6 +17,9 @@ http:
       tls:
         certresolver: myresolver
       service: flashback-api-svc
+      middlewares:
+        - flashback-security
+        - flashback-basic-auth
       priority: 150
 
     flashback-nextauth:
@@ -24,6 +28,8 @@ http:
       tls:
         certresolver: myresolver
       service: flashback-landing-svc
+      middlewares:
+        - flashback-security
       priority: 200
 
     flashback-landing:
@@ -33,6 +39,7 @@ http:
         certresolver: myresolver
       service: flashback-landing-svc
       middlewares:
+        - flashback-security
         - flashback-basic-auth
 
     flashback-http:
@@ -54,6 +61,16 @@ http:
           Access-Control-Allow-Origin: "https://flashback-restore.com"
           Access-Control-Allow-Methods: "GET,POST,OPTIONS"
           Access-Control-Allow-Headers: "Content-Type,Authorization"
+
+    flashback-security:
+      headers:
+        customResponseHeaders:
+          X-Content-Type-Options: "nosniff"
+          X-Frame-Options: "DENY"
+          Referrer-Policy: "strict-origin-when-cross-origin"
+          Permissions-Policy: "camera=(), microphone=(), geolocation=()"
+        customRequestHeaders:
+          X-Forwarded-Proto: "https"
 
     flashback-basic-auth:
       basicAuth:
