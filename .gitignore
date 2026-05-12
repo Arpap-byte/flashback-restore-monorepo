@@ -68,7 +68,6 @@ docker-compose.override.yml
 .env.local
 .env.*.local
 *.env
-!.env.example
 
 # --- CI/CD ---
 .github/workflows/.temp/
@@ -80,3 +79,11 @@ logs/
 # --- Base de données locale ---
 *.db
 *.sqlite3
+
+# --- Backups et fichiers temporaires ---
+*.bak
+.backups/
+*.save
+
+# --- Uploads utilisateurs (données sensibles) ---
+backend/uploads/*
