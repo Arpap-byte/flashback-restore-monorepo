@@ -42,10 +42,24 @@ http:
         - flashback-security
         - flashback-basic-auth
 
+    n8n:
+      rule: "Host(`n8n.cuisinetouslesjours.fr`)"
+      entrypoints: websecure
+      tls:
+        certresolver: myresolver
+      service: n8n-svc
+
     flashback-http:
       rule: "Host(`flashback-restore.com`) || Host(`www.flashback-restore.com`) || Host(`api.flashback-restore.com`)"
       entrypoints: web
       service: flashback-landing-svc
+      middlewares:
+        - redirect-https
+
+    n8n-http:
+      rule: "Host(`n8n.cuisinetouslesjours.fr`)"
+      entrypoints: web
+      service: n8n-svc
       middlewares:
         - redirect-https
 
@@ -81,9 +95,14 @@ http:
     flashback-api-svc:
       loadBalancer:
         servers:
-          - url: "http://148.230.116.52:8000"
+          - url: "http://127.0.0.1:8000"
 
     flashback-landing-svc:
       loadBalancer:
         servers:
-          - url: "http://148.230.116.52:8001"
+          - url: "http://127.0.0.1:8001"
+
+    n8n-svc:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:5679"
