@@ -78,6 +78,8 @@ logs/
 
 # --- Base de données locale ---
 *.db
+*.db-shm
+*.db-wal
 *.sqlite3
 
 # --- Backups et fichiers temporaires ---
@@ -87,3 +89,4 @@ logs/
 
 # --- Uploads utilisateurs (données sensibles) ---
 backend/uploads/*
+*.bak-*
