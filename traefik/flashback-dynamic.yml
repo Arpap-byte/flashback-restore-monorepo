@@ -1,0 +1,72 @@
+http:
+  routers:
+    flashback-api:
+      rule: "Host(`flashback-restore.com`) && PathPrefix(`/api`) || Host(`www.flashback-restore.com`) && PathPrefix(`/api`) || Host(`api.flashback-restore.com`)"
+      entrypoints: websecure
+      tls:
+        certresolver: myresolver
+      service: flashback-api-svc
+      middlewares:
+        - flashback-cors
+        - flashback-basic-auth
+
+    flashback-uploads:
+      rule: "Host(`flashback-restore.com`) && PathPrefix(`/uploads`) || Host(`www.flashback-restore.com`) && PathPrefix(`/uploads`)"
+      entrypoints: websecure
+      tls:
+        certresolver: myresolver
+      service: flashback-api-svc
+      priority: 150
+
+    flashback-nextauth:
+      rule: "Host(`flashback-restore.com`) && (PathPrefix(`/api/auth/callback`) || Path(`/api/auth/csrf`) || Path(`/api/auth/session`) || Path(`/api/auth/signin`) || Path(`/api/auth/signout`) || Path(`/api/auth/error`) || Path(`/api/auth/providers`) || Path(`/api/auth/_log`)) || Host(`www.flashback-restore.com`) && (PathPrefix(`/api/auth/callback`) || Path(`/api/auth/csrf`) || Path(`/api/auth/session`) || Path(`/api/auth/signin`) || Path(`/api/auth/signout`) || Path(`/api/auth/error`) || Path(`/api/auth/providers`) || Path(`/api/auth/_log`))"
+      entrypoints: websecure
+      tls:
+        certresolver: myresolver
+      service: flashback-landing-svc
+      priority: 200
+
+    flashback-landing:
+      rule: "Host(`flashback-restore.com`) || Host(`www.flashback-restore.com`)"
+      entrypoints: websecure
+      tls:
+        certresolver: myresolver
+      service: flashback-landing-svc
+      middlewares:
+        - flashback-basic-auth
+
+    flashback-http:
+      rule: "Host(`flashback-restore.com`) || Host(`www.flashback-restore.com`) || Host(`api.flashback-restore.com`)"
+      entrypoints: web
+      service: flashback-landing-svc
+      middlewares:
+        - redirect-https
+
+  middlewares:
+    redirect-https:
+      redirectScheme:
+        scheme: https
+        permanent: true
+
+    flashback-cors:
+      headers:
+        customResponseHeaders:
+          Access-Control-Allow-Origin: "https://flashback-restore.com"
+          Access-Control-Allow-Methods: "GET,POST,OPTIONS"
+          Access-Control-Allow-Headers: "Content-Type,Authorization"
+
+    flashback-basic-auth:
+      basicAuth:
+        users:
+          - "admin:$apr1$HKSxdnl4$in/TA3x.MDAvTtk8FTqTZ."
+
+  services:
+    flashback-api-svc:
+      loadBalancer:
+        servers:
+          - url: "http://148.230.116.52:8000"
+
+    flashback-landing-svc:
+      loadBalancer:
+        servers:
+          - url: "http://148.230.116.52:8001"
