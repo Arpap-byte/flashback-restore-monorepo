@@ -77,7 +77,7 @@ class RestaurationReponse(BaseModel):
 
     message: str = Field(..., description="Message de succès")
     analyse: AnalyseReponse
-    parametres: ParametresRestauration
+    parametres: Optional[ParametresRestauration] = Field(default=None, description="Paramètres de restauration (obsolète avec restauration IA)")
     url_image: str = Field(..., description="URL ou chemin de l'image restaurée")
     credits_consommes: int = Field(default=1, description="Nombre de crédits consommés")
 
@@ -243,3 +243,28 @@ class EtatAbonnement(BaseModel):
         default=None,
         description="Indique si l'abonnement sera résilié en fin de période",
     )
+
+
+# ---------------------------------------------------------------------------
+# Préférences utilisateur (rétention)
+# ---------------------------------------------------------------------------
+
+class PreferencesRequete(BaseModel):
+    """Requête pour modifier les préférences de rétention."""
+
+    retention_jours: int = Field(
+        ..., ge=7, le=90,
+        description="Durée de conservation des photos : 7, 30 ou 90 jours",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dashboard Admin
+# ---------------------------------------------------------------------------
+
+class DashboardAdminReponse(BaseModel):
+    """Réponse du dashboard administrateur."""
+    utilisateurs: dict = Field(default_factory=dict)
+    travaux: dict = Field(default_factory=dict)
+    stockage: dict = Field(default_factory=dict)
+    credits: dict = Field(default_factory=dict)

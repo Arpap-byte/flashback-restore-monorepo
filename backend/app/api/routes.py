@@ -12,32 +12,37 @@ Endpoints :
 
 import json
 import logging
+import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from PIL import Image, ImageEnhance, ImageFilter
 
-from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR
+from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
 from app.auth import exiger_utilisateur
 from app.db.database import (
     CREDITS_PAR_PLAN,
-    _obtenir_connexion,
-    consommer_credit,
+    compter_audit_logs,
     crediter_utilisateur,
     creer_abonnement,
     creer_travail,
     enregistrer_achat_credits,
+    lister_audit_logs,
     mettre_a_jour_abonnement,
+    mettre_a_jour_activite,
     mettre_a_jour_attribution_credits,
+    mettre_a_jour_chemin_animation,
     mettre_a_jour_job_externe_id,
+    mettre_a_jour_plan_utilisateur,
     mettre_a_jour_travail,
     obtenir_abonnement,
     obtenir_travail,
     obtenir_travail_par_job_externe,
     obtenir_utilisateur_par_email,
 )
+from app.services.credits import consommer_operation, peut_animer, peut_restaurer
 from app.limiter import limiter
 from app.models.schemas import (
     AnalyseReponse,
@@ -55,7 +60,11 @@ from app.models.schemas import (
     WebhookReponse,
 )
 from app.services.did_service import creer_animation, verifier_statut_animation
-from app.services.gemini_service import analyser_photo, obtenir_parametres_restauration, coloriser_photo
+from app.services.gemini_service import (
+    analyser_photo,
+    coloriser_photo,
+    restaurer_photo_ia,
+)
 from app.services.stripe_service import (
     creer_session_paiement,
     creer_session_paiement_credits,
@@ -73,9 +82,41 @@ TAILLE_MAX_UPLOAD = 20 * 1024 * 1024
 # Formats d'image acceptés
 FORMATS_ACCEPTES = {"image/jpeg", "image/png", "image/webp", "image/tiff"}
 
+
+def _valider_upload(fichier: UploadFile, contenu: bytes, nom_par_defaut: str = "photo.jpg") -> str:
+    """
+    Valide le type MIME et la taille d'un fichier uploadé, puis retourne
+    un nom de fichier sécurisé.
+
+    Args:
+        fichier: Le fichier uploadé depuis FastAPI.
+        contenu: Les bytes du fichier (déjà lus).
+        nom_par_defaut: Nom par défaut si fichier.filename est None.
+
+    Returns:
+        Un nom de fichier sécurisé à utiliser pour la sauvegarde.
+
+    Raises:
+        HTTPException(400): Si le format MIME ou la taille est invalide.
+    """
+    if fichier.content_type and fichier.content_type not in FORMATS_ACCEPTES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Format non accepté : {fichier.content_type}. "
+                   f"Formats acceptés : {', '.join(FORMATS_ACCEPTES)}",
+        )
+    if len(contenu) > TAILLE_MAX_UPLOAD:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Fichier trop volumineux ({len(contenu)} octets). "
+                   f"Taille maximale : {TAILLE_MAX_UPLOAD} octets.",
+        )
+    safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', fichier.filename or nom_par_defaut)[:80]
+    return f"{uuid.uuid4().hex}_{safe_name}"
+
 # URLs de redirection Stripe (frontend)
-URL_SUCCES_STRIPE = "http://localhost:3000/abonnement/succes"
-URL_ANNULATION_STRIPE = "http://localhost:3000/abonnement/annulation"
+URL_SUCCES_STRIPE = f"{SITE_URL}/abonnement/succes"
+URL_ANNULATION_STRIPE = f"{SITE_URL}/abonnement/annulation"
 
 
 # ---------------------------------------------------------------------------
@@ -112,15 +153,14 @@ async def sante(request: Request):
     # --- Test D-ID : vérification simple de la présence de la clé ---
     did_ok = bool(DID_API_KEY)
 
-    # --- Test Base de données : SELECT 1 ---
+    # --- Test Base de données : SELECT 1 via SQLAlchemy async ---
     db_ok = False
     try:
-        conn = _obtenir_connexion()
-        try:
-            conn.execute("SELECT 1")
+        from app.db.session import async_session
+        from sqlalchemy import text as _sa_text
+        async with async_session() as session:
+            await session.execute(_sa_text("SELECT 1"))
             db_ok = True
-        finally:
-            conn.close()
     except Exception as e:
         logger.warning(f"Test de connectivité DB échoué : {e}")
 
@@ -154,20 +194,14 @@ async def statistiques(request: Request):
         raise HTTPException(status_code=403, detail="Accès non autorisé. Token admin requis.")
 
     # Requêtes de statistiques
+    nb_utilisateurs = nb_restaurations = nb_animations = 0
     try:
-        conn = _obtenir_connexion()
-        try:
-            nb_utilisateurs = conn.execute(
-                "SELECT COUNT(*) FROM utilisateurs"
-            ).fetchone()[0]
-            nb_restaurations = conn.execute(
-                "SELECT COUNT(*) FROM travaux WHERE type = 'restauration'"
-            ).fetchone()[0]
-            nb_animations = conn.execute(
-                "SELECT COUNT(*) FROM travaux WHERE type = 'animation'"
-            ).fetchone()[0]
-        finally:
-            conn.close()
+        from app.db.session import async_session
+        from sqlalchemy import text as _sa_text
+        async with async_session() as session:
+            nb_utilisateurs = (await session.execute(_sa_text("SELECT COUNT(*) FROM utilisateurs"))).fetchone()[0]
+            nb_restaurations = (await session.execute(_sa_text("SELECT COUNT(*) FROM travaux WHERE type = 'restauration'"))).fetchone()[0]
+            nb_animations = (await session.execute(_sa_text("SELECT COUNT(*) FROM travaux WHERE type = 'animation'"))).fetchone()[0]
     except Exception as e:
         logger.exception(f"Erreur lors de la récupération des statistiques : {e}")
         raise HTTPException(
@@ -182,12 +216,210 @@ async def statistiques(request: Request):
     )
 
 
+@router.get("/audit-logs")
+async def consulter_audit_logs(
+    request: Request,
+    email: str = None,
+    evenement: str = None,
+    reussite: bool = None,
+    limite: int = 50,
+    offset: int = 0,
+):
+    """
+    Retourne les logs d'audit de sécurité (authentification).
+
+    **Protégé par token admin** : nécessite l'en-tête X-Admin-Key.
+
+    Filtres optionnels :
+    - email : filtrer par email d'utilisateur
+    - evenement : filtrer par type (login, register, oauth_*, forgot_password, reset_password)
+    - reussite : true = succès, false = échecs
+    - limite / offset : pagination
+    """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé. Token admin requis.")
+
+    logs = lister_audit_logs(
+        email=email,
+        evenement=evenement,
+        reussite=reussite,
+        limite=min(limite, 200),
+        offset=offset,
+    )
+    total = compter_audit_logs(
+        email=email,
+        evenement=evenement,
+        reussite=reussite,
+    )
+    return {
+        "total": total,
+        "limite": limite,
+        "offset": offset,
+        "logs": logs,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Nettoyage des uploads (Admin)
+# ---------------------------------------------------------------------------
+
+@router.post("/admin/cleanup")
+async def declencher_nettoyage(request: Request):
+    """
+    Déclenche le nettoyage des travaux expirés.
+
+    Pour chaque travail terminé/en erreur, vérifie si sa date de création
+    dépasse la rétention configurée par son propriétaire (7j, 30j ou 90j),
+    puis supprime les 3 fichiers (original, résultat, animation).
+
+    **Protégé par token admin** : nécessite l'en-tête X-Admin-Key.
+    """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé. Token admin requis.")
+
+    from app.services.cleanup import nettoyer_uploads
+    resultat = nettoyer_uploads()
+    return resultat
+
+
+# ---------------------------------------------------------------------------
+# Dashboard Admin
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/dashboard")
+async def dashboard_admin(request: Request):
+    """
+    Retourne les métriques agrégées pour le dashboard administrateur.
+
+    **Protégé par token admin** : nécessite l'en-tête X-Admin-Key.
+    """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    from app.db.session import async_session
+    from sqlalchemy import text as _sa_text
+
+    maintenant = datetime.now(timezone.utc)
+    il_y_a_7j = maintenant - timedelta(days=7)
+    il_y_a_30j = maintenant - timedelta(days=30)
+
+    async with async_session() as session:
+        # --- Utilisateurs ---
+        total_utilisateurs = (await session.execute(
+            _sa_text("SELECT COUNT(*) FROM utilisateurs")
+        )).fetchone()[0]
+
+        actifs_7j = (await session.execute(
+            _sa_text("SELECT COUNT(*) FROM utilisateurs WHERE derniere_activite >= :seuil"),
+            {"seuil": il_y_a_7j}
+        )).fetchone()[0]
+
+        actifs_30j = (await session.execute(
+            _sa_text("SELECT COUNT(*) FROM utilisateurs WHERE derniere_activite >= :seuil"),
+            {"seuil": il_y_a_30j}
+        )).fetchone()[0]
+
+        par_plan_rows = (await session.execute(
+            _sa_text("SELECT plan, COUNT(*) as nb FROM utilisateurs GROUP BY plan ORDER BY nb DESC")
+        )).fetchall()
+
+        # --- Travaux ---
+        total_travaux = (await session.execute(
+            _sa_text("SELECT COUNT(*) FROM travaux")
+        )).fetchone()[0]
+
+        photos_stockees = (await session.execute(
+            _sa_text("SELECT COUNT(*) FROM travaux WHERE statut IN ('termine', 'erreur')")
+        )).fetchone()[0]
+
+        par_type_rows = (await session.execute(
+            _sa_text("SELECT type, COUNT(*) as nb FROM travaux GROUP BY type ORDER BY nb DESC")
+        )).fetchall()
+
+        par_statut_rows = (await session.execute(
+            _sa_text("SELECT statut, COUNT(*) as nb FROM travaux GROUP BY statut ORDER BY nb DESC")
+        )).fetchall()
+
+        # --- Stockage ---
+        espace_rows = (await session.execute(
+            _sa_text("""
+                SELECT COALESCE(SUM(COALESCE(taille_original, 0)), 0)
+                     + COALESCE(SUM(COALESCE(taille_resultat, 0)), 0)
+                     as total_octets
+                FROM travaux
+                WHERE statut IN ('termine', 'erreur')
+            """)
+        )).fetchone()
+        espace_total_octets = espace_rows[0] if espace_rows else 0
+
+        top5_rows = (await session.execute(
+            _sa_text("""
+                SELECT u.email,
+                       COALESCE(SUM(COALESCE(t.taille_original, 0)), 0)
+                     + COALESCE(SUM(COALESCE(t.taille_resultat, 0)), 0) as espace_octets
+                FROM travaux t
+                JOIN utilisateurs u ON t.utilisateur_id = u.id
+                WHERE t.statut IN ('termine', 'erreur')
+                GROUP BY u.email
+                ORDER BY espace_octets DESC
+                LIMIT 5
+            """)
+        )).fetchall()
+
+        # --- Crédits ---
+        credits_rows = (await session.execute(
+            _sa_text("""
+                SELECT
+                    COALESCE(SUM(credits), 0) as total_distribues,
+                    COALESCE((SELECT SUM(credits_utilises) FROM consommation_credits), 0) as total_consommes
+                FROM utilisateurs
+            """)
+        )).fetchone()
+
+        credits_actifs = (await session.execute(
+            _sa_text("SELECT COALESCE(SUM(credits), 0) FROM utilisateurs")
+        )).fetchone()[0]
+
+    return {
+        "utilisateurs": {
+            "total": total_utilisateurs,
+            "actifs_7j": actifs_7j,
+            "actifs_30j": actifs_30j,
+            "par_plan": {row[0] or "inconnu": row[1] for row in par_plan_rows},
+        },
+        "travaux": {
+            "total": total_travaux,
+            "photos_stockees": photos_stockees,
+            "par_type": {row[0]: row[1] for row in par_type_rows},
+            "par_statut": {row[0]: row[1] for row in par_statut_rows},
+        },
+        "stockage": {
+            "espace_total_octets": espace_total_octets,
+            "espace_total_mb": round(espace_total_octets / (1024 * 1024), 2),
+            "top5_utilisateurs": [
+                {"email": row[0], "espace_mb": round(row[1] / (1024 * 1024), 2)}
+                for row in top5_rows
+            ],
+        },
+        "credits": {
+            "total_distribues": credits_rows[0] if credits_rows else 0,
+            "total_consommes": credits_rows[1] if credits_rows else 0,
+            "credits_actifs": credits_actifs,
+        },
+    }
+
+
 # ---------------------------------------------------------------------------
 # Analyse
 # ---------------------------------------------------------------------------
 
 @router.post("/analyze", response_model=AnalyseReponse)
+@limiter.limit("10/minute")
 async def analyser(
+    request: Request,
     fichier: UploadFile = File(...),
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
@@ -203,30 +435,18 @@ async def analyser(
     Returns:
         Un rapport d'analyse complet en français.
     """
-    # Validation
-    if fichier.content_type and fichier.content_type not in FORMATS_ACCEPTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Format non accepté : {fichier.content_type}. "
-                   f"Formats acceptés : {', '.join(FORMATS_ACCEPTES)}",
-        )
-
+    # Validation et sauvegarde
     contenu = await fichier.read()
-    if len(contenu) > TAILLE_MAX_UPLOAD:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Fichier trop volumineux ({len(contenu)} octets). "
-                   f"Taille maximale : {TAILLE_MAX_UPLOAD} octets.",
-        )
-
-    # Sauvegarde du fichier
-    nom_fichier = f"{uuid.uuid4()}_{fichier.filename or 'photo.jpg'}"
+    nom_fichier = _valider_upload(fichier, contenu)
     chemin = UPLOAD_DIR / nom_fichier
     chemin.write_bytes(contenu)
 
+    # Suivi dashboard admin
+    mettre_a_jour_activite(utilisateur["id"])
+
     # Création du travail dans la base
     travail_id = creer_travail("analyse", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours")
+    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     try:
         resultat = await analyser_photo(str(chemin))
@@ -323,7 +543,9 @@ def _appliquer_restauration_pillow(
 
 
 @router.post("/restore", response_model=RestaurationReponse)
+@limiter.limit("10/minute")
 async def restaurer(
+    request: Request,
     fichier: UploadFile = File(...),
     coloriser: bool = Form(False),
     utilisateur: dict = Depends(exiger_utilisateur),
@@ -354,78 +576,50 @@ async def restaurer(
     if coloriser:
         nb_credits_total = 2
 
-    # Validation
-    if fichier.content_type and fichier.content_type not in FORMATS_ACCEPTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Format non accepté : {fichier.content_type}. "
-                   f"Formats acceptés : {', '.join(FORMATS_ACCEPTES)}",
-        )
-
+    # Validation et sauvegarde
     contenu = await fichier.read()
-    if len(contenu) > TAILLE_MAX_UPLOAD:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Fichier trop volumineux ({len(contenu)} octets). "
-                   f"Taille maximale : {TAILLE_MAX_UPLOAD} octets.",
-        )
-
-    # Sauvegarde du fichier original
-    nom_base = uuid.uuid4().hex
-    nom_original = f"{nom_base}_{fichier.filename or 'photo.jpg'}"
+    nom_original = _valider_upload(fichier, contenu)
     chemin_original = UPLOAD_DIR / nom_original
     chemin_original.write_bytes(contenu)
 
+    # Suivi dashboard admin
+    mettre_a_jour_activite(utilisateur["id"])
+
+    # Base du nom pour fichiers dérivés (UUID)
+    nom_base = nom_original.split('_')[0]
+
     # Création du travail
     travail_id = creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours")
+    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Vérification des crédits avant traitement (crédit n°1 : restauration)
-    resultat_credit = consommer_credit(utilisateur["id"], "restauration", travail_id)
-    if not resultat_credit["succes"]:
-        mettre_a_jour_travail(
-            travail_id,
-            statut="erreur",
-            message_erreur=resultat_credit.get("raison", "Crédits insuffisants"),
-        )
-        raise HTTPException(
-            status_code=402,
-            detail=resultat_credit.get("raison", "Crédits insuffisants. Achetez des crédits pour continuer."),
-        )
-
-    # --- Si colorisation demandée, vérifier le 2e crédit AVANT de restaurer ---
-    if coloriser:
-        resultat_credit2 = consommer_credit(utilisateur["id"], "restauration", travail_id)
-        if not resultat_credit2["succes"]:
-            # Rembourser le premier crédit (via crediter_utilisateur)
-            from app.db.database import crediter_utilisateur
-            crediter_utilisateur(utilisateur["id"], 1)
+    # Vérification et consommation des crédits (check-then-consume)
+    for i in range(nb_credits_total):
+        peut, raison = peut_restaurer(utilisateur["id"])
+        if not peut:
+            # Rembourser les crédits déjà consommés dans ce batch
+            if i > 0:
+                crediter_utilisateur(utilisateur["id"], i)
+            message_err = (
+                "Crédits insuffisants pour la colorisation (1 crédit supplémentaire requis)."
+                if i == 1
+                else raison
+            )
             mettre_a_jour_travail(
                 travail_id,
                 statut="erreur",
-                message_erreur="Crédits insuffisants pour la colorisation (1 crédit supplémentaire requis).",
+                message_erreur=message_err,
             )
-            raise HTTPException(
-                status_code=402,
-                detail="Crédits insuffisants pour la colorisation. "
-                       "La colorisation consomme 1 crédit supplémentaire.",
-            )
+            raise HTTPException(status_code=402, detail=raison)
+        consommer_operation(utilisateur["id"], "restauration", travail_id)
 
     try:
         # Étape 1 : Analyse des défauts
         analyse = await analyser_photo(str(chemin_original))
 
-        # Étape 2 : Paramètres de restauration
-        params = await obtenir_parametres_restauration(str(chemin_original))
-
-        # Étape 3 : Application avec Pillow
+        # Étape 2 : Restauration IA (Gemini Image Model)
         nom_restaure = f"{nom_base}_restaure.jpg"
         chemin_restaure = UPLOAD_DIR / nom_restaure
-        _appliquer_restauration_pillow(
-            str(chemin_original),
-            str(chemin_restaure),
-            params,
-        )
+        await restaurer_photo_ia(str(chemin_original), str(chemin_restaure))
 
         # Étape 4 : Colorisation (optionnelle)
         url_image = f"/uploads/{nom_restaure}"
@@ -441,7 +635,6 @@ async def restaurer(
             message="Photo restaurée avec succès !"
                     + (" (colorisée)" if coloriser else ""),
             analyse=analyse,
-            parametres=params,
             url_image=url_image,
             credits_consommes=nb_credits_total,
         )
@@ -449,9 +642,9 @@ async def restaurer(
             travail_id,
             statut="termine",
             chemin_resultat=str(chemin_restaure),
+            taille_resultat=chemin_restaure.stat().st_size,
             resultat_json=json.dumps({
                 "analyse": analyse.model_dump(),
-                "parametres": params.model_dump(),
                 "colorise": coloriser,
                 "credits_consommes": nb_credits_total,
             }),
@@ -472,11 +665,83 @@ async def restaurer(
 
 
 # ---------------------------------------------------------------------------
+# Colorisation standalone
+# ---------------------------------------------------------------------------
+
+@router.post("/colorize", response_model=RestaurationReponse)
+@limiter.limit("5/minute")
+async def coloriser_standalone(
+    request: Request,
+    fichier: UploadFile = File(...),
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """
+    Colorise une photo déjà restaurée (ou toute photo N&B).
+
+    **Authentification requise** : 1 crédit est consommé.
+
+    Args:
+        fichier: La photo à coloriser (JPEG, PNG, WebP, TIFF).
+
+    Returns:
+        L'URL de l'image colorisée et le nombre de crédits consommés.
+    """
+    # Validation et sauvegarde
+    contenu = await fichier.read()
+    nom_original = _valider_upload(fichier, contenu)
+    chemin_original = UPLOAD_DIR / nom_original
+    chemin_original.write_bytes(contenu)
+
+    # Suivi dashboard admin
+    mettre_a_jour_activite(utilisateur["id"])
+
+    nom_base = nom_original.split('_')[0]
+
+    # Création du travail
+    travail_id = creer_travail("colorisation", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
+    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
+
+    # Vérification des crédits
+    peut, raison = peut_restaurer(utilisateur["id"])
+    if not peut:
+        mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
+        raise HTTPException(status_code=402, detail=raison)
+    consommer_operation(utilisateur["id"], "colorisation", travail_id)
+
+    try:
+        nom_colorise = f"{nom_base}_colorized.jpg"
+        chemin_colorise = UPLOAD_DIR / nom_colorise
+        await coloriser_photo(str(chemin_original), str(chemin_colorise))
+
+        resultat = RestaurationReponse(
+            message="Photo colorisée avec succès !",
+            analyse=None,  # type: ignore — pas d'analyse pour la colorisation standalone
+            url_image=f"/uploads/{nom_colorise}",
+            credits_consommes=1,
+        )
+        mettre_a_jour_travail(
+            travail_id,
+            statut="termine",
+            chemin_resultat=str(chemin_colorise),
+            taille_resultat=chemin_colorise.stat().st_size,
+            resultat_json=json.dumps({"colorise": True, "credits_consommes": 1}),
+        )
+        return resultat
+
+    except Exception as e:
+        logger.exception(f"Erreur lors de la colorisation : {e}")
+        mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=str(e))
+        raise HTTPException(status_code=500, detail=f"Erreur lors de la colorisation : {str(e)}")
+
+
+# ---------------------------------------------------------------------------
 # Animation (D-ID)
 # ---------------------------------------------------------------------------
 
 @router.post("/animate", response_model=AnimationReponse)
+@limiter.limit("10/minute")
 async def animer(
+    request: Request,
     fichier: UploadFile = File(...),
     texte: str = Form("Bonjour ! Je suis un souvenir restauré."),
     utilisateur: dict = Depends(exiger_utilisateur),
@@ -500,46 +765,36 @@ async def animer(
     Returns:
         L'identifiant du travail d'animation pour suivi ultérieur.
     """
-    # Validation
-    if fichier.content_type and fichier.content_type not in FORMATS_ACCEPTES:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Format non accepté : {fichier.content_type}.",
-        )
-
+    # Validation et sauvegarde
     contenu = await fichier.read()
-    if len(contenu) > TAILLE_MAX_UPLOAD:
-        raise HTTPException(
-            status_code=400,
-            detail="Fichier trop volumineux.",
-        )
-
-    # Sauvegarde
-    nom_fichier = f"{uuid.uuid4().hex}_{fichier.filename or 'portrait.jpg'}"
+    nom_fichier = _valider_upload(fichier, contenu, nom_par_defaut="portrait.jpg")
     chemin = UPLOAD_DIR / nom_fichier
     chemin.write_bytes(contenu)
 
+    # Suivi dashboard admin
+    mettre_a_jour_activite(utilisateur["id"])
+
     # Création du travail
     travail_id = creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours")
+    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Vérification des crédits avant traitement
-    resultat_credit = consommer_credit(utilisateur["id"], "animation", travail_id)
-    if not resultat_credit["succes"]:
+    # Vérification des crédits et de la limite d'animations par forfait
+    peut, raison = peut_animer(utilisateur["id"])
+    if not peut:
         mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=resultat_credit.get("raison", "Crédits insuffisants"),
+            message_erreur=raison,
         )
-        raise HTTPException(
-            status_code=402,
-            detail=resultat_credit.get("raison", "Crédits insuffisants. Achetez des crédits pour continuer."),
-        )
+        raise HTTPException(status_code=403, detail=raison)
+
+    # Consommer le crédit/essai (et incrémenter le compteur d'animations)
+    consommer_operation(utilisateur["id"], "animation", travail_id)
 
     try:
         # Construction de l'URL publique de la photo
         # En production, utilisez l'URL réelle de votre serveur
-        url_photo = f"http://148.230.116.52:8000/uploads/{nom_fichier}"
+        url_photo = f"{PUBLIC_BACKEND_URL}/uploads/{nom_fichier}"
 
         job_did = await creer_animation(url_photo, texte=texte)
 
@@ -604,12 +859,16 @@ async def statut_animation(job_id: str):
         travail = obtenir_travail_par_job_externe(job_id)
         if travail:
             if statut_interne == StatutAnimation.TERMINE:
+                url_video = data.get("url_video")
                 mettre_a_jour_travail(
                     travail["id"],
                     statut="termine",
-                    chemin_resultat=data.get("url_video"),
+                    chemin_resultat=url_video,
                     resultat_json=json.dumps(data),
                 )
+                # Sauvegarder aussi dans chemin_animation pour l'historique
+                if url_video:
+                    mettre_a_jour_chemin_animation(travail["id"], url_video)
             elif statut_interne == StatutAnimation.ERREUR:
                 mettre_a_jour_travail(
                     travail["id"],
@@ -804,6 +1063,7 @@ async def webhook_stripe(request: Request):
                     utilisateur = obtenir_utilisateur_par_email(email)
                     if utilisateur:
                         crediter_utilisateur(utilisateur["id"], nb_credits)
+                        mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
                         logger.info(
                             f"Crédits d'abonnement ajoutés : email={email}, "
                             f"plan={plan}, credits={nb_credits}, "
@@ -847,6 +1107,7 @@ async def webhook_stripe(request: Request):
                         utilisateur = obtenir_utilisateur_par_email(email)
                         if utilisateur:
                             crediter_utilisateur(utilisateur["id"], nb_credits)
+                            mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
                             mettre_a_jour_attribution_credits(stripe_subscription_id, maintenant)
                             logger.info(
                                 f"Crédits renouvelés (invoice.paid) : email={email}, "

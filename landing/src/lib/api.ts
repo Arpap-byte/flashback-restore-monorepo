@@ -1,5 +1,6 @@
-const API_BASE =
-  process.env.NEXT_PUBLIC_API_URL || "http://148.230.116.52:8000";
+const API_BASE = typeof window === "undefined"
+  ? (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
+  : (process.env.NEXT_PUBLIC_API_URL || ""); // client : chemin relatif → même domaine HTTPS
 
 export interface AnalysisResult {
   rayures: boolean;
@@ -15,7 +16,7 @@ export interface AnalysisResult {
 export interface RestoreResult {
   message: string;
   analyse: AnalysisResult;
-  parametres: {
+  parametres?: {
     luminosite: number;
     contraste: number;
     saturation: number;
@@ -48,10 +49,14 @@ export interface TravailHistorique {
   id: string;
   type: string;
   statut: string;
-  chemin_photo: string | null;
-  chemin_resultat: string | null;
+  url_original: string | null;
+  url_resultat: string | null;
+  url_animation: string | null;
+  taille_original: number | null;
+  taille_resultat: number | null;
   message_erreur: string | null;
   cree_le: string;
+  expire_le: string | null;
 }
 
 /** Get the NextAuth JWT for authenticating API calls */
@@ -142,13 +147,31 @@ export async function restorePhoto(file: File, colorize?: boolean): Promise<Rest
   }, 60000);
 }
 
+export async function colorizePhoto(file: File): Promise<RestoreResult> {
+  const formData = new FormData();
+  formData.append("fichier", file);
+  return apiFetch<RestoreResult>("/api/colorize", {
+    method: "POST",
+    body: formData,
+  }, 60000);
+}
+
 export function getRestoredImageUrl(urlImage: string): string {
-  return `${API_BASE}${urlImage}`;
+  // Use absolute URL so Next.js Image optimization works (image is served by backend, not Next.js)
+  if (urlImage.startsWith("http")) return urlImage;
+  const base = typeof window !== "undefined"
+    ? window.location.origin
+    : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
+  return `${base}${urlImage}`;
 }
 
 export function getPhotoUrl(chemin: string): string {
   if (chemin.startsWith("http")) return chemin;
-  return `${API_BASE}/uploads/${chemin.split("/").pop()}`;
+  const filename = chemin.split("/").pop();
+  const base = typeof window !== "undefined"
+    ? window.location.origin
+    : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
+  return `${base}/uploads/${filename}`;
 }
 
 export async function animatePhoto(
@@ -181,10 +204,6 @@ export async function createCheckout(
   });
 }
 
-export async function getUserHistory(): Promise<{ travaux: TravailHistorique[] }> {
-  return apiFetch<{ travaux: TravailHistorique[] }>("/api/user/history");
-}
-
 export interface UserMe {
   id: string;
   email: string;
@@ -194,13 +213,58 @@ export interface UserMe {
   credits_utilises: number;
   photos_restaurees_mois: number;
   animations_creees: number;
+  animations_utilisees: number;
+  animations_limite: number;
   date_renouvellement: string | null;
   est_abonne: boolean;
   essais_restants: number;
+  retention_jours: number;
+  derniere_activite: string | null;
 }
 
 export async function getUserMe(): Promise<UserMe> {
   return apiFetch<UserMe>("/api/user/me");
+}
+
+export interface UserHistoryResponse {
+  travaux: TravailHistorique[];
+  retention_jours: number;
+  total: number;
+}
+
+export async function getUserHistory(): Promise<UserHistoryResponse> {
+  return apiFetch<UserHistoryResponse>("/api/user/history");
+}
+
+export interface UserPreferences {
+  retention_jours: number;
+  options_disponibles: number[];
+}
+
+export async function getUserPreferences(): Promise<UserPreferences> {
+  return apiFetch<UserPreferences>("/api/user/preferences");
+}
+
+export async function updatePreferences(retention_jours: number): Promise<{ message: string; retention_jours: number }> {
+  return apiFetch<{ message: string; retention_jours: number }>("/api/user/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ retention_jours }),
+  });
+}
+
+export async function deleteTravail(travail_id: string): Promise<{ message: string; fichiers_supprimes: string[] }> {
+  return apiFetch<{ message: string; fichiers_supprimes: string[] }>(
+    `/api/user/history/${travail_id}`,
+    { method: "DELETE" }
+  );
+}
+
+export async function deleteAllHistory(): Promise<{ message: string; travaux_supprimes: number; fichiers_supprimes: number }> {
+  return apiFetch<{ message: string; travaux_supprimes: number; fichiers_supprimes: number }>(
+    "/api/user/history",
+    { method: "DELETE" }
+  );
 }
 
 export async function healthCheck(): Promise<{ status: string }> {

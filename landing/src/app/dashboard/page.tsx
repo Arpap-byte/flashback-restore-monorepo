@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import {
   LayoutDashboard,
   Sparkles,
@@ -21,6 +22,8 @@ import {
   Briefcase,
   User,
   Calendar,
+  ShieldCheck,
+  Trash2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -29,6 +32,8 @@ import {
   getUserHistory,
   getUserMe,
   getPhotoUrl,
+  getUserPreferences,
+  updatePreferences,
   TravailHistorique,
   UserMe,
 } from "@/lib/api";
@@ -231,16 +236,20 @@ export default function DashboardPage() {
   const [travaux, setTravaux] = useState<TravailHistorique[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retention, setRetention] = useState<number>(30);
 
   /* ---------- Récupération des données ---------- */
+
+  const lastFetchedUserId = useRef<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoadingData(true);
     setError(null);
     try {
-      const [meData, historyData] = await Promise.allSettled([
+      const [meData, historyData, prefsData] = await Promise.allSettled([
         getUserMe(),
         getUserHistory(),
+        getUserPreferences(),
       ]);
 
       if (meData.status === "fulfilled") {
@@ -257,15 +266,22 @@ export default function DashboardPage() {
             credits_utilises: 0,
             photos_restaurees_mois: 0,
             animations_creees: 0,
+            animations_utilisees: 0,
+            animations_limite: 0,
             date_renouvellement: null,
             est_abonne: user.est_abonne,
             essais_restants: user.essais_restants,
+            retention_jours: 30,
+            derniere_activite: null,
           });
         }
       }
 
       if (historyData.status === "fulfilled") {
         setTravaux(historyData.value.travaux.slice(0, 5));
+      }
+      if (prefsData.status === "fulfilled") {
+        setRetention(prefsData.value.retention_jours);
       }
     } catch (err) {
       setError(
@@ -275,6 +291,7 @@ export default function DashboardPage() {
       );
     } finally {
       setLoadingData(false);
+      lastFetchedUserId.current = user?.id ?? null;
     }
   }, [user]);
 
@@ -282,8 +299,11 @@ export default function DashboardPage() {
     if (authLoading) return;
     if (!user) {
       setLoadingData(false);
+      lastFetchedUserId.current = null;
       return;
     }
+    // Only fetch if the user changed (prevents re-fetch loops)
+    if (lastFetchedUserId.current === user.id) return;
     fetchData();
   }, [user, authLoading, fetchData]);
 
@@ -314,10 +334,14 @@ export default function DashboardPage() {
   const creditsDisplay = userMe
     ? userMe.plan === "pro"
       ? "Illimités"
-      : userMe.plan === "gratuit"
-      ? `${Math.max(0, userMe.essais_restants)} essais`
       : `${Math.max(0, userMe.credits)} crédits`
     : "—";
+
+  const trialsDisplay = userMe
+    ? userMe.plan === "gratuit"
+      ? `${Math.max(0, userMe.essais_restants)} essais`
+      : null
+    : null;
 
   /* ---------- Rendu conditionnel ---------- */
 
@@ -399,12 +423,15 @@ export default function DashboardPage() {
                 {creditsDisplay}
               </p>
               <p className="text-xs text-muted">
-                {userMe?.plan === "gratuit"
-                  ? "Essais gratuits"
-                  : userMe?.plan === "pro"
+                {userMe?.plan === "pro"
                   ? "Accès illimité"
-                  : `Crédits mensuels`}
+                  : "Crédits achetés"}
               </p>
+              {trialsDisplay && (
+                <p className="text-sm text-accent mt-1 font-medium">
+                  + {trialsDisplay} gratuits
+                </p>
+              )}
             </motion.div>
 
             {/* Photos restaurées ce mois-ci */}
@@ -442,7 +469,15 @@ export default function DashboardPage() {
               <p className="text-2xl sm:text-3xl font-bold text-foreground mb-1">
                 {userMe?.animations_creees ?? 0}
               </p>
-              <p className="text-xs text-muted">Ce mois-ci</p>
+              <p className="text-xs text-muted">
+                {userMe?.plan === "gratuit"
+                  ? "Non disponible"
+                  : userMe?.plan === "pro"
+                  ? "Illimité"
+                  : userMe?.animations_limite
+                  ? `${userMe.animations_utilisees ?? userMe.animations_creees ?? 0} / ${userMe.animations_limite} ce mois`
+                  : "Ce mois-ci"}
+              </p>
             </motion.div>
           </motion.div>
 
@@ -478,6 +513,17 @@ export default function DashboardPage() {
                 >
                   <planConfig.icon className="w-4 h-4" />
                   {planConfig.label}
+                </div>
+
+                {/* Rétention */}
+                <div className="flex items-center gap-2 text-sm text-muted mb-4">
+                  <ShieldCheck className="w-4 h-4 text-accent/70" />
+                  <span>
+                    Conservation :{" "}
+                    <span className="text-foreground font-medium">
+                      {retention === 7 ? "7 jours" : retention === 90 ? "3 mois" : `${retention} jours`}
+                    </span>
+                  </span>
                 </div>
 
                 {/* Date de renouvellement */}
@@ -566,14 +612,16 @@ export default function DashboardPage() {
                       className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface/50 transition-colors group/item"
                     >
                       {/* Miniature */}
-                      {(t.chemin_resultat || t.chemin_photo) ? (
-                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0 border border-card-border">
-                          <img
+                      {(t.url_resultat || t.url_original) ? (
+                        <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0 border border-card-border relative">
+                          <Image
                             src={getPhotoUrl(
-                              t.chemin_resultat || t.chemin_photo!
+                              t.url_resultat || t.url_original!
                             )}
                             alt={TYPE_LABELS[t.type] || t.type}
-                            className="w-full h-full object-cover group-hover/item:scale-110 transition-transform duration-300"
+                            fill
+                            className="object-cover group-hover/item:scale-110 transition-transform duration-300"
+                            sizes="56px"
                           />
                         </div>
                       ) : (
@@ -603,9 +651,9 @@ export default function DashboardPage() {
                       </div>
 
                       {/* Lien résultat */}
-                      {t.chemin_resultat && t.statut === "termine" && (
+                      {t.url_resultat && t.statut === "termine" && (
                         <a
-                          href={getPhotoUrl(t.chemin_resultat)}
+                          href={getPhotoUrl(t.url_resultat)}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="flex-shrink-0 w-8 h-8 rounded-lg bg-surface border border-card-border flex items-center justify-center text-muted hover:text-accent hover:border-accent/30 transition-all"
