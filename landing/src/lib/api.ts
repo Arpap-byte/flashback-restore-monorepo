@@ -38,6 +38,7 @@ export interface AnimationStatus {
   status: "en_attente" | "en_cours" | "termine" | "erreur";
   progress?: number;
   result_url?: string;
+  url_video?: string;
   message?: string;
 }
 
@@ -228,11 +229,11 @@ export function getPhotoUrl(chemin: string): string {
 
 export async function animatePhoto(
   file: File,
-  text: string
+  comportement: string = "naturel"
 ): Promise<AnimateResult> {
   const formData = new FormData();
   formData.append("fichier", file);
-  formData.append("texte", text);
+  formData.append("comportement", comportement);
   return apiFetch<AnimateResult>("/api/animate", {
     method: "POST",
     body: formData,

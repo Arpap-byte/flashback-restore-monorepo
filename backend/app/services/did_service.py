@@ -2,11 +2,11 @@
 Service d'intégration avec D-ID pour l'animation de portraits.
 
 Permet de :
-- Créer une animation « portrait parlant » à partir d'une photo
+- Créer une animation « portrait vivant » à partir d'une photo
 - Suivre l'état d'une animation en cours
 
-Les animations sont de style « Harry Potter » : le visage sur la photo
-s'anime et prononce un texte fourni.
+Les animations sont des micro-expressions naturelles (respiration, sourire, rire)
+sans parole — style « photo qui prend vie » en 5 secondes max.
 """
 
 import logging
@@ -25,39 +25,68 @@ _HEADERS = {
     "Accept": "application/json",
 }
 
+# Scripts silencieux pour les comportements sans parole
+COMPORTEMENT_SCRIPTS: dict[str, str] = {
+    "sourire": "            ",  # 12 espaces → ~0.5s de silence, le driver fait le reste
+    "rire": "                    ",
+    "respirer": "               ",
+    "clin_oeil": "            ",
+    "naturel": "               ",
+}
+
 
 async def creer_animation(
     url_photo: str,
-    texte: str = "Bonjour ! Je suis un souvenir restauré.",
-    voix: Optional[str] = None,
+    comportement: str = "naturel",
+    duree_sec: int = 5,
 ) -> str:
     """
-    Crée une animation D-ID « talking head » à partir d'une photo.
+    Crée une animation faciale D-ID sans parole.
 
     Args:
         url_photo: URL publique de la photo à animer.
-        texte: Texte que le portrait va prononcer.
-        voix: Identifiant de la voix (optionnel, voix par défaut si absent).
+        comportement: Type de micro-expression (« sourire », « rire »,
+                      « respirer », « clin_oeil », « naturel »).
+        duree_sec: Durée cible en secondes (défaut 5s).
 
     Returns:
         L'identifiant du travail D-ID (job ID).
-
-    Raises:
-        httpx.HTTPStatusError: Si l'API D-ID retourne une erreur HTTP.
-        Exception: En cas d'erreur réseau ou inattendue.
     """
-    logger.info(f"Création d'une animation D-ID pour : {url_photo}")
+    # Script minimal pour déclencher l'animation faciale sans parole
+    script_silencieux = COMPORTEMENT_SCRIPTS.get(
+        comportement,
+        " " * (duree_sec * 3),  # fallback : espaces proportionnels à la durée
+    )
 
-    corps = {
+    logger.info(
+        f"Création animation D-ID sans parole : comportement={comportement}, "
+        f"duree={duree_sec}s, photo={url_photo}"
+    )
+
+    corps: dict = {
         "script": {
             "type": "text",
-            "input": texte,
+            "input": script_silencieux,
+            "provider": {
+                "type": "microsoft",
+                "voice_id": "fr-FR-DeniseNeural",
+            },
         },
         "source_url": url_photo,
+        "config": {
+            "result_format": "mp4",
+            "stitch": True,
+            "driver_expressions": {
+                "expressions": [
+                    {"expression": comportement, "start_frame": 0, "intensity": 0.7}
+                ]
+            } if comportement != "naturel" else {},
+        },
     }
 
-    if voix:
-        corps["config"] = {"voice": {"voice_id": voix}}
+    # Ajouter le driver d'expression seulement si pas "naturel"
+    if comportement == "naturel":
+        del corps["config"]["driver_expressions"]
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
@@ -72,7 +101,7 @@ async def creer_animation(
     if not job_id:
         raise RuntimeError("L'API D-ID n'a pas retourné d'identifiant de travail.")
 
-    logger.info(f"Animation créée avec succès, job_id={job_id}")
+    logger.info(f"Animation sans parole créée, job_id={job_id}")
     return job_id
 
 

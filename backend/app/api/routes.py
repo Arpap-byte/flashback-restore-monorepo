@@ -787,11 +787,11 @@ async def coloriser_standalone(
 async def animer(
     request: Request,
     fichier: UploadFile = File(...),
-    texte: str = Form("Bonjour ! Je suis un souvenir restauré."),
+    comportement: str = Form("naturel"),
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
-    Crée une animation de portrait parlant (style Harry Potter).
+    Crée une animation faciale sans parole (micro-expressions naturelles).
 
     **Non-bloquant** : le traitement est délégué à un worker ARQ.
     La réponse immédiate contient un job_id pour suivre la progression.
@@ -800,7 +800,8 @@ async def animer(
 
     Args:
         fichier: La photo du visage à animer.
-        texte: Le texte que le portrait va prononcer (français).
+        comportement: Type d'expression (« sourire », « rire », « respirer »,
+                      « clin_oeil », « naturel »). Défaut: « naturel ».
 
     Returns:
         job_id pour suivre la progression + message de confirmation.
@@ -838,7 +839,7 @@ async def animer(
             'animation_job',
             utilisateur["id"],
             str(chemin),
-            texte,
+            comportement,
             travail_id,
         )
         return {

@@ -169,11 +169,11 @@ async def animation_job(
     ctx: dict,
     utilisateur_id: int,
     chemin_original: str,
-    texte: str,
+    comportement: str,
     travail_id: int,
 ) -> dict:
     """
-    Crée une animation D-ID dans le worker ARQ.
+    Crée une animation faciale D-ID sans parole dans le worker ARQ.
 
     Le fichier est déjà sauvegardé par le handler HTTP.
     Le job appelle l'API D-ID et met à jour le travail en base.
@@ -186,15 +186,15 @@ async def animation_job(
     nom_fichier = Path(chemin_original).name
     logger.info(
         f"[ARQ] Démarrage animation — travail_id={travail_id}, "
-        f"fichier={chemin_original}"
+        f"comportement={comportement}, fichier={chemin_original}"
     )
 
     try:
         # Construction de l'URL publique
         url_photo = f"{PUBLIC_BACKEND_URL}/uploads/{nom_fichier}"
 
-        # Appel à l'API D-ID
-        job_did = await creer_animation(url_photo, texte=texte)
+        # Appel à l'API D-ID (animation sans parole, 5 secondes)
+        job_did = await creer_animation(url_photo, comportement=comportement)
 
         # Association du job D-ID au travail local
         await mettre_a_jour_travail(
