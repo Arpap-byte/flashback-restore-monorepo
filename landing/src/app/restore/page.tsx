@@ -26,7 +26,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
-import { restorePhoto, colorizePhoto, getRestoredImageUrl, RestoreResult } from "@/lib/api";
+import { restorePhoto, colorizePhoto, getRestoredImageUrl, RestoreResult, pollRestoreJob } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
@@ -45,6 +45,7 @@ export default function RestorePage() {
   const [sliderPos, setSliderPos] = useState(50);
   const [colorize, setColorize] = useState(false);
   const [colorizing, setColorizing] = useState(false);
+  const [restoreProgress, setRestoreProgress] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
@@ -98,9 +99,18 @@ export default function RestorePage() {
     if (!file) return;
     setRestoring(true);
     setError(null);
+    setRestoreProgress("Envoi de la photo...");
     try {
-      const result = await restorePhoto(file, colorize);
-      setRestoreResult(result);
+      const { jobId, travailId } = await restorePhoto(file, colorize);
+      
+      // Poll for the async job result
+      setRestoreProgress("Restauration IA en cours...");
+      const finalResult = await pollRestoreJob(jobId, (progress) => {
+        setRestoreProgress(progress);
+      });
+      
+      setRestoreResult(finalResult);
+      setRestoreProgress("");
     } catch (err) {
       setError(
         err instanceof Error
@@ -118,6 +128,7 @@ export default function RestorePage() {
     setPreview(null);
     setRestoreResult(null);
     setError(null);
+    setRestoreProgress("");
     sessionStorage.removeItem("flashback_photo");
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -131,8 +142,11 @@ export default function RestorePage() {
       const res = await fetch(restoredUrl!);
       const blob = await res.blob();
       const f = new File([blob], "restored.jpg", { type: "image/jpeg" });
-      const result = await colorizePhoto(f);
-      setRestoreResult(result);
+      const { jobId } = await colorizePhoto(f);
+      
+      // Poll for the async colorization result
+      const finalResult = await pollRestoreJob(jobId, () => {});
+      setRestoreResult(finalResult);
     } catch (err) {
       setError(
         err instanceof Error
@@ -163,466 +177,378 @@ export default function RestorePage() {
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
     } catch {
-      window.open(url, "_blank");
+      setError("Erreur lors du téléchargement.");
+      setTimeout(() => setError(null), 4000);
     }
   };
 
-  // Slider drag (mouse + touch)
-  const handleSliderStart = useCallback(
-    (clientX: number) => {
-      const startX = clientX;
-      const startPos = sliderPos;
-
-      const onMove = (ev: MouseEvent | TouchEvent) => {
-        const cx =
-          "touches" in ev ? ev.touches[0].clientX : ev.clientX;
-        const dx = cx - startX;
-        const rect = sliderRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const newPos = Math.max(
-          0,
-          Math.min(100, startPos + (dx / rect.width) * 100)
-        );
-        setSliderPos(newPos);
-      };
-
-      const onUp = () => {
-        document.removeEventListener("mousemove", onMove as EventListener);
-        document.removeEventListener("mouseup", onUp);
-        document.removeEventListener("touchmove", onMove as EventListener);
-        document.removeEventListener("touchend", onUp);
-      };
-
-      document.addEventListener("mousemove", onMove as EventListener);
-      document.addEventListener("mouseup", onUp);
-      document.addEventListener("touchmove", onMove as EventListener, { passive: false });
-      document.addEventListener("touchend", onUp);
-    },
-    [sliderPos]
-  );
-
-  const handleSliderMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    handleSliderStart(e.clientX);
-  };
-
-  const handleSliderTouchStart = (e: React.TouchEvent) => {
-    e.preventDefault();
-    handleSliderStart(e.touches[0].clientX);
-  };
-
-  if (authLoading) {
+  // Loading skeleton
+  if (authLoading || !clerkLoaded) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="flex-1 flex items-center justify-center pt-24 pb-16">
-          <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-            className="w-12 h-12 rounded-full border-2 border-accent/30 border-t-accent"
-          />
-        </div>
-        <Footer />
+        <main className="pt-24 lg:pt-32 pb-20 px-4">
+          <div className="max-w-5xl mx-auto text-center">
+            <div className="w-16 h-16 rounded-full border-4 border-accent/30 border-t-accent animate-spin mx-auto mb-6" />
+            <p className="text-muted">Chargement...</p>
+          </div>
+        </main>
       </div>
     );
   }
 
+  // Not authenticated = prompt
   if (!isAuthenticated) {
     return (
-      <div className="flex flex-col min-h-screen bg-background">
+      <div className="min-h-screen bg-background">
         <Navbar />
-        <div className="flex-1 flex items-center justify-center pt-24 pb-16">
-          {/* Background glow */}
-          <div className="fixed inset-0 pointer-events-none">
-            <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-violet-600/6 rounded-full blur-[120px]" />
-            <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px]" />
-          </div>
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="relative z-10 max-w-md mx-auto px-4 text-center"
-          >
+        <main className="pt-24 lg:pt-32 pb-20 px-4">
+          <div className="max-w-lg mx-auto text-center">
             <div className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-6">
-              <Shield className="w-10 h-10 text-accent" />
+              <LogIn className="w-10 h-10 text-accent" />
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground mb-3 font-[family-name:var(--font-playfair)]">
+            <h1 className="text-2xl font-bold text-foreground mb-3">
               Connectez-vous pour restaurer vos photos
             </h1>
             <p className="text-muted mb-8">
               Créez un compte gratuit pour commencer à restaurer vos souvenirs.
             </p>
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
               <Link
                 href="/auth?callbackUrl=/restore"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
+                className="px-6 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all"
               >
-                <LogIn className="w-5 h-5" />
                 Se connecter
               </Link>
               <Link
                 href="/auth?callbackUrl=/restore"
-                className="text-sm text-muted hover:text-foreground transition-colors underline underline-offset-4"
+                className="px-6 py-3 rounded-full border border-card-border text-foreground hover:bg-surface transition-all"
               >
                 Créer un compte
               </Link>
             </div>
-          </motion.div>
-        </div>
+          </div>
+        </main>
         <Footer />
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="flex-1 pt-24 pb-16">
-        {/* Background glow */}
-        <div className="fixed inset-0 pointer-events-none">
-          <div className="absolute top-1/4 right-1/4 w-[600px] h-[600px] bg-violet-600/6 rounded-full blur-[120px]" />
-          <div className="absolute bottom-1/4 left-1/4 w-[500px] h-[500px] bg-accent/5 rounded-full blur-[100px]" />
-        </div>
-
-        <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6">
+      <main className="pt-24 lg:pt-32 pb-20 px-4">
+        <div className="max-w-5xl mx-auto">
           {/* Header */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center mb-12"
-          >
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-6">
-              <Sparkles className="w-4 h-4" />
-              Restauration
-            </div>
+          <div className="text-center mb-10">
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 font-[family-name:var(--font-playfair)]">
-              Restauration
-              <br />
-              <span className="text-gradient">par intelligence artificielle</span>
+              Restaurez vos{" "}
+              <span className="text-gradient">photos anciennes</span>
             </h1>
-            <p className="text-muted text-lg max-w-xl mx-auto">
-              Notre IA corrige automatiquement les défauts de votre photo :
-              rayures, taches, déchirures et couleurs délavées.
+            <p className="text-muted max-w-xl mx-auto">
+              Notre IA détecte et répare automatiquement les défauts, rayures et taches.
+              Résultat instantané.
             </p>
-          </motion.div>
+          </div>
 
-          {/* Main content */}
-          <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-          >
-            {!preview ? (
-              /* Upload zone (no photo yet) */
-              <div
-                onDragOver={(e) => {
-                  e.preventDefault();
-                  setDragOver(true);
+          {/* Upload zone */}
+          {!preview && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4 }}
+              className={`max-w-2xl mx-auto border-2 border-dashed rounded-3xl p-12 text-center transition-all cursor-pointer ${
+                dragOver
+                  ? "border-accent bg-accent/5 scale-[1.02]"
+                  : "border-card-border hover:border-accent/30 hover:bg-surface/50"
+              }`}
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragOver(true);
+              }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFile(f);
                 }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={`relative rounded-3xl border-2 border-dashed p-12 lg:p-16 text-center cursor-pointer transition-all duration-300 ${
-                  dragOver
-                    ? "border-accent bg-accent/5 scale-[1.01]"
-                    : "border-card-border hover:border-muted bg-card/50"
-                }`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) handleFile(f);
-                  }}
-                />
-                <div className="flex flex-col items-center gap-4">
-                  <motion.div
-                    animate={dragOver ? { scale: 1.1, y: -4 } : {}}
-                    className="w-20 h-20 rounded-2xl bg-accent/10 flex items-center justify-center"
-                  >
-                    <Upload className="w-10 h-10 text-accent" />
-                  </motion.div>
-                  <div>
-                    <p className="text-foreground text-lg font-semibold mb-1">
-                      Glissez-déposez votre photo ici
-                    </p>
-                    <p className="text-muted text-sm">
-                      ou cliquez pour parcourir vos fichiers
-                    </p>
-                  </div>
-                </div>
+                className="hidden"
+              />
+              <div className="w-16 h-16 rounded-2xl bg-accent/10 flex items-center justify-center mx-auto mb-4">
+                <Upload className="w-8 h-8 text-accent" />
               </div>
-            ) : !restoring && !restoreResult ? (
-              /* Photo loaded, ready to restore */
-              <div className="grid lg:grid-cols-5 gap-8">
-                <div className="lg:col-span-2">
-                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl aspect-[4/3]">
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                Glissez votre photo ici
+              </h3>
+              <p className="text-muted text-sm mb-4">
+                ou cliquez pour sélectionner un fichier
+              </p>
+              <p className="text-muted/60 text-xs">
+                JPG, PNG, WebP — Max 20 Mo
+              </p>
+            </motion.div>
+          )}
+
+          {/* Photo loaded + result */}
+          {preview && (
+            <div className="max-w-4xl mx-auto">
+              {/* Colorize toggle */}
+              {!restoreResult && !restoring && (
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={colorize}
+                      onChange={(e) => setColorize(e.target.checked)}
+                      className="w-4 h-4 rounded accent-accent"
+                    />
+                    <Palette className="w-4 h-4 text-muted" />
+                    <span className="text-sm text-muted">
+                      Coloriser après restauration
+                    </span>
+                  </label>
+                </div>
+              )}
+
+              {/* Restore button or progress */}
+              {!restoring && !restoreResult ? (
+                /* Photo loaded, ready to restore */
+                <div className="flex flex-col items-center gap-4">
+                  <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-surface border border-card-border">
                     <Image
                       src={preview}
                       alt="Photo à restaurer"
-                      fill
-                      className="object-contain bg-surface-alt"
-                      sizes="(max-width: 1024px) 100vw, 40vw"
+                      width={800}
+                      height={600}
+                      className="w-full h-auto object-contain"
+                      unoptimized
                     />
+                  </div>
+                  <div className="flex gap-3">
                     <button
                       onClick={handleClear}
-                      className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                      className="px-5 py-2.5 rounded-full border border-card-border text-muted hover:text-foreground text-sm transition-all"
                     >
-                      <X className="w-4 h-4" />
+                      <X className="w-4 h-4 inline mr-1.5" />
+                      Annuler
                     </button>
-                  </div>
-                </div>
-                <div className="lg:col-span-3 flex flex-col items-center justify-center text-center p-8">
-                  <Sparkles className="w-12 h-12 text-accent mb-4" />
-                  <h3 className="text-xl font-semibold text-foreground mb-2">
-                    Prêt pour la restauration
-                  </h3>
-                  <p className="text-muted mb-8">
-                    Notre IA va analyser et réparer automatiquement les défauts
-                    de votre photo. Cliquez sur le bouton ci-dessous pour lancer
-                    la magie.
-                  </p>
-                  <div className="mb-6 p-4 rounded-xl border border-card-border bg-surface/50">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={colorize}
-                        onChange={(e) => setColorize(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded border-card-border text-accent focus:ring-accent"
-                      />
-                      <div className="text-left">
-                        <span className="text-foreground text-sm font-medium">Coloriser la photo</span>
-                        <span className="inline-flex items-center gap-1 ml-2 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-medium">1 crédit</span>
-                        <p className="text-muted text-xs mt-1">Transforme une photo noir & blanc en couleur naturelle. Idéal pour les photos anciennes.</p>
-                      </div>
-                    </label>
-                  </div>
-                  <button
-                    onClick={handleRestore}
-                    className="group inline-flex items-center gap-2 px-8 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
-                  >
-                    <Sparkles className="w-5 h-5" />
-                    Restaurer la photo
-                    <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                  </button>
-                </div>
-              </div>
-            ) : restoring ? (
-              /* Restoring — simple spinner */
-              <div className="max-w-lg mx-auto text-center py-12">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "linear",
-                  }}
-                  className="w-20 h-20 rounded-full border-2 border-accent/30 border-t-accent mx-auto mb-8"
-                />
-                <h3 className="text-xl font-semibold text-foreground mb-2">
-                  Restauration en cours...
-                </h3>
-                <p className="text-muted">
-                  L'IA analyse et répare votre photo. Cela prend quelques secondes.
-                </p>
-                <div className="mt-8 w-full max-w-xs mx-auto h-1.5 rounded-full bg-surface overflow-hidden">
-                  <motion.div
-                    className="h-full rounded-full bg-gradient-to-r from-accent to-violet-500"
-                    initial={{ width: "0%" }}
-                    animate={{ width: "100%" }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                  />
-                </div>
-              </div>
-            ) : restoreResult ? (
-              /* Result: Before/After */
-              <div className="space-y-8">
-                {/* View toggle */}
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setShowAfter(false)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                      !showAfter
-                        ? "bg-accent text-white dark:text-gray-950"
-                        : "bg-surface text-muted hover:text-foreground"
-                    }`}
-                  >
-                    Avant
-                  </button>
-                  <button
-                    onClick={() => setShowAfter(true)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                      showAfter
-                        ? "bg-accent text-white dark:text-gray-950"
-                        : "bg-surface text-muted hover:text-foreground"
-                    }`}
-                  >
-                    Après
-                  </button>
-                  <button
-                    onClick={() => setShowAfter(!showAfter)}
-                    className="px-4 py-2 rounded-full text-sm font-medium bg-surface text-muted hover:text-foreground transition-all flex items-center gap-1.5"
-                  >
-                    <ArrowLeftRight className="w-3.5 h-3.5" />
-                    Comparer
-                  </button>
-                </div>
-
-                {/* Slider comparison */}
-                <div
-                  ref={sliderRef}
-                  className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-2xl cursor-col-resize select-none"
-                  onMouseDown={handleSliderMouseDown}
-                  onTouchStart={handleSliderTouchStart}
-                >
-                  <div className="relative w-full max-h-[500px] aspect-[4/3] overflow-hidden">
-                    {/* After (full) */}
-                    <Image
-                      src={restoredUrl!}
-                      alt="Photo restaurée"
-                      fill
-                      unoptimized
-                      className="object-contain bg-surface-alt"
-                      sizes="100vw"
-                    />
-                    {/* Before (clipped via clip-path) */}
-                    <div
-                      className="absolute inset-0"
-                      style={{ clipPath: `inset(0 ${100 - sliderPos}% 0 0)` }}
-                    >
-                      <Image
-                        src={preview!}
-                        alt="Photo originale"
-                        fill
-                        unoptimized
-                        className="object-contain bg-surface-alt"
-                        sizes="100vw"
-                      />
-                    </div>
-                    {/* Slider handle */}
-                    <div
-                      className="absolute top-0 bottom-0 w-0.5 bg-white shadow-lg shadow-black/30"
-                      style={{ left: `${sliderPos}%` }}
-                    >
-                      <div className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-white shadow-xl flex items-center justify-center">
-                        <ArrowLeftRight className="w-5 h-5 text-gray-800" />
-                      </div>
-                    </div>
-                    {/* Labels */}
-                    <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur text-white text-xs font-medium">
-                      Avant
-                    </div>
-                    <div className="absolute top-3 right-3 px-3 py-1 rounded-full bg-accent/80 backdrop-blur text-white text-xs font-medium flex items-center gap-1">
-                      <Sparkles className="w-3 h-3" />
-                      Après
-                    </div>
-                  </div>
-                </div>
-
-                {/* Mobile fallback: toggle view */}
-                <div className="lg:hidden">
-                  <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl aspect-[4/3]">
-                    <Image
-                      src={!showAfter ? preview! : restoredUrl!}
-                      alt={!showAfter ? "Avant" : "Après"}
-                      fill
-                      className="object-contain bg-surface-alt"
-                      sizes="100vw"
-                    />
-                    <div className="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/60 backdrop-blur text-white text-xs font-medium">
-                      {!showAfter ? "Avant" : "Après ✨"}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex flex-col sm:flex-row items-center gap-3">
-                  <button
-                    onClick={() =>
-                      restoredUrl &&
-                      handleDownload(restoredUrl, "flashback-restored.jpg")
-                    }
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
-                  >
-                    <Download className="w-5 h-5" />
-                    Télécharger la photo restaurée
-                  </button>
-                  <button
-                    onClick={handleColorize}
-                    disabled={colorizing}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-amber-500 text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-xl hover:shadow-amber-500/30 active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {colorizing ? (
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                      <Palette className="w-5 h-5" />
-                    )}
-                    {colorizing ? "Colorisation..." : "Coloriser"}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (restoredUrl) {
-                        sessionStorage.setItem("flashback_photo", restoredUrl);
-                      }
-                      router.push("/animate");
-                    }}
-                    className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full border-2 border-violet-500/30 text-foreground hover:bg-violet-500/10 hover:border-violet-400 font-semibold transition-all active:scale-[0.97]"
-                  >
-                    <Play className="w-5 h-5 text-violet-400" />
-                    Animer cette photo
-                  </button>
-                  <button
-                    onClick={handleClear}
-                    className="flex items-center justify-center gap-2 px-6 py-4 rounded-full border border-card-border text-muted hover:text-foreground hover:border-muted transition-all"
-                  >
-                    <RefreshCw className="w-4 h-4" />
-                    Nouvelle photo
-                  </button>
-                </div>
-
-                {/* Error toast */}
-                {error && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3"
-                  >
-                    <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-red-400 text-sm">{error}</p>
                     <button
-                      onClick={() => setError(null)}
-                      className="ml-auto text-red-400/60 hover:text-red-400"
+                      onClick={handleRestore}
+                      className="px-6 py-2.5 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all flex items-center gap-2"
                     >
-                      <X className="w-4 h-4" />
+                      <Sparkles className="w-4 h-4" />
+                      Restaurer la photo
                     </button>
-                  </motion.div>
-                )}
-              </div>
-            ) : null}
+                  </div>
+                </div>
+              ) : restoring && !restoreResult ? (
+                /* Restoring in progress */
+                <div className="flex flex-col items-center py-12">
+                  <div className="w-20 h-20 relative mb-6">
+                    <div className="absolute inset-0 rounded-full border-4 border-accent/20" />
+                    <div className="absolute inset-0 rounded-full border-4 border-accent border-t-transparent animate-spin" />
+                  </div>
+                  <p className="text-foreground font-medium text-lg mb-2">
+                    {restoreProgress || "Restauration IA en cours..."}
+                  </p>
+                  <p className="text-muted text-sm">
+                    Notre IA analyse et répare votre photo. Cela prend environ 30 secondes.
+                  </p>
+                </div>
+              ) : restoreResult ? (
+                /* Result displayed */
+                <div className="space-y-6">
+                  {/* Toggle buttons */}
+                  <div className="flex items-center justify-center gap-2">
+                    <button
+                      onClick={() => setShowAfter(false)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                        !showAfter
+                          ? "bg-accent text-white dark:text-gray-950"
+                          : "bg-surface text-muted hover:text-foreground border border-card-border"
+                      }`}
+                    >
+                      Avant
+                    </button>
+                    <button
+                      onClick={() => setShowAfter(true)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                        showAfter
+                          ? "bg-accent text-white dark:text-gray-950"
+                          : "bg-surface text-muted hover:text-foreground border border-card-border"
+                      }`}
+                    >
+                      ✨ Après
+                    </button>
+                    <button
+                      onClick={() => setShowAfter(!showAfter)}
+                      className="px-4 py-2 rounded-full text-sm font-medium bg-surface text-muted hover:text-foreground border border-card-border transition-all flex items-center gap-1.5"
+                    >
+                      <ArrowLeftRight className="w-4 h-4" />
+                      Comparer
+                    </button>
+                  </div>
 
-            {/* Error toast (for upload errors) */}
-            <AnimatePresence>
-              {error && !restoreResult && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="mt-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-start gap-3"
-                >
-                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <p className="text-red-400 text-sm">{error}</p>
-                  <button
-                    onClick={() => setError(null)}
-                    className="ml-auto text-red-400/60 hover:text-red-400"
+                  {/* Comparison view */}
+                  <div
+                    ref={sliderRef}
+                    className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden bg-surface border border-card-border select-none"
                   >
-                    <X className="w-4 h-4" />
-                  </button>
-                </motion.div>
+                    {/* Before image (full width) */}
+                    <Image
+                      src={preview!}
+                      alt="Photo originale"
+                      width={800}
+                      height={600}
+                      className="w-full h-auto"
+                      unoptimized
+                    />
+
+                    {/* After image overlays with clip-path slider */}
+                    {!showAfter ? null : restoredUrl ? (
+                      <>
+                        <div
+                          className="absolute inset-0 overflow-hidden"
+                          style={{
+                            clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                          }}
+                        >
+                          <Image
+                            src={restoredUrl!}
+                            alt="Photo restaurée"
+                            width={800}
+                            height={600}
+                            className="w-full h-full object-cover absolute inset-0"
+                            unoptimized
+                          />
+                        </div>
+
+                        {/* Slider handle */}
+                        <div
+                          className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize z-10"
+                          style={{ left: `${sliderPos}%` }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            const slider = sliderRef.current;
+                            if (!slider) return;
+                            const rect = slider.getBoundingClientRect();
+
+                            const onMove = (ev: MouseEvent) => {
+                              const x = ev.clientX - rect.left;
+                              const pct = Math.max(0, Math.min(100, (x / rect.width) * 100));
+                              setSliderPos(pct);
+                            };
+                            const onUp = () => {
+                              document.removeEventListener("mousemove", onMove);
+                              document.removeEventListener("mouseup", onUp);
+                            };
+                            document.addEventListener("mousemove", onMove);
+                            document.addEventListener("mouseup", onUp);
+                          }}
+                        >
+                          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-xl flex items-center justify-center">
+                            <ArrowLeftRight className="w-5 h-5 text-gray-700" />
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+                  </div>
+
+                  {/* Labels */}
+                  <div className="flex items-center justify-center gap-8 text-sm font-medium">
+                    <span className="px-3 py-1 rounded-full bg-surface text-muted border border-card-border">
+                      Avant
+                    </span>
+                    <span className="px-3 py-1 rounded-full bg-accent/15 text-accent">
+                      ✨ Après
+                    </span>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      onClick={() =>
+                        restoredUrl &&
+                        handleDownload(restoredUrl, "flashback-restored.jpg")
+                      }
+                      disabled={!restoredUrl}
+                      className="px-5 py-2.5 rounded-full bg-accent/90 text-white dark:text-gray-950 text-sm font-medium hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Download className="w-4 h-4" />
+                      Télécharger la photo restaurée
+                    </button>
+                    {!colorize && (
+                      <button
+                        onClick={handleColorize}
+                        disabled={colorizing}
+                        className="px-5 py-2.5 rounded-full bg-orange-500 text-white text-sm font-medium hover:brightness-110 transition-all flex items-center gap-2 disabled:opacity-50"
+                      >
+                        {colorizing ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Palette className="w-4 h-4" />
+                        )}
+                        Coloriser
+                      </button>
+                    )}
+                    <button
+                      onClick={() => {
+                        if (restoredUrl) {
+                          sessionStorage.setItem("flashback_photo", restoredUrl);
+                          router.push("/animate");
+                        }
+                      }}
+                      disabled={!restoredUrl}
+                      className="px-5 py-2.5 rounded-full border border-card-border text-foreground text-sm hover:bg-surface transition-all flex items-center gap-2 disabled:opacity-50"
+                    >
+                      <Play className="w-4 h-4" />
+                      Animer cette photo
+                    </button>
+                    <button
+                      onClick={handleClear}
+                      className="px-5 py-2.5 rounded-full border border-card-border text-muted hover:text-foreground text-sm transition-all flex items-center gap-2"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      Nouvelle photo
+                    </button>
+                  </div>
+
+                  {/* Analysis info */}
+                  {restoreResult.analyse && (
+                    <div className="max-w-xl mx-auto mt-6 p-4 bg-surface rounded-xl border border-card-border">
+                      <h4 className="text-sm font-semibold text-foreground mb-2">
+                        Analyse de l&apos;IA
+                      </h4>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-muted">
+                        <div>
+                          <span className="text-foreground/70">État :</span>{" "}
+                          {restoreResult.analyse.etat_global}
+                        </div>
+                        <div>
+                          <span className="text-foreground/70">Âge estimé :</span>{" "}
+                          {restoreResult.analyse.age_estime}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {/* Error display */}
+              {error && !restoreResult && (
+                <div className="flex items-center gap-2 justify-center mt-6 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm max-w-lg mx-auto">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  {error}
+                </div>
               )}
-            </AnimatePresence>
-          </motion.div>
+            </div>
+          )}
         </div>
       </main>
       <Footer />

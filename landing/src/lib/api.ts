@@ -138,25 +138,74 @@ export async function analyzePhoto(file: File): Promise<AnalysisResult> {
   });
 }
 
-export async function restorePhoto(file: File, colorize?: boolean): Promise<RestoreResult> {
+export interface RestoreJobResponse {
+  jobId: string;
+  travailId: string;
+  message: string;
+}
+
+export async function restorePhoto(file: File, colorize?: boolean): Promise<RestoreJobResponse> {
   const formData = new FormData();
   formData.append("fichier", file);
   if (colorize) {
     formData.append("coloriser", "true");
   }
-  return apiFetch<RestoreResult>("/api/restore", {
+  const raw = await apiFetch<{ job_id: string; travail_id: string; message: string }>("/api/restore", {
     method: "POST",
     body: formData,
   }, 60000);
+  return { jobId: raw.job_id, travailId: raw.travail_id, message: raw.message };
 }
 
-export async function colorizePhoto(file: File): Promise<RestoreResult> {
+export async function colorizePhoto(file: File): Promise<RestoreJobResponse> {
   const formData = new FormData();
   formData.append("fichier", file);
-  return apiFetch<RestoreResult>("/api/colorize", {
+  const raw = await apiFetch<{ job_id: string; travail_id?: string; message: string; url_image?: string }>("/api/colorize", {
     method: "POST",
     body: formData,
   }, 60000);
+  return { jobId: raw.job_id, travailId: raw.travail_id || "", message: raw.message };
+}
+
+export async function pollRestoreJob(
+  jobId: string,
+  onProgress?: (msg: string) => void,
+  maxWaitMs = 120000
+): Promise<RestoreResult> {
+  const start = Date.now();
+  const pollInterval = 2000;
+
+  while (Date.now() - start < maxWaitMs) {
+    const status = await apiFetch<{
+      statut: string;
+      resultat?: { url_image?: string; message?: string; analyse?: AnalysisResult; credits_consommes?: number };
+      message?: string;
+    }>(`/api/job/${jobId}`);
+
+    if (status.statut === "termine") {
+      const res = status.resultat || {};
+      return {
+        message: res.message || "Photo restaurée avec succès !",
+        analyse: res.analyse || { rayures: false, decoloration: false, taches: false, dechirures: false, bruit: false, etat_global: "restauré", age_estime: "inconnu", recommandations: [] },
+        url_image: res.url_image || "",
+      };
+    }
+
+    if (status.statut === "erreur") {
+      throw new Error(status.message || "Erreur lors du traitement de la photo.");
+    }
+
+    if (status.statut === "introuvable") {
+      throw new Error("Le job de restauration a expiré. Veuillez réessayer.");
+    }
+
+    // Still in progress
+    const elapsed = Math.round((Date.now() - start) / 1000);
+    onProgress?.(`Restauration IA en cours... (${elapsed}s)`);
+    await new Promise((r) => setTimeout(r, pollInterval));
+  }
+
+  throw new Error("La restauration a pris trop de temps. Veuillez réessayer.");
 }
 
 export function getRestoredImageUrl(urlImage: string): string {
