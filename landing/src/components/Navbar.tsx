@@ -5,7 +5,8 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sparkles, Sun, Moon, User, History, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import { UserButton, SignInButton, useAuth } from "@clerk/nextjs";
+import { UserButton, SignInButton, useAuth, useClerk } from "@clerk/nextjs";
+import { LogOut } from "lucide-react";
 
 const navLinks = [
   { label: "Accueil", href: "/" },
@@ -18,6 +19,7 @@ export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
   const { isSignedIn } = useAuth();
+  const { signOut } = useClerk();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -113,6 +115,14 @@ export default function Navbar() {
                     }}
                   />
                 </div>
+                <button
+                  onClick={() => signOut()}
+                  className="text-sm text-muted hover:text-red-400 transition-colors font-medium px-3 py-2 rounded-lg hover:bg-red-400/5 flex items-center gap-1.5"
+                  title="Déconnexion"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Déconnexion
+                </button>
               </>
             ) : (
               <SignInButton mode="modal">
@@ -198,6 +208,12 @@ export default function Navbar() {
                   >
                     Dashboard
                   </Link>
+                  <button
+                    onClick={() => { signOut(); setMobileOpen(false); }}
+                    className="block w-full text-left py-2.5 px-3 text-muted hover:text-red-400 hover:bg-red-400/5 rounded-lg transition-colors font-medium"
+                  >
+                    Déconnexion
+                  </button>
                 </>
               ) : (
                 <SignInButton mode="modal">
