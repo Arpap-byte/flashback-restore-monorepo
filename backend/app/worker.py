@@ -236,5 +236,5 @@ class WorkerSettings:
     functions = [restauration_job, animation_job]
     redis_settings = RedisSettings(host='localhost', port=6379)
     max_jobs = 10  # Limite de jobs concurrents par worker
-    job_timeout = 300  # Timeout max par job (5 minutes)
+    job_timeout = 600  # Timeout max par job (10 minutes, D-ID peut être lent)
     keep_result = 3600  # Garde les résultats 1h dans Redis
