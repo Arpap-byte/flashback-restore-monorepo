@@ -7,8 +7,10 @@ Type=simple
 User=flashback
 Group=flashback
 WorkingDirectory=/opt/flashback-restore-monorepo/landing
-Environment="NEXTAUTH_SECRET=change-me-to-random-64-chars"
-Environment="AUTH_SECRET=change-me-to-random-64-chars"
+Environment="NEXTAUTH_SECRET=kpCr/8IMQoqVF67Wxt+GYCnsIgXD5mqc7P2Qv8Q50zo="
+Environment="AUTH_SECRET=kpCr/8IMQoqVF67Wxt+GYCnsIgXD5mqc7P2Qv8Q50zo="
+Environment="CLERK_SECRET_KEY=sk_test_NVaHy5Dm9iS9dCfn6Fxv2MZxR8aTu0LhNeaxKAyC70"
+Environment="NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_dGhvcm91Z2gtc2F0eXItODMuY2xlcmsuYWNjb3VudHMuZGV2JA"
 ExecStart=/usr/bin/npx next start -p 8001
 Restart=always
 RestartSec=5

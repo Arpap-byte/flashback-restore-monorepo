@@ -170,7 +170,7 @@ export async function colorizePhoto(file: File): Promise<RestoreResult> {
 }
 
 export function getRestoredImageUrl(urlImage: string): string {
-  // Use absolute URL so Next.js Image optimization works (image is served by backend, not Next.js)
+  if (!urlImage) return "";
   if (urlImage.startsWith("http")) return urlImage;
   const base = typeof window !== "undefined"
     ? window.location.origin
@@ -179,6 +179,7 @@ export function getRestoredImageUrl(urlImage: string): string {
 }
 
 export function getPhotoUrl(chemin: string): string {
+  if (!chemin) return "";
   if (chemin.startsWith("http")) return chemin;
   const filename = chemin.split("/").pop();
   const base = typeof window !== "undefined"
