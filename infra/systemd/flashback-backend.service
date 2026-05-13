@@ -1,0 +1,24 @@
+[Unit]
+Description=Flashback Restore - Backend FastAPI
+After=network.target
+
+[Service]
+Type=simple
+User=flashback
+Group=flashback
+WorkingDirectory=/opt/flashback-restore-monorepo/backend
+ExecStart=/opt/flashback-restore-monorepo/backend/.venv/bin/python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --loop asyncio
+Restart=always
+RestartSec=5
+Environment="ENVIRONMENT=production"
+
+# Isolation
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/flashback-restore-monorepo
+ReadOnlyPaths=/opt/flashback-restore-monorepo/backend/.venv
+
+[Install]
+WantedBy=multi-user.target

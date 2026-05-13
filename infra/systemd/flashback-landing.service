@@ -1,0 +1,24 @@
+[Unit]
+Description=Flashback Restore - Landing Page Next.js
+After=network.target
+
+[Service]
+Type=simple
+User=flashback
+Group=flashback
+WorkingDirectory=/opt/flashback-restore-monorepo/landing
+Environment="NEXTAUTH_SECRET=change-me-to-random-64-chars"
+Environment="AUTH_SECRET=change-me-to-random-64-chars"
+ExecStart=/usr/bin/npx next start -p 8001
+Restart=always
+RestartSec=5
+
+# Isolation
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/opt/flashback-restore-monorepo
+
+[Install]
+WantedBy=multi-user.target

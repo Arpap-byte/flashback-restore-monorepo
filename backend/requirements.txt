@@ -43,3 +43,15 @@ python-dotenv>=1.0,<2.0
 
 # Observability
 sentry-sdk>=2.0,<3.0
+# Queue de tâches asynchrone
+arq>=0.26,<1.0
+
+# Stockage S3 (Backblaze B2)
+boto3>=1.34,<2.0
+botocore>=1.34,<2.0
+
+# PostgreSQL async (production)
+asyncpg>=0.29,<1.0
+
+# Migrations de base de données
+alembic>=1.13,<2.0
