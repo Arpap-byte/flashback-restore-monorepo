@@ -8,7 +8,7 @@ Fournit des helpers pour enregistrer les événements de sécurité
 import logging
 from typing import Optional
 
-from app.db.database import enregistrer_audit as _db_audit
+from app.db.queries import enregistrer_audit as _db_audit
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ def extraire_ip_et_ua(request) -> tuple[str, str]:
     return ip, ua
 
 
-def log_auth(
+async def log_auth(
     request,
     evenement: str,
     email: Optional[str] = None,
@@ -54,9 +54,17 @@ def log_auth(
     """
     ip, ua = extraire_ip_et_ua(request)
 
-    audit_id = _db_audit(
+    # Masquage de l'email pour l'audit (RGPD)
+    if email and "@" in email:
+        email_masque = email[:3] + "***@" + email.split("@")[1]
+    elif email:
+        email_masque = email[:3] + "***"
+    else:
+        email_masque = None
+
+    audit_id = await _db_audit(
         evenement=evenement,
-        email=email,
+        email=email_masque,
         utilisateur_id=utilisateur_id,
         ip=ip,
         user_agent=ua,
@@ -65,6 +73,6 @@ def log_auth(
     )
 
     statut = "✓" if reussite else "✗"
-    logger.info(f"[AUDIT] {statut} {evenement} | email={email or '?'} | ip={ip} | {detail or ''}")
+    logger.info(f"[AUDIT] {statut} {evenement} | email={email_masque or '?'} | ip={ip} | {detail or ''}")
 
     return audit_id

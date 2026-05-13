@@ -6,6 +6,7 @@ et la consultation des abonnements clients.
 """
 
 import logging
+from datetime import datetime, timezone
 from typing import Optional
 
 import stripe
@@ -25,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 # Initialisation du SDK Stripe avec la clé API
 stripe.api_key = STRIPE_API_KEY
+
+# Timestamp du dernier webhook reçu (pour détection d'inactivité)
+_dernier_webhook: Optional[datetime] = None
 
 # ---------------------------------------------------------------------------
 # Mapping des plans → identifiants de prix Stripe
@@ -224,10 +228,24 @@ async def traiter_webhook(
     type_evenement = evenement["type"]
     donnees = evenement["data"]["object"]
 
+    # Mise à jour du timestamp du dernier webhook
+    global _dernier_webhook
+    _dernier_webhook = datetime.now(timezone.utc)
+
     logger.info(f"Webhook reçu : type={type_evenement}, id={evenement['id']}")
+
+    # Vérification d'inactivité : warning si plus de 24h depuis le dernier webhook
+    if _dernier_webhook:
+        delta = datetime.now(timezone.utc) - _dernier_webhook
+        if delta.total_seconds() > 86400:
+            logger.warning(
+                "Aucun webhook Stripe reçu depuis plus de 24h (dernier : %s)",
+                _dernier_webhook.isoformat(),
+            )
 
     return {
         "type": type_evenement,
+        "event_id": evenement["id"],
         "data": {
             "id": donnees.get("id"),
             "customer": donnees.get("customer"),

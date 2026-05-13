@@ -8,18 +8,20 @@ et le montage des routes.
 import logging
 import os
 import sys
-from pathlib import Path
 
+import sentry_sdk
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+from sentry_sdk.integrations.starlette import StarletteIntegration
 
 from app.api.auth import router as auth_router
 from app.api.routes import router
 from app.api.user import router as user_router
-from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT
-from app.db.database import initialiser_base
+from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT, SENTRY_DSN
 from app.db.session import init_db as async_initialiser_base
 from app.rate_limit_middleware import check_rate_limit
 
@@ -48,6 +50,26 @@ logging.getLogger("google_genai").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
+# Initialisation de Sentry (observabilité — optionnel)
+# ---------------------------------------------------------------------------
+
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        environment=ENVIRONMENT,
+        traces_sample_rate=0.1,
+        profiles_sample_rate=0.1,
+        integrations=[
+            StarletteIntegration(),
+            FastApiIntegration(),
+            SqlalchemyIntegration(),
+        ],
+    )
+    logger.info("Sentry initialisé (environnement : %s)", ENVIRONMENT)
+else:
+    logger.info("Sentry désactivé (SENTRY_DSN non défini)")
+
+# ---------------------------------------------------------------------------
 # Initialisation de l'application
 # ---------------------------------------------------------------------------
 
@@ -59,8 +81,8 @@ app = FastAPI(
         "et crée des animations de portraits parlants."
     ),
     version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if os.getenv("ENVIRONMENT") == "production" else "/docs",
+    redoc_url=None if os.getenv("ENVIRONMENT") == "production" else "/redoc",
 )
 
 # Rate limiting — middleware HTTP custom (voir rate_limit_middleware.py)
@@ -114,6 +136,7 @@ async def ajouter_headers_securite(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Strict-Transport-Security"] = "max-age=63072000"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     return response
 
 
@@ -158,6 +181,16 @@ async def demarrage():
 async def arret():
     """Nettoyage à l'arrêt."""
     logger.info("Arrêt de Flashback Restore API.")
+
+
+# ---------------------------------------------------------------------------
+# Endpoint de test Sentry (développement uniquement)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/sentry-test")
+async def sentry_test():
+    """Endpoint de test : déclenche une exception pour vérifier Sentry."""
+    raise Exception("Test Sentry — si SENTRY_DSN est configuré, cette erreur remonte dans Sentry")
 
 
 # ---------------------------------------------------------------------------

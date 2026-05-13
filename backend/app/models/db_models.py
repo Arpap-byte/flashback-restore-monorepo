@@ -19,6 +19,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 
@@ -96,6 +97,7 @@ class Travail(Base):
     __table_args__ = (
         Index("idx_travaux_statut", "statut"),
         Index("idx_travaux_type", "type"),
+        Index("idx_travaux_user_date", "utilisateur_id", text("cree_le DESC")),
         CheckConstraint(
             "type IN ('analyse', 'restauration', 'animation')",
             name="ck_travaux_type",
@@ -207,4 +209,19 @@ class AuditLog(Base):
 
     __table_args__ = (
         Index("idx_audit_reussite", "reussite"),
+    )
+
+
+class StripeEvent(Base):
+    """Traçabilité des événements Stripe pour idempotence des webhooks."""
+
+    __tablename__ = "stripe_events"
+
+    id = Column(String, primary_key=True, default=_new_uuid)
+    event_id = Column(String, nullable=False, unique=True, index=True)
+    type_evenement = Column(String, nullable=False)
+    traite_le = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    __table_args__ = (
+        Index("idx_stripe_event_id", "event_id"),
     )

@@ -18,7 +18,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import exiger_utilisateur
-from app.db.database import (
+from app.db.queries import (
     ANIMATIONS_PAR_PLAN,
     lister_travaux_par_utilisateur,
     mettre_a_jour_retention,
@@ -43,7 +43,7 @@ async def trials(utilisateur: dict = Depends(exiger_utilisateur)):
     Retourne le nombre d'essais gratuits restants et le statut d'abonnement.
     Nécessite un token JWT valide.
     """
-    essais = obtenir_essais_restants(utilisateur["id"])
+    essais = await obtenir_essais_restants(utilisateur["id"])
     if essais is None:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
@@ -60,18 +60,18 @@ async def me(utilisateur: dict = Depends(exiger_utilisateur)):
     (plan, crédits, animations, rétention, etc.).
     Nécessite un token JWT valide.
     """
-    detail = obtenir_utilisateur_par_id(utilisateur["id"])
+    detail = await obtenir_utilisateur_par_id(utilisateur["id"])
     if detail is None:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
-    essais = obtenir_essais_restants(utilisateur["id"]) or {
+    essais = await obtenir_essais_restants(utilisateur["id"]) or {
         "essais_restants": 0,
         "est_abonne": False,
     }
 
-    plan = obtenir_plan_utilisateur(utilisateur["id"])
+    plan = await obtenir_plan_utilisateur(utilisateur["id"])
     animations_limite = ANIMATIONS_PAR_PLAN.get(plan, 0)
-    retention = obtenir_retention(utilisateur["id"])
+    retention = await obtenir_retention(utilisateur["id"])
 
     return {
         "id": detail["id"],
@@ -107,7 +107,7 @@ async def preferences(
             detail="La durée de conservation doit être 7, 30 ou 90 jours.",
         )
 
-    ok = mettre_a_jour_retention(utilisateur["id"], body.retention_jours)
+    ok = await mettre_a_jour_retention(utilisateur["id"], body.retention_jours)
     if not ok:
         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
 
@@ -120,7 +120,7 @@ async def preferences(
 @router.get("/preferences")
 async def lire_preferences(utilisateur: dict = Depends(exiger_utilisateur)):
     """Retourne les préférences de l'utilisateur (durée de conservation)."""
-    retention = obtenir_retention(utilisateur["id"])
+    retention = await obtenir_retention(utilisateur["id"])
     return {
         "retention_jours": retention,
         "options_disponibles": [7, 30, 90],
@@ -153,8 +153,8 @@ async def history(
     - Tailles de fichiers
     - Date d'expiration calculée selon la rétention configurée
     """
-    travaux = lister_travaux_par_utilisateur(utilisateur["id"], limite)
-    retention = obtenir_retention(utilisateur["id"])
+    travaux = await lister_travaux_par_utilisateur(utilisateur["id"], limite)
+    retention = await obtenir_retention(utilisateur["id"])
 
     resultat = []
     for t in travaux:
@@ -204,7 +204,7 @@ async def supprimer_travail_endpoint(
     (photo originale, résultat, animation). L'utilisateur doit être
     propriétaire du travail.
     """
-    travail = obtenir_travail(travail_id)
+    travail = await obtenir_travail(travail_id)
     if travail is None:
         raise HTTPException(status_code=404, detail="Travail introuvable.")
     if travail.get("utilisateur_id") != utilisateur["id"]:
@@ -222,7 +222,7 @@ async def supprimer_travail_endpoint(
                 logger.warning(f"Impossible de supprimer {chemin}: {e}")
 
     # Supprimer l'enregistrement en base
-    _supprimer_travail_db(travail_id)
+    await _supprimer_travail_db(travail_id)
 
     return {
         "message": "Travail supprimé.",
@@ -239,7 +239,7 @@ async def supprimer_tout_historique(
     ⚠️ Action irréversible.
     """
     # Récupérer tous les travaux pour supprimer les fichiers
-    tous_les_travaux = lister_travaux_par_utilisateur(utilisateur["id"], limite=10000)
+    tous_les_travaux = await lister_travaux_par_utilisateur(utilisateur["id"], limite=10000)
 
     fichiers_supprimes = 0
     for travail in tous_les_travaux:
@@ -252,7 +252,7 @@ async def supprimer_tout_historique(
                 except OSError:
                     pass
 
-    nb_supprimes = _supprimer_tous_db(utilisateur["id"])
+    nb_supprimes = await _supprimer_tous_db(utilisateur["id"])
 
     return {
         "message": f"{nb_supprimes} travaux supprimés.",

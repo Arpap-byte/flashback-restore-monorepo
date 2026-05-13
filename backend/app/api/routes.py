@@ -3,9 +3,10 @@ Routes de l'API Flaskback Restore.
 
 Endpoints :
 - POST /api/analyze   : Analyser les défauts d'une photo
-- POST /api/restore   : Restaurer une photo ancienne
-- POST /api/animate   : Créer une animation
+- POST /api/restore   : Restaurer une photo ancienne (non-bloquant via ARQ)
+- POST /api/animate   : Créer une animation (non-bloquant via ARQ)
 - GET  /api/animate/{id} : Suivre le statut d'une animation
+- GET  /api/job/{job_id} : Statut d'un job ARQ (restauration/animation)
 - GET  /api/health    : Vérifier la santé du service (Gemini, D-ID, DB, Stripe)
 - GET  /api/stats     : Statistiques globales (protégé par X-Admin-Key)
 """
@@ -16,13 +17,19 @@ import re
 import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Optional
 
+import magic
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from PIL import Image, ImageEnhance, ImageFilter
 
+from arq import create_pool
+from arq.connections import RedisSettings
+from arq.jobs import Job as ArqJob, JobStatus as ArqJobStatus
+
 from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
 from app.auth import exiger_utilisateur
-from app.db.database import (
+from app.db.queries import (
     CREDITS_PAR_PLAN,
     compter_audit_logs,
     crediter_utilisateur,
@@ -30,6 +37,7 @@ from app.db.database import (
     creer_travail,
     enregistrer_achat_credits,
     lister_audit_logs,
+    marquer_stripe_event_traite,
     mettre_a_jour_abonnement,
     mettre_a_jour_activite,
     mettre_a_jour_attribution_credits,
@@ -41,6 +49,7 @@ from app.db.database import (
     obtenir_travail,
     obtenir_travail_par_job_externe,
     obtenir_utilisateur_par_email,
+    stripe_event_deja_traite,
 )
 from app.services.credits import consommer_operation, peut_animer, peut_restaurer
 from app.limiter import limiter
@@ -76,17 +85,48 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
+# ---------------------------------------------------------------------------
+# Pool ARQ (connexion Redis) — initialisé paresseusement
+# ---------------------------------------------------------------------------
+
+_arq_pool = None
+_arq_pool_lock = None  # sera initialisé si besoin
+
+
+async def _get_arq_pool():
+    """Retourne le pool ARQ connecté à Redis (singleton)."""
+    global _arq_pool
+    if _arq_pool is not None:
+        return _arq_pool
+    _arq_pool = await create_pool(RedisSettings(host='localhost', port=6379))
+    return _arq_pool
+
 # Taille maximale des uploads : 20 Mo
 TAILLE_MAX_UPLOAD = 20 * 1024 * 1024
 
-# Formats d'image acceptés
+# Formats d'image acceptés (Content-Type)
 FORMATS_ACCEPTES = {"image/jpeg", "image/png", "image/webp", "image/tiff"}
+
+# Types MIME vérifiés par magic bytes (validation de contenu réelle)
+MAGIC_MIME_TYPES = {
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/tiff'
+}
+
+
+def _valider_upload_par_contenu(contenu: bytes) -> bool:
+    """Vérifie le vrai type MIME du fichier via magic bytes (python-magic)."""
+    detected = magic.from_buffer(contenu, mime=True)
+    return detected in MAGIC_MIME_TYPES
 
 
 def _valider_upload(fichier: UploadFile, contenu: bytes, nom_par_defaut: str = "photo.jpg") -> str:
     """
     Valide le type MIME et la taille d'un fichier uploadé, puis retourne
     un nom de fichier sécurisé.
+
+    Effectue une double validation :
+    1. Content-Type déclaré par le client (vérification rapide)
+    2. Magic bytes du contenu réel (protection anti-MIME spoofing)
 
     Args:
         fichier: Le fichier uploadé depuis FastAPI.
@@ -110,6 +150,14 @@ def _valider_upload(fichier: UploadFile, contenu: bytes, nom_par_defaut: str = "
             status_code=400,
             detail=f"Fichier trop volumineux ({len(contenu)} octets). "
                    f"Taille maximale : {TAILLE_MAX_UPLOAD} octets.",
+        )
+    # Validation par magic bytes (protection anti-MIME spoofing)
+    if not _valider_upload_par_contenu(contenu):
+        detected = magic.from_buffer(contenu, mime=True)
+        raise HTTPException(
+            status_code=400,
+            detail=f"Type de fichier invalide détecté : {detected}. "
+                   f"Formats acceptés : {', '.join(MAGIC_MIME_TYPES)}",
         )
     safe_name = re.sub(r'[^a-zA-Z0-9._-]', '_', fichier.filename or nom_par_defaut)[:80]
     return f"{uuid.uuid4().hex}_{safe_name}"
@@ -167,6 +215,14 @@ async def sante(request: Request):
     # --- Test Stripe : vérification simple de la présence de la clé ---
     stripe_ok = bool(STRIPE_API_KEY)
 
+    # --- Test B2 : vérification du bucket via S3 API ---
+    b2_ok = False
+    try:
+        from app.storage import b2_est_disponible
+        b2_ok = b2_est_disponible()
+    except Exception as e:
+        logger.warning(f"Test de connectivité B2 échoué : {e}")
+
     return SanteReponse(
         statut="OK",
         version="1.0.0",
@@ -174,6 +230,7 @@ async def sante(request: Request):
         did_disponible=did_ok,
         db_disponible=db_ok,
         stripe_disponible=stripe_ok,
+        b2_disponible=b2_ok,
     )
 
 
@@ -240,14 +297,14 @@ async def consulter_audit_logs(
     if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
         raise HTTPException(status_code=403, detail="Accès non autorisé. Token admin requis.")
 
-    logs = lister_audit_logs(
+    logs = await lister_audit_logs(
         email=email,
         evenement=evenement,
         reussite=reussite,
         limite=min(limite, 200),
         offset=offset,
     )
-    total = compter_audit_logs(
+    total = await compter_audit_logs(
         email=email,
         evenement=evenement,
         reussite=reussite,
@@ -280,7 +337,7 @@ async def declencher_nettoyage(request: Request):
         raise HTTPException(status_code=403, detail="Accès non autorisé. Token admin requis.")
 
     from app.services.cleanup import nettoyer_uploads
-    resultat = nettoyer_uploads()
+    resultat = await nettoyer_uploads()
     return resultat
 
 
@@ -442,15 +499,15 @@ async def analyser(
     chemin.write_bytes(contenu)
 
     # Suivi dashboard admin
-    mettre_a_jour_activite(utilisateur["id"])
+    await mettre_a_jour_activite(utilisateur["id"])
 
     # Création du travail dans la base
-    travail_id = creer_travail("analyse", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
+    travail_id = await creer_travail("analyse", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
+    await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     try:
         resultat = await analyser_photo(str(chemin))
-        mettre_a_jour_travail(
+        await mettre_a_jour_travail(
             travail_id,
             statut="termine",
             resultat_json=resultat.model_dump_json(),
@@ -458,7 +515,7 @@ async def analyser(
         return resultat
     except Exception as e:
         logger.exception(f"Erreur lors de l'analyse : {e}")
-        mettre_a_jour_travail(
+        await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
             message_erreur=str(e),
@@ -542,7 +599,7 @@ def _appliquer_restauration_pillow(
     logger.info(f"Image restaurée sauvegardée : {chemin_destination}")
 
 
-@router.post("/restore", response_model=RestaurationReponse)
+@router.post("/restore")
 @limiter.limit("10/minute")
 async def restaurer(
     request: Request,
@@ -553,13 +610,14 @@ async def restaurer(
     """
     Restaure une photo ancienne en utilisant l'intelligence artificielle.
 
-    Processus :
-    1. La photo est d'abord analysée pour détecter ses défauts.
-    2. L'IA détermine les paramètres de restauration optimaux.
-    3. Pillow applique ces paramètres (luminosité, contraste, saturation,
-       netteté, débruitage, correction colorimétrique).
-    4. Si coloriser=True, l'image est colorisée (Gemini avec fallback Pillow).
-    5. L'image restaurée (et éventuellement colorisée) est retournée.
+    **Non-bloquant** : le traitement est délégué à un worker ARQ.
+    La réponse immédiate contient un job_id pour suivre la progression.
+
+    Processus (exécuté par le worker) :
+    1. La photo est analysée pour détecter ses défauts.
+    2. L'IA restaure l'image (Gemini Image Model).
+    3. Si coloriser=True, l'image est colorisée.
+    4. Le travail est mis à jour avec le résultat.
 
     **Authentification requise** : un crédit (ou 2 si colorisation) est consommé.
 
@@ -569,8 +627,7 @@ async def restaurer(
                    (consomme 1 crédit supplémentaire).
 
     Returns:
-        L'analyse, les paramètres appliqués, le chemin de l'image finale,
-        et le nombre de crédits consommés.
+        job_id pour suivre la progression + message de confirmation.
     """
     nb_credits_total = 1  # restauration de base = 1 crédit
     if coloriser:
@@ -578,7 +635,7 @@ async def restaurer(
 
     # Vérifier les crédits AVANT de sauvegarder le fichier
     for i in range(nb_credits_total):
-        peut, raison = peut_restaurer(utilisateur["id"])
+        peut, raison = await peut_restaurer(utilisateur["id"])
         if not peut:
             raise HTTPException(status_code=402, detail=raison)
 
@@ -588,69 +645,57 @@ async def restaurer(
     chemin_original = UPLOAD_DIR / nom_original
     chemin_original.write_bytes(contenu)
 
-    # Suivi dashboard admin
-    mettre_a_jour_activite(utilisateur["id"])
+    # Upload vers B2 (stockage cloud redondant)
+    try:
+        from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
+        if b2_est_disponible():
+            cle = generer_cle_distant("photos", nom_original)
+            uploader_bytes(contenu, cle, fichier.content_type or "image/jpeg")
+    except Exception as e:
+        logger.warning("Échec upload B2 (fallback local): %s", e)
 
-    # Base du nom pour fichiers dérivés (UUID)
-    nom_base = nom_original.split('_')[0]
+    # Suivi dashboard admin
+    await mettre_a_jour_activite(utilisateur["id"])
 
     # Création du travail
-    travail_id = creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
+    travail_id = await creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
+    await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     # Consommation des crédits (déjà vérifiés avant la sauvegarde du fichier)
     for i in range(nb_credits_total):
-        consommer_operation(utilisateur["id"], "restauration", travail_id)
+        await consommer_operation(utilisateur["id"], "restauration", travail_id)
 
+    # Délégation au worker ARQ (non-bloquant)
     try:
-        # Étape 1 : Analyse des défauts
-        analyse = await analyser_photo(str(chemin_original))
-
-        # Étape 2 : Restauration IA (Gemini Image Model)
-        nom_restaure = f"{nom_base}_restaure.jpg"
-        chemin_restaure = UPLOAD_DIR / nom_restaure
-        await restaurer_photo_ia(str(chemin_original), str(chemin_restaure))
-
-        # Étape 4 : Colorisation (optionnelle)
-        url_image = f"/uploads/{nom_restaure}"
-        if coloriser:
-            nom_colorise = f"{nom_base}_colorized.jpg"
-            chemin_colorise = UPLOAD_DIR / nom_colorise
-            await coloriser_photo(str(chemin_restaure), str(chemin_colorise))
-            url_image = f"/uploads/{nom_colorise}"
-            chemin_restaure = chemin_colorise  # pour le résultat final
-
-        # Succès
-        resultat = RestaurationReponse(
-            message="Photo restaurée avec succès !"
-                    + (" (colorisée)" if coloriser else ""),
-            analyse=analyse,
-            url_image=url_image,
-            credits_consommes=nb_credits_total,
-        )
-        mettre_a_jour_travail(
+        pool = await _get_arq_pool()
+        job = await pool.enqueue_job(
+            'restauration_job',
+            utilisateur["id"],
+            str(chemin_original),
+            coloriser,
             travail_id,
-            statut="termine",
-            chemin_resultat=str(chemin_restaure),
-            taille_resultat=chemin_restaure.stat().st_size,
-            resultat_json=json.dumps({
-                "analyse": analyse.model_dump(),
-                "colorise": coloriser,
-                "credits_consommes": nb_credits_total,
-            }),
+            nb_credits_total,
         )
-        return resultat
-
+        # Stocker le job_id ARQ dans le travail pour le suivi
+        await mettre_a_jour_travail(
+            travail_id,
+            resultat_json=json.dumps({"arq_job_id": job.job_id, "coloriser": coloriser}),
+        )
+        return {
+            "message": "Traitement de restauration en cours.",
+            "job_id": job.job_id,
+            "travail_id": travail_id,
+        }
     except Exception as e:
-        logger.exception(f"Erreur lors de la restauration : {e}")
-        mettre_a_jour_travail(
+        logger.exception(f"Erreur lors de l'envoi du job ARQ (restauration) : {e}")
+        await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=str(e),
+            message_erreur=f"Échec d'envoi au worker : {str(e)}",
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Erreur lors de la restauration : {str(e)}",
+            detail=f"Erreur lors de la mise en file d'attente : {str(e)}",
         )
 
 
@@ -682,21 +727,30 @@ async def coloriser_standalone(
     chemin_original = UPLOAD_DIR / nom_original
     chemin_original.write_bytes(contenu)
 
+    # Upload vers B2 (stockage cloud redondant)
+    try:
+        from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
+        if b2_est_disponible():
+            cle = generer_cle_distant("photos", nom_original)
+            uploader_bytes(contenu, cle, fichier.content_type or "image/jpeg")
+    except Exception as e:
+        logger.warning("Échec upload B2 (fallback local): %s", e)
+
     # Suivi dashboard admin
-    mettre_a_jour_activite(utilisateur["id"])
+    await mettre_a_jour_activite(utilisateur["id"])
 
     nom_base = nom_original.split('_')[0]
 
     # Création du travail
-    travail_id = creer_travail("colorisation", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
+    travail_id = await creer_travail("colorisation", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
+    await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     # Vérification des crédits
-    peut, raison = peut_restaurer(utilisateur["id"])
+    peut, raison = await peut_restaurer(utilisateur["id"])
     if not peut:
-        mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
+        await mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
         raise HTTPException(status_code=402, detail=raison)
-    consommer_operation(utilisateur["id"], "colorisation", travail_id)
+    await consommer_operation(utilisateur["id"], "colorisation", travail_id)
 
     try:
         nom_colorise = f"{nom_base}_colorized.jpg"
@@ -709,7 +763,7 @@ async def coloriser_standalone(
             url_image=f"/uploads/{nom_colorise}",
             credits_consommes=1,
         )
-        mettre_a_jour_travail(
+        await mettre_a_jour_travail(
             travail_id,
             statut="termine",
             chemin_resultat=str(chemin_colorise),
@@ -720,7 +774,7 @@ async def coloriser_standalone(
 
     except Exception as e:
         logger.exception(f"Erreur lors de la colorisation : {e}")
-        mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=str(e))
+        await mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=str(e))
         raise HTTPException(status_code=500, detail=f"Erreur lors de la colorisation : {str(e)}")
 
 
@@ -728,7 +782,7 @@ async def coloriser_standalone(
 # Animation (D-ID)
 # ---------------------------------------------------------------------------
 
-@router.post("/animate", response_model=AnimationReponse)
+@router.post("/animate")
 @limiter.limit("10/minute")
 async def animer(
     request: Request,
@@ -739,21 +793,17 @@ async def animer(
     """
     Crée une animation de portrait parlant (style Harry Potter).
 
-    La photo est sauvegardée localement puis envoyée au service d'animation pour générer
-    une vidéo où le visage s'anime et prononce le texte fourni.
+    **Non-bloquant** : le traitement est délégué à un worker ARQ.
+    La réponse immédiate contient un job_id pour suivre la progression.
 
     **Authentification requise** : un crédit ou essai gratuit est consommé.
-
-    **Important** : Pour que le service d'animation puisse accéder à la photo, celle-ci doit
-    être accessible via une URL publique. En développement, utilisez un
-    service comme ngrok ou déployez le backend sur un serveur public.
 
     Args:
         fichier: La photo du visage à animer.
         texte: Le texte que le portrait va prononcer (français).
 
     Returns:
-        L'identifiant du travail d'animation pour suivi ultérieur.
+        job_id pour suivre la progression + message de confirmation.
     """
     # Validation et sauvegarde
     contenu = await fichier.read()
@@ -762,16 +812,16 @@ async def animer(
     chemin.write_bytes(contenu)
 
     # Suivi dashboard admin
-    mettre_a_jour_activite(utilisateur["id"])
+    await mettre_a_jour_activite(utilisateur["id"])
 
     # Création du travail
-    travail_id = creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
-    mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
+    travail_id = await creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
+    await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     # Vérification des crédits et de la limite d'animations par forfait
-    peut, raison = peut_animer(utilisateur["id"])
+    peut, raison = await peut_animer(utilisateur["id"])
     if not peut:
-        mettre_a_jour_travail(
+        await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
             message_erreur=raison,
@@ -779,40 +829,33 @@ async def animer(
         raise HTTPException(status_code=403, detail=raison)
 
     # Consommer le crédit/essai (et incrémenter le compteur d'animations)
-    consommer_operation(utilisateur["id"], "animation", travail_id)
+    await consommer_operation(utilisateur["id"], "animation", travail_id)
 
+    # Délégation au worker ARQ (non-bloquant)
     try:
-        # Construction de l'URL publique de la photo
-        # En production, utilisez l'URL réelle de votre serveur
-        url_photo = f"{PUBLIC_BACKEND_URL}/uploads/{nom_fichier}"
-
-        job_did = await creer_animation(url_photo, texte=texte)
-
-        # Association du job D-ID au travail local
-        # job_externe_id is stored in résultat_json and updated via a direct SQL call
-        mettre_a_jour_travail(
+        pool = await _get_arq_pool()
+        job = await pool.enqueue_job(
+            'animation_job',
+            utilisateur["id"],
+            str(chemin),
+            texte,
             travail_id,
-            statut="en_cours",
-            resultat_json=json.dumps({"job_did": job_did}),
         )
-        # Also update the job_externe_id column separately
-        mettre_a_jour_job_externe_id(travail_id, job_did)
-
-        return AnimationReponse(
-            message="Animation créée avec succès. Vous pouvez suivre sa progression.",
-            job_id=job_did,
-        )
-
+        return {
+            "message": "Traitement d'animation en cours.",
+            "job_id": job.job_id,
+            "travail_id": travail_id,
+        }
     except Exception as e:
-        logger.exception(f"Erreur lors de la création d'animation : {e}")
-        mettre_a_jour_travail(
+        logger.exception(f"Erreur lors de l'envoi du job ARQ (animation) : {e}")
+        await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=str(e),
+            message_erreur=f"Échec d'envoi au worker : {str(e)}",
         )
         raise HTTPException(
             status_code=500,
-            detail=f"Erreur lors de la création d'animation : {str(e)}",
+            detail=f"Erreur lors de la mise en file d'attente : {str(e)}",
         )
 
 
@@ -836,7 +879,7 @@ async def statut_animation(
         Le statut actuel et l'URL de la vidéo si terminée.
     """
     # Vérifier que le job appartient à l'utilisateur
-    travail = obtenir_travail_par_job_externe(job_id)
+    travail = await obtenir_travail_par_job_externe(job_id)
     if travail is None:
         raise HTTPException(status_code=404, detail="Travail introuvable.")
     if travail.get("utilisateur_id") != utilisateur["id"]:
@@ -857,11 +900,11 @@ async def statut_animation(
         )
 
         # Mise à jour du travail local
-        travail = obtenir_travail_par_job_externe(job_id)
+        travail = await obtenir_travail_par_job_externe(job_id)
         if travail:
             if statut_interne == StatutAnimation.TERMINE:
                 url_video = data.get("url_video")
-                mettre_a_jour_travail(
+                await mettre_a_jour_travail(
                     travail["id"],
                     statut="termine",
                     chemin_resultat=url_video,
@@ -869,9 +912,9 @@ async def statut_animation(
                 )
                 # Sauvegarder aussi dans chemin_animation pour l'historique
                 if url_video:
-                    mettre_a_jour_chemin_animation(travail["id"], url_video)
+                    await mettre_a_jour_chemin_animation(travail["id"], url_video)
             elif statut_interne == StatutAnimation.ERREUR:
-                mettre_a_jour_travail(
+                await mettre_a_jour_travail(
                     travail["id"],
                     statut="erreur",
                     message_erreur=data.get("message", "Erreur inconnue"),
@@ -889,6 +932,69 @@ async def statut_animation(
         raise HTTPException(
             status_code=500,
             detail=f"Erreur lors du suivi d'animation : {str(e)}",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Statut des jobs ARQ (restauration, animation)
+# ---------------------------------------------------------------------------
+
+@router.get("/job/{job_id}")
+async def statut_job_arq(
+    job_id: str,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """
+    Vérifie le statut d'un job ARQ (restauration ou animation).
+
+    **Authentification requise** (le job_id étant opaque, l'auth est la seule
+    protection — l'utilisateur doit connaître son job_id).
+
+    Retourne :
+    - statut: "en_attente" | "en_cours" | "termine" | "erreur" | "introuvable"
+    - resultat: le résultat du job si terminé (optionnel)
+    - message: message d'erreur si erreur (optionnel)
+    """
+    try:
+        pool = await _get_arq_pool()
+        arq_job = ArqJob(job_id, pool)
+        arq_status = await arq_job.status()
+
+        if arq_status == ArqJobStatus.not_found:
+            return {
+                "job_id": job_id,
+                "statut": "introuvable",
+                "message": "Job introuvable ou expiré.",
+            }
+
+        statut_map = {
+            ArqJobStatus.queued: "en_attente",
+            ArqJobStatus.in_progress: "en_cours",
+            ArqJobStatus.complete: "termine",
+        }
+        statut = statut_map.get(arq_status, str(arq_status))
+
+        response_data = {
+            "job_id": job_id,
+            "statut": statut,
+        }
+
+        if arq_status == ArqJobStatus.complete:
+            try:
+                resultat = await arq_job.result(timeout=0.5)
+                response_data["resultat"] = resultat
+            except Exception:
+                response_data["resultat"] = None
+        elif arq_status == ArqJobStatus.not_found:
+            response_data["message"] = "Job introuvable ou expiré."
+
+        return response_data
+
+    except Exception as e:
+        logger.exception(f"Erreur lors de la vérification du job ARQ {job_id} : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Erreur lors de la vérification du job : {str(e)}",
         )
 
 
@@ -1007,6 +1113,15 @@ async def webhook_stripe(request: Request):
 
     type_evenement = resultat["type"]
     donnees = resultat["data"]
+    event_id = resultat.get("event_id", "")
+
+    # --- Protection anti-doublon (idempotence des webhooks Stripe) ---
+    if event_id and await stripe_event_deja_traite(event_id):
+        logger.info(f"Webhook Stripe déjà traité, ignoré : event_id={event_id}")
+        return WebhookReponse(
+            type_evenement=type_evenement,
+            message=f"Événement « {type_evenement} » déjà traité (idempotent).",
+        )
 
     # --- Traitement selon le type d'événement ---
 
@@ -1022,10 +1137,10 @@ async def webhook_stripe(request: Request):
                 session_id = donnees.get("id")
                 montant = (donnees.get("amount_total") or 0) / 100.0
 
-                utilisateur = obtenir_utilisateur_par_email(email) if email else None
+                utilisateur = await obtenir_utilisateur_par_email(email) if email else None
                 if utilisateur:
-                    crediter_utilisateur(utilisateur["id"], nb_credits)
-                    enregistrer_achat_credits(
+                    await crediter_utilisateur(utilisateur["id"], nb_credits)
+                    await enregistrer_achat_credits(
                         utilisateur["id"], session_id, nb_credits, montant
                     )
                     logger.info(
@@ -1049,7 +1164,7 @@ async def webhook_stripe(request: Request):
                 maintenant = datetime.now(timezone.utc).isoformat()
 
                 # Créer l'abonnement en base avec le plan et l'email
-                creer_abonnement(
+                await creer_abonnement(
                     stripe_customer_id=stripe_customer_id,
                     stripe_subscription_id=stripe_subscription_id,
                     statut="actif",
@@ -1061,10 +1176,10 @@ async def webhook_stripe(request: Request):
                 # Créditer l'utilisateur avec l'allocation mensuelle
                 nb_credits = CREDITS_PAR_PLAN.get(plan, 0)
                 if nb_credits > 0 and email:
-                    utilisateur = obtenir_utilisateur_par_email(email)
+                    utilisateur = await obtenir_utilisateur_par_email(email)
                     if utilisateur:
-                        crediter_utilisateur(utilisateur["id"], nb_credits)
-                        mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
+                        await crediter_utilisateur(utilisateur["id"], nb_credits)
+                        await mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
                         logger.info(
                             f"Crédits d'abonnement ajoutés : email={email}, "
                             f"plan={plan}, credits={nb_credits}, "
@@ -1092,7 +1207,7 @@ async def webhook_stripe(request: Request):
                 logger.warning("invoice.paid sans subscription_id, ignoré")
             else:
                 # Récupérer l'abonnement local
-                abo = obtenir_abonnement(stripe_subscription_id=stripe_subscription_id)
+                abo = await obtenir_abonnement(stripe_subscription_id=stripe_subscription_id)
                 if not abo:
                     logger.warning(
                         f"Abonnement introuvable pour invoice.paid : {stripe_subscription_id}"
@@ -1105,11 +1220,11 @@ async def webhook_stripe(request: Request):
 
                     nb_credits = CREDITS_PAR_PLAN.get(plan, 0)
                     if nb_credits > 0 and email:
-                        utilisateur = obtenir_utilisateur_par_email(email)
+                        utilisateur = await obtenir_utilisateur_par_email(email)
                         if utilisateur:
-                            crediter_utilisateur(utilisateur["id"], nb_credits)
-                            mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
-                            mettre_a_jour_attribution_credits(stripe_subscription_id, maintenant)
+                            await crediter_utilisateur(utilisateur["id"], nb_credits)
+                            await mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
+                            await mettre_a_jour_attribution_credits(stripe_subscription_id, maintenant)
                             logger.info(
                                 f"Crédits renouvelés (invoice.paid) : email={email}, "
                                 f"plan={plan}, credits={nb_credits}, "
@@ -1131,7 +1246,7 @@ async def webhook_stripe(request: Request):
     elif type_evenement == "customer.subscription.deleted":
         # Abonnement résilié
         try:
-            mettre_a_jour_abonnement(
+            await mettre_a_jour_abonnement(
                 stripe_subscription_id=donnees.get("id"),
                 statut="resilie",
             )
@@ -1142,7 +1257,7 @@ async def webhook_stripe(request: Request):
     elif type_evenement == "customer.subscription.updated":
         # Abonnement modifié
         try:
-            mettre_a_jour_abonnement(
+            await mettre_a_jour_abonnement(
                 stripe_subscription_id=donnees.get("id"),
                 statut=donnees.get("status", "actif"),
             )
@@ -1159,12 +1274,16 @@ async def webhook_stripe(request: Request):
             f"Échec de paiement : client={donnees.get('customer')}"
         )
         try:
-            mettre_a_jour_abonnement(
+            await mettre_a_jour_abonnement(
                 stripe_customer_id=donnees.get("customer"),
                 statut="impaye",
             )
         except Exception as e:
             logger.exception(f"Erreur mise à jour abonnement impayé : {e}")
+
+    # Marquer l'événement comme traité (idempotence)
+    if event_id:
+        await marquer_stripe_event_traite(event_id, type_evenement)
 
     return WebhookReponse(
         type_evenement=type_evenement,

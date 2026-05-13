@@ -22,6 +22,7 @@ from app.models.db_models import (
     ConsommationCredits,
     EssaiGratuit,
     ReinitialisationMdp,
+    StripeEvent,
     Travail,
     Utilisateur,
 )
@@ -560,13 +561,16 @@ async def consommer_credit(
     """
     Consomme un crédit pour une opération.
     Priorité : essais gratuits puis crédits payants.
+
+    Utilise SELECT ... FOR UPDATE pour verrouiller la ligne utilisateur
+    et éviter les race conditions (ex: double consommation sous charge).
     """
     async with async_session() as session:
         async with session.begin():
-            # Récupérer crédits et essais
+            # Récupérer crédits et essais AVEC verrou de ligne
             stmt = select(
                 Utilisateur.credits, Utilisateur.essais_restants
-            ).where(Utilisateur.id == utilisateur_id)
+            ).where(Utilisateur.id == utilisateur_id).with_for_update()
             result = await session.execute(stmt)
             user = result.one_or_none()
             if not user:
@@ -1145,3 +1149,32 @@ async def supprimer_tous_travaux_utilisateur(utilisateur_id: str) -> int:
             await session.delete(t)
         await session.commit()
         return count
+
+
+# ===================================================================
+# Stripe Events (idempotence des webhooks)
+# ===================================================================
+
+
+async def stripe_event_deja_traite(event_id: str) -> bool:
+    """Vérifie si un événement Stripe a déjà été traité."""
+    async with async_session() as session:
+        stmt = select(StripeEvent.id).where(StripeEvent.event_id == event_id)
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+
+async def marquer_stripe_event_traite(event_id: str, type_evenement: str) -> str:
+    """Marque un événement Stripe comme traité. Retourne l'ID local."""
+    stripe_event_id = _new_uuid()
+    maintenant = _utcnow()
+    async with async_session() as session:
+        entry = StripeEvent(
+            id=stripe_event_id,
+            event_id=event_id,
+            type_evenement=type_evenement,
+            traite_le=maintenant,
+        )
+        session.add(entry)
+        await session.commit()
+    return stripe_event_id

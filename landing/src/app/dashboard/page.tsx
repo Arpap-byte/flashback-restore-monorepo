@@ -28,6 +28,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useUser } from "@clerk/nextjs";
 import {
   getUserHistory,
   getUserMe,
@@ -230,6 +231,11 @@ function NotConnected() {
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+
+  // Consider user as connected if EITHER auth system has a user
+  const isAuthenticated = !!user || !!clerkUser;
+  const isLoading = authLoading || !clerkLoaded;
 
   // États
   const [userMe, setUserMe] = useState<UserMe | null>(null);
@@ -255,22 +261,24 @@ export default function DashboardPage() {
       if (meData.status === "fulfilled") {
         setUserMe(meData.value);
       } else {
-        // Fallback : utiliser les données basiques du contexte
-        if (user) {
+        console.error("[Dashboard] getUserMe failed:", meData.reason);
+        // Fallback : utiliser Clerk ou l'ancien contexte
+        const email = clerkUser?.emailAddresses?.[0]?.emailAddress || user?.email || "";
+        if (email) {
           setUserMe({
-            id: user.id,
-            email: user.email,
-            nom: null,
-            plan: user.est_abonne ? "decouverte" : "gratuit",
-            credits: user.credits,
+            id: clerkUser?.id || user?.id || "",
+            email: email,
+            nom: clerkUser?.firstName || null,
+            plan: user?.est_abonne ? "decouverte" : "gratuit",
+            credits: user?.credits || 0,
             credits_utilises: 0,
             photos_restaurees_mois: 0,
             animations_creees: 0,
             animations_utilisees: 0,
             animations_limite: 0,
             date_renouvellement: null,
-            est_abonne: user.est_abonne,
-            essais_restants: user.essais_restants,
+            est_abonne: user?.est_abonne || false,
+            essais_restants: user?.essais_restants || 3,
             retention_jours: 30,
             derniere_activite: null,
           });
@@ -293,19 +301,20 @@ export default function DashboardPage() {
       setLoadingData(false);
       lastFetchedUserId.current = user?.id ?? null;
     }
-  }, [user]);
+  }, [user, clerkUser]);
 
   useEffect(() => {
-    if (authLoading) return;
-    if (!user) {
+    if (isLoading) return;
+    if (!isAuthenticated) {
       setLoadingData(false);
       lastFetchedUserId.current = null;
       return;
     }
-    // Only fetch if the user changed (prevents re-fetch loops)
-    if (lastFetchedUserId.current === user.id) return;
+    const currentId = clerkUser?.id || user?.id;
+    if (!currentId) return;
+    if (lastFetchedUserId.current === currentId) return;
     fetchData();
-  }, [user, authLoading, fetchData]);
+  }, [user, clerkUser, isLoading, isAuthenticated, fetchData]);
 
   /* ---------- Helpers ---------- */
 
@@ -334,7 +343,9 @@ export default function DashboardPage() {
   const creditsDisplay = userMe
     ? userMe.plan === "pro"
       ? "Illimités"
-      : `${Math.max(0, userMe.credits)} crédits`
+      : userMe.plan === "gratuit"
+        ? `${Math.max(0, userMe.essais_restants)}`
+        : `${Math.max(0, userMe.credits)}`
     : "—";
 
   const trialsDisplay = userMe
@@ -345,8 +356,8 @@ export default function DashboardPage() {
 
   /* ---------- Rendu conditionnel ---------- */
 
-  if (authLoading || loadingData) return <DashboardSkeleton />;
-  if (!user) return <NotConnected />;
+  if (isLoading || loadingData) return <DashboardSkeleton />;
+  if (!isAuthenticated) return <NotConnected />;
 
   return (
     <div className="flex flex-col min-h-screen bg-background">
@@ -377,10 +388,10 @@ export default function DashboardPage() {
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-3 font-[family-name:var(--font-playfair)]">
                 Bonjour{" "}
                 <span className="text-gradient">
-                  {userMe?.nom || user.email.split("@")[0]}
+                  {userMe?.nom || clerkUser?.firstName || user?.email?.split("@")[0]}
                 </span>
               </h1>
-              <p className="text-muted">{user.email}</p>
+              <p className="text-muted">{clerkUser?.emailAddresses?.[0]?.emailAddress || user?.email || ""}</p>
             </motion.div>
 
             {/* Badge d'abonnement */}
@@ -425,7 +436,9 @@ export default function DashboardPage() {
               <p className="text-xs text-muted">
                 {userMe?.plan === "pro"
                   ? "Accès illimité"
-                  : "Crédits achetés"}
+                  : userMe?.plan === "gratuit"
+                    ? "Essais offerts"
+                    : "Crédits mensuels"}
               </p>
               {trialsDisplay && (
                 <p className="text-sm text-accent mt-1 font-medium">

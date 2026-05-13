@@ -25,11 +25,14 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useUser } from "@clerk/nextjs";
 import { restorePhoto, colorizePhoto, getRestoredImageUrl, RestoreResult } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const isAuthenticated = !!user || !!clerkUser;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
@@ -224,7 +227,7 @@ export default function RestorePage() {
     );
   }
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Navbar />

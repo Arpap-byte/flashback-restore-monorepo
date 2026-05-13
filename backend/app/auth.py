@@ -4,7 +4,7 @@ Authentification JWT — utilitaires.
 Fournit des fonctions pour créer et vérifier des tokens JWT,
 ainsi qu'une dépendance FastAPI pour protéger les routes.
 
-Compatible avec les tokens NextAuth.js (Auth.js) et les tokens internes.
+Compatible avec les tokens NextAuth.js (Auth.js), les tokens Clerk et les tokens internes.
 """
 
 import logging
@@ -49,25 +49,37 @@ def decoder_token(token: str) -> dict:
     """
     Décode et vérifie un token JWT.
 
-    Essaie avec le secret interne, puis avec le secret NextAuth.
+    Essaie avec le secret interne HS256, puis avec le secret NextAuth,
+    puis avec la vérification Clerk RS256 (JWKS).
     Lève une exception si le token est invalide.
     """
+    # Étape 1 : tokens internes et NextAuth (HS256)
     for secret in _SECRETS:
         try:
             return jwt.decode(token, secret, algorithms=[ALGORITHME])
         except jwt.InvalidTokenError:
             continue
+
+    # Étape 2 : tokens Clerk (RS256 via JWKS)
+    from app.clerk_auth import verify_clerk_token
+    try:
+        return verify_clerk_token(token)
+    except jwt.InvalidTokenError:
+        pass
+
     raise jwt.InvalidTokenError("Token invalide")
 
 
 async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
     """
-    Trouve un utilisateur à partir du payload JWT (NextAuth ou interne).
+    Trouve un utilisateur à partir du payload JWT (NextAuth, interne ou Clerk).
 
     - Si sub est un UUID existant → retourne l'utilisateur
-    - Si email présent → cherche par email, crée si nécessaire
+    - Si email présent → cherche par email
+    - Si le token vient de Clerk (contient "sid") → crée l'utilisateur si nécessaire
+    - Sinon (NextAuth) → rejette les emails inconnus
     """
-    from app.db.database import (
+    from app.db.queries import (
         creer_utilisateur_oauth,
         mettre_a_jour_derniere_connexion,
         obtenir_utilisateur_par_email,
@@ -76,22 +88,34 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
 
     utilisateur_id = payload.get("sub", "")
     email = payload.get("email", "")
+    est_clerk = "sid" in payload  # Les tokens Clerk contiennent un session ID
 
-    # Essayer par ID d'abord
-    if utilisateur_id:
-        u = obtenir_utilisateur_par_id(utilisateur_id)
+    # Essayer par ID d'abord (seulement si ce n'est pas un sub Clerk "user_xxx")
+    if utilisateur_id and not utilisateur_id.startswith("user_"):
+        u = await obtenir_utilisateur_par_id(utilisateur_id)
         if u:
-            mettre_a_jour_derniere_connexion(u["id"])
+            await mettre_a_jour_derniere_connexion(u["id"])
             return u
 
-    # Puis par email (token NextAuth)
+    # Puis par email
     if email:
-        u = obtenir_utilisateur_par_email(email)
+        u = await obtenir_utilisateur_par_email(email)
         if u:
-            mettre_a_jour_derniere_connexion(u["id"])
+            await mettre_a_jour_derniere_connexion(u["id"])
             return u
 
-        # Ne plus créer automatiquement d'utilisateur — rejeter les emails inconnus
+        # Token Clerk : créer l'utilisateur automatiquement
+        if est_clerk:
+            provider_id = utilisateur_id or email
+            logger.info(
+                "Création automatique utilisateur Clerk: email=%s provider_id=%s",
+                email, provider_id,
+            )
+            nouvel_id = await creer_utilisateur_oauth(email, "clerk", provider_id)
+            if nouvel_id:
+                return await obtenir_utilisateur_par_id(nouvel_id)
+
+        # Token NextAuth ou autre : ne pas créer automatiquement
         logger.warning("Tentative de connexion avec email inconnu: %s", email)
 
     return None
@@ -104,8 +128,8 @@ async def obtenir_utilisateur_courant(
     """
     Dépendance FastAPI : extrait l'utilisateur courant du token JWT.
 
-    Accepte les tokens internes ET les tokens NextAuth.js.
-    Si l'utilisateur NextAuth n'existe pas encore, il est créé automatiquement.
+    Accepte les tokens internes, les tokens NextAuth.js ET les tokens Clerk.
+    Si l'utilisateur Clerk n'existe pas encore, il est créé automatiquement.
     Si aucun token n'est fourni, retourne None.
     Si le token est invalide ou expiré, lève HTTP 401.
     """

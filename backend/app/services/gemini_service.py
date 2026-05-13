@@ -14,6 +14,8 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+from PIL import Image; Image.MAX_IMAGE_PIXELS = 50_000_000
+
 from google import genai
 from google.genai import types
 

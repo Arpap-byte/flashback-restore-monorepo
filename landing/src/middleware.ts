@@ -1,22 +1,26 @@
-import { auth } from "@/auth"
-import { NextResponse } from "next/server"
+import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
 
-// Pages that require authentication
-const PROTECTED = ["/restore", "/animate", "/historique", "/dashboard"]
+const isPublicRoute = createRouteMatcher([
+  '/',
+  '/sign-in(.*)',
+  '/sign-up(.*)',
+  '/auth(.*)',
+  '/about',
+  '/privacy',
+  '/terms',
+  '/cookies',
+  '/api/public(.*)',
+])
 
-export default auth((req) => {
-  const { pathname } = req.nextUrl
-
-  // Redirect to /auth if accessing protected page without session
-  if (PROTECTED.some((p) => pathname.startsWith(p)) && !req.auth) {
-    const url = new URL("/auth", req.url)
-    url.searchParams.set("callbackUrl", pathname)
-    return NextResponse.redirect(url)
+export default clerkMiddleware(async (auth, request) => {
+  if (!isPublicRoute(request)) {
+    await auth.protect()
   }
-
-  return NextResponse.next()
 })
 
 export const config = {
-  matcher: ["/restore", "/animate", "/historique", "/dashboard"],
+  matcher: [
+    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/(api|trpc)(.*)',
+  ],
 }

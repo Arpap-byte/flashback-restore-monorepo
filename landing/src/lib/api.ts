@@ -59,10 +59,23 @@ export interface TravailHistorique {
   expire_le: string | null;
 }
 
-/** Get the NextAuth JWT for authenticating API calls */
+/** Get the JWT for authenticating API calls (supports Clerk + NextAuth) */
 async function getAuthHeader(): Promise<Record<string, string>> {
   if (typeof window === "undefined") return {};
 
+  // 1. Clerk token (primary — Google/Facebook/Email via Clerk)
+  try {
+    // @ts-ignore — Clerk injects a global Clerk object
+    const clerk = (window as any).Clerk;
+    if (clerk?.session) {
+      const token = await clerk.session.getToken();
+      if (token) {
+        return { Authorization: `Bearer ${token}` };
+      }
+    }
+  } catch {}
+
+  // 2. NextAuth JWT (legacy credentials)
   try {
     const { getSession } = await import("next-auth/react");
     const session = await getSession();
@@ -72,7 +85,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     }
   } catch {}
 
-  // Fallback: localStorage token (legacy email/password auth)
+  // 3. Fallback: localStorage token (legacy email/password auth)
   try {
     const stored = localStorage.getItem("flashback_auth");
     if (stored) {

@@ -1,0 +1,18 @@
+[Unit]
+Description=Flashback ARQ Worker
+After=network.target redis-server.service
+Requires=redis-server.service
+
+[Service]
+Type=simple
+User=flashback
+WorkingDirectory=/opt/flashback-restore-monorepo/backend
+Environment="ENVIRONMENT=production"
+ExecStart=/opt/flashback-restore-monorepo/backend/.venv/bin/arq app.worker.WorkerSettings
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

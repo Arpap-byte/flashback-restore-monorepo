@@ -3,7 +3,7 @@ Tests unitaires pour les endpoints d'authentification.
 Exécuter : cd backend && .venv/bin/pytest tests/test_auth.py -v
 """
 
-import sys, time, secrets, os
+import sys, time, secrets, os, asyncio
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -11,16 +11,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db.database import (
-    initialiser_base,
+from app.db.queries import (
+    init_db,
     obtenir_utilisateur_par_email,
     creer_token_reinitialisation,
     verifier_token_reinitialisation,
 )
-from app.config import INTERNAL_API_KEY
-
 client = TestClient(app)
-initialiser_base()
+
+# Initialisation async de la base
+asyncio.run(init_db())
 
 # Délai entre tests pour éviter rate limit (5/min)
 SLEEP = 1.2
@@ -56,7 +56,7 @@ class TestRegister:
 
     def test_hash_stored(self):
         client.post("/api/auth/register", json={"email": "t3@test.fr", "password": "mypassword"})
-        u = obtenir_utilisateur_par_email("t3@test.fr")
+        u = asyncio.run(obtenir_utilisateur_par_email("t3@test.fr"))
         assert u and u["password_hash"] != "mypassword"
 
 
@@ -110,18 +110,18 @@ class TestResetPassword:
         email = "t8@test.fr"
         r = client.post("/api/auth/register", json={"email": email, "password": "oldpass123"})
         assert r.status_code == 200, f"Register failed: {r.json()}"
-        u = obtenir_utilisateur_par_email(email)
+        u = asyncio.run(obtenir_utilisateur_par_email(email))
         assert u is not None, f"User {email} not found"
 
         token = secrets.token_urlsafe(48)
-        creer_token_reinitialisation(u["id"], token)
-        assert verifier_token_reinitialisation(token) is not None
+        asyncio.run(creer_token_reinitialisation(u["id"], token))
+        assert asyncio.run(verifier_token_reinitialisation(token)) is not None
 
         res = client.post("/api/auth/reset-password", json={"token": token, "password": "newpass123"})
         assert res.status_code == 200
 
         # Token used
-        assert verifier_token_reinitialisation(token) is None
+        assert asyncio.run(verifier_token_reinitialisation(token)) is None
 
         # Old pwd fails, new pwd works
         assert client.post("/api/auth/login", json={"email": email, "password": "oldpass"}).status_code == 401
@@ -133,32 +133,14 @@ class TestResetPassword:
     def test_already_used(self):
         email = "t9@test.fr"
         client.post("/api/auth/register", json={"email": email, "password": "oldpass123"})
-        u = obtenir_utilisateur_par_email(email)
+        u = asyncio.run(obtenir_utilisateur_par_email(email))
         token = secrets.token_urlsafe(48)
-        creer_token_reinitialisation(u["id"], token)
+        asyncio.run(creer_token_reinitialisation(u["id"], token))
 
         client.post("/api/auth/reset-password", json={"token": token, "password": "newpass123"})
         res = client.post("/api/auth/reset-password", json={"token": token, "password": "another123"})
         assert res.status_code == 400
 
-
-class TestOAuth:
-    def test_no_key(self):
-        assert client.post("/api/auth/oauth", json={
-            "provider": "google", "provider_id": "1", "email": "o@t.fr"
-        }).status_code == 403
-
-    def test_bad_key(self):
-        assert client.post("/api/auth/oauth", json={
-            "provider": "google", "provider_id": "1", "email": "o@t.fr"
-        }, headers={"X-Internal-Key": "wrong"}).status_code == 403
-
-    def test_success(self):
-        res = client.post("/api/auth/oauth", json={
-            "provider": "google", "provider_id": "oa1", "email": "o1@test.fr"
-        }, headers={"X-Internal-Key": INTERNAL_API_KEY})
-        assert res.status_code == 200
-        assert "token" in res.json()
 
 
 class TestMe:

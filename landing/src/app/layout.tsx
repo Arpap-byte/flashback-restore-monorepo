@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Inter, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/context/AuthContext";
+import { ClerkProvider } from "@clerk/nextjs";
+import { frFR } from "@clerk/localizations";
 import "./globals.css";
 
 const inter = Inter({
@@ -58,9 +60,11 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background text-foreground font-sans transition-colors">
-        <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
-        </ThemeProvider>
+        <ClerkProvider localization={frFR}>
+          <ThemeProvider>
+            <AuthProvider>{children}</AuthProvider>
+          </ThemeProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

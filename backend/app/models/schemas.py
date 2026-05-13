@@ -148,6 +148,9 @@ class SanteReponse(BaseModel):
     stripe_disponible: bool = Field(
         default=True, description="Indique si la clé API Stripe est configurée"
     )
+    b2_disponible: bool = Field(
+        default=True, description="Indique si le stockage B2 est accessible"
+    )
 
 
 class StatsReponse(BaseModel):

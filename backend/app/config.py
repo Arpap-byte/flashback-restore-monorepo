@@ -45,10 +45,10 @@ SECRET_KEY: str = os.getenv("SECRET_KEY")
 if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set in environment or .env file")
 AUTH_SECRET: str = os.getenv("AUTH_SECRET", "")
-INTERNAL_API_KEY: str = os.getenv("INTERNAL_API_KEY")
-if not INTERNAL_API_KEY:
-    raise RuntimeError("INTERNAL_API_KEY must be set in environment or .env file")
-
+# --- Clerk JWT ---
+CLERK_ISSUER: str = os.getenv("CLERK_ISSUER", "")
+CLERK_JWKS_URL: str = os.getenv("CLERK_JWKS_URL", "")
+CLERK_AUDIENCE: str = os.getenv("CLERK_AUDIENCE", "")
 # --- Admin ---
 ADMIN_API_KEY: str = os.getenv("ADMIN_API_KEY", "")
 # Clé pour les endpoints admin (stats, etc.) — pas de valeur par défaut
@@ -80,6 +80,9 @@ ENVIRONMENT: str = os.getenv("ENVIRONMENT", "production")
 # --- URLs publiques ---
 PUBLIC_BACKEND_URL: str = os.getenv("PUBLIC_BACKEND_URL", "http://localhost:8000")
 ALLOWED_ORIGINS: str = os.getenv("ALLOWED_ORIGINS", "")
+
+# --- Sentry (observabilité) ---
+SENTRY_DSN: str = os.getenv("SENTRY_DSN", "")
 
 # --- Email (SMTP) ---
 SMTP_HOST: str = os.getenv("SMTP_HOST", "smtp.gmail.com")

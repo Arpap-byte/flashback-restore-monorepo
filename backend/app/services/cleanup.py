@@ -83,9 +83,6 @@ async def _nettoyer_async() -> dict:
     }
 
 
-def nettoyer_uploads() -> dict:
-    """Wrapper sync pour le endpoint admin /api/admin/cleanup."""
-    import nest_asyncio
-    nest_asyncio.apply()
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(_nettoyer_async())
+async def nettoyer_uploads() -> dict:
+    """Nettoie les travaux expirés (appelé par le endpoint admin /api/admin/cleanup)."""
+    return await _nettoyer_async()

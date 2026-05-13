@@ -19,10 +19,9 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, EmailStr, Field
 
 from app.auth import creer_token, exiger_utilisateur
-from app.config import INTERNAL_API_KEY, SITE_URL
+from app.config import SITE_URL
 from app.services.audit import log_auth
-from app.db.database import (
-    _obtenir_connexion,
+from app.db.queries import (
     ANIMATIONS_PAR_PLAN,
     changer_mot_de_passe,
     creer_token_reinitialisation,
@@ -102,9 +101,9 @@ async def register(request: Request, body: RegisterRequest):
     un 202 Accepted est retourné avec un message générique (l'info est logguée côté serveur).
     """
     # Vérifier si l'utilisateur existe déjà
-    existing = obtenir_utilisateur_par_email(body.email)
+    existing = await obtenir_utilisateur_par_email(body.email)
     if existing:
-        log_auth(request, "register", email=body.email, reussite=False, detail="Email déjà utilisé")
+        await log_auth(request, "register", email=body.email, reussite=False, detail="Email déjà utilisé")
         logger.info(f"Tentative d'inscription avec un email déjà utilisé : {body.email}")
         return JSONResponse(
             status_code=202,
@@ -117,7 +116,7 @@ async def register(request: Request, body: RegisterRequest):
     ).decode("utf-8")
 
     # Créer l'utilisateur
-    utilisateur_id = creer_utilisateur(body.email, password_hash)
+    utilisateur_id = await creer_utilisateur(body.email, password_hash)
     if utilisateur_id is None:
         raise HTTPException(
             status_code=500, detail="Erreur lors de la création du compte."
@@ -128,7 +127,7 @@ async def register(request: Request, body: RegisterRequest):
     logger.info(f"Nouvel utilisateur créé : {body.email}")
 
     # Audit log
-    log_auth(request, "register", email=body.email, utilisateur_id=utilisateur_id, reussite=True)
+    await log_auth(request, "register", email=body.email, utilisateur_id=utilisateur_id, reussite=True)
 
     return AuthResponse(
         token=token,
@@ -150,7 +149,7 @@ async def login(request: Request, body: LoginRequest):
 
     Vérifie l'email et le mot de passe, puis retourne un token JWT.
     """
-    utilisateur = obtenir_utilisateur_par_email(body.email)
+    utilisateur = await obtenir_utilisateur_par_email(body.email)
     if utilisateur is None:
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
 
@@ -159,21 +158,21 @@ async def login(request: Request, body: LoginRequest):
         body.password.encode("utf-8"),
         utilisateur["password_hash"].encode("utf-8"),
     ):
-        log_auth(request, "login", email=body.email, reussite=False, detail="Mot de passe incorrect")
+        await log_auth(request, "login", email=body.email, reussite=False, detail="Mot de passe incorrect")
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
 
     # Mettre à jour la dernière connexion
-    mettre_a_jour_derniere_connexion(utilisateur["id"])
+    await mettre_a_jour_derniere_connexion(utilisateur["id"])
 
     # Créer le token
     token = creer_token(utilisateur["id"], utilisateur["email"])
     logger.info(f"Connexion réussie : {utilisateur['email']}")
 
     # Audit log
-    log_auth(request, "login", email=body.email, utilisateur_id=utilisateur["id"], reussite=True)
+    await log_auth(request, "login", email=body.email, utilisateur_id=utilisateur["id"], reussite=True)
 
     # Récupérer les essais
-    essais = obtenir_essais_restants(utilisateur["id"]) or {
+    essais = await obtenir_essais_restants(utilisateur["id"]) or {
         "essais_restants": 0,
         "est_abonne": False,
     }
@@ -190,43 +189,6 @@ async def login(request: Request, body: LoginRequest):
     )
 
 
-# --- Route OAuth supprimée (non utilisée par le frontend) ---
-# La route POST /api/auth/oauth a été retirée car NextAuth n'est pas intégré
-# côté frontend. Le code était protégé par X-Internal-Key mais représentait
-# du code mort augmentant la surface d'attaque inutilement.
-# Si l'authentification sociale est rétablie, réimplémenter cette route
-# avec vérification réelle du token OAuth auprès du provider.
-#
-# @router.post("/oauth", response_model=AuthResponse)
-# @limiter.limit("10/minute")
-# async def oauth_login(
-#     request: Request,
-#     body: OAuthRequest,
-#     x_internal_key: str = Header(None, alias="X-Internal-Key"),
-# ):
-#     ...
-
-
-# --- Route /me déplacée vers user.py (GET /api/user/me) ---
-# La route GET /api/auth/me a été supprimée pour éviter le conflit avec
-# GET /api/user/me (définie dans user.py).
-# Code original commenté ci-dessous pour référence.
-#
-# @router.get("/me", response_model=UserResponse)
-# async def me(utilisateur: dict = Depends(exiger_utilisateur)):
-#     detail = obtenir_utilisateur_par_id(utilisateur["id"])
-#     if detail is None:
-#         raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
-#     essais = obtenir_essais_restants(utilisateur["id"]) or {"essais_restants": 0, "est_abonne": False}
-#     plan = obtenir_plan_utilisateur(utilisateur["id"])
-#     animations_limite = ANIMATIONS_PAR_PLAN.get(plan, 0)
-#     return UserResponse(
-#         id=detail["id"], email=detail["email"],
-#         essais_restants=essais["essais_restants"], est_abonne=essais["est_abonne"],
-#         credits=detail.get("credits", 0), plan=plan,
-#         animations_utilisees=detail.get("animations_utilisees", 0),
-#         animations_limite=animations_limite,
-#     )
 
 
 # ---------------------------------------------------------------------------
@@ -253,13 +215,13 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
     Pour des raisons de sécurité, retourne toujours un succès,
     même si l'email n'existe pas (pour éviter l'énumération d'utilisateurs).
     """
-    utilisateur = obtenir_utilisateur_par_email(body.email)
+    utilisateur = await obtenir_utilisateur_par_email(body.email)
 
     if utilisateur and utilisateur.get("password_hash"):
-        log_auth(request, "forgot_password", email=body.email, utilisateur_id=utilisateur["id"], reussite=True)
+        await log_auth(request, "forgot_password", email=body.email, utilisateur_id=utilisateur["id"], reussite=True)
         # Générer un token sécurisé
         token = secrets.token_urlsafe(48)
-        creer_token_reinitialisation(utilisateur["id"], token)
+        await creer_token_reinitialisation(utilisateur["id"], token)
 
         # Envoyer l'email
         lien = f"{SITE_URL}/auth/reset-password?token={token}"
@@ -280,7 +242,7 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
         logger.info(f"Email de réinitialisation envoyé à {body.email}")
 
     if not utilisateur or not utilisateur.get("password_hash"):
-        log_auth(request, "forgot_password", email=body.email, reussite=False, detail="Email inconnu ou compte OAuth")
+        await log_auth(request, "forgot_password", email=body.email, reussite=False, detail="Email inconnu ou compte OAuth")
     # Toujours retourner un succès
     return {"message": "Si un compte existe avec cet email, vous recevrez un lien de réinitialisation."}
 
@@ -292,9 +254,9 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
     Réinitialise le mot de passe avec un token valide.
     """
     # Vérifier le token
-    entry = verifier_token_reinitialisation(body.token)
+    entry = await verifier_token_reinitialisation(body.token)
     if not entry:
-        log_auth(request, "reset_password", reussite=False, detail="Token invalide ou expiré")
+        await log_auth(request, "reset_password", reussite=False, detail="Token invalide ou expiré")
         raise HTTPException(
             status_code=400,
             detail="Ce lien de réinitialisation est invalide ou a expiré.",
@@ -306,15 +268,15 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
     ).decode("utf-8")
 
     # Changer le mot de passe
-    ok = changer_mot_de_passe(entry["utilisateur_id"], password_hash)
+    ok = await changer_mot_de_passe(entry["utilisateur_id"], password_hash)
     if not ok:
         raise HTTPException(status_code=500, detail="Erreur lors du changement de mot de passe.")
 
     # Marquer le token comme utilisé
-    marquer_token_utilise(body.token)
+    await marquer_token_utilise(body.token)
 
     logger.info(f"Mot de passe réinitialisé pour l'utilisateur {entry['utilisateur_id']}")
 
-    log_auth(request, "reset_password", email=body.email if hasattr(body, 'email') else None, utilisateur_id=entry["utilisateur_id"], reussite=True)
+    await log_auth(request, "reset_password", utilisateur_id=entry["utilisateur_id"], reussite=True)
 
     return {"message": "Votre mot de passe a été réinitialisé avec succès. Vous pouvez maintenant vous connecter."}

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
+import { useUser } from "@clerk/nextjs";
 import {
   Upload,
   Sparkles,
@@ -40,6 +41,8 @@ const statusLabels: Record<string, string> = {
 
 export default function AnimatePage() {
   const { user, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const isAuthenticated = !!user || !!clerkUser;
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
@@ -235,7 +238,7 @@ export default function AnimatePage() {
     );
   }
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Navbar />

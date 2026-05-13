@@ -2,7 +2,7 @@
 
 import { useRef } from "react";
 import { motion, useInView } from "framer-motion";
-import { Check, Sparkles, Zap, Crown, Gift, Briefcase } from "lucide-react";
+import { Check, Sparkles, Zap, Crown, Gift, Briefcase, Shield, Info } from "lucide-react";
 import Link from "next/link";
 import StripeCheckoutButton from "@/components/StripeCheckoutButton";
 
@@ -13,12 +13,13 @@ const plans = [
     price: "0€",
     period: "à vie",
     description: "Pour découvrir la magie de Flashback Restore.",
-    credits: "3 essais",
+    credits: "3 restaurations offertes",
     features: [
-      "3 essais gratuits",
-      "0 animation",
+      "Jusqu'à 3 restaurations",
+      "Animations non incluses",
       "Qualité standard",
       "Galerie de base",
+      "Respect de la confidentialité",
     ],
     cta: "Commencer gratuitement",
     highlighted: false,
@@ -34,13 +35,14 @@ const plans = [
     price: "4,99€",
     period: "/mois",
     description: "Idéal pour débuter avec la restauration HD.",
-    credits: "10 crédits/mois",
+    credits: "Jusqu'à 10 restaurations/mois",
     features: [
-      "10 restaurations HD/mois",
-      "2 animations/mois",
+      "Jusqu'à 10 restaurations HD/mois",
+      "Jusqu'à 2 animations/mois",
       "Sans filigrane",
       "Galerie cloud",
       "Support email",
+      "Respect de la confidentialité",
     ],
     cta: "S'abonner",
     highlighted: false,
@@ -56,13 +58,15 @@ const plans = [
     price: "29€",
     period: "/mois",
     description: "Pour les passionnés de souvenirs.",
-    credits: "100 crédits/mois",
+    credits: "Jusqu'à 100 restaurations/mois",
     features: [
-      "100 restaurations HD/mois",
-      "25 animations/mois",
+      "Jusqu'à 100 restaurations HD/mois",
+      "Jusqu'à 25 animations/mois",
+      "Niveau de restauration maximal",
       "Sans filigrane",
       "Galerie cloud",
       "Support prioritaire",
+      "Respect de la confidentialité",
     ],
     cta: "S'abonner",
     highlighted: true,
@@ -78,15 +82,17 @@ const plans = [
     icon: Crown,
     price: "249€",
     period: "/an",
-    description: "100 crédits/mois — 2 mois offerts !",
-    credits: "100 crédits/mois",
+    description: "Jusqu'à 100 restaurations/mois — 2 mois offerts !",
+    credits: "Jusqu'à 100 restaurations/mois",
     features: [
-      "100 restaurations HD/mois",
-      "25 animations/mois",
+      "Jusqu'à 100 restaurations HD/mois",
+      "Jusqu'à 25 animations/mois",
+      "Niveau de restauration maximal",
       "Sans filigrane",
       "Galerie cloud",
       "Support prioritaire",
       "Économisez 99€/an",
+      "Respect de la confidentialité",
     ],
     cta: "S'abonner",
     highlighted: false,
@@ -103,14 +109,16 @@ const plans = [
     price: "Sur mesure",
     period: "",
     description: "Pour les studios, archives et gros volumes.",
-    credits: "Crédits illimités",
+    credits: "Volume sur mesure",
     features: [
-      "Crédits illimités",
+      "Restaurations illimitées",
       "Animations illimitées",
+      "Niveau de restauration maximal",
       "API dédiée",
       "Support 24/7",
       "Traitement par lot",
       "SLA garanti",
+      "Respect de la confidentialité",
     ],
     cta: "Contactez-nous",
     highlighted: false,
@@ -252,12 +260,18 @@ function PricingCard({
           <ul className="space-y-3 mb-8 flex-1">
             {plan.features.map((feature) => (
               <li key={feature} className="flex items-start gap-3">
-                <Check
-                  className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
+                {feature === "Respect de la confidentialité" ? (
+                  <Shield className="w-5 h-5 flex-shrink-0 mt-0.5 text-emerald-500" />
+                ) : (
+                  <Check className={`w-5 h-5 flex-shrink-0 mt-0.5 ${
                     plan.highlighted ? "text-accent" : "text-emerald-500"
-                  }`}
-                />
-                <span className="text-muted text-sm leading-tight">
+                  }`} />
+                )}
+                <span className={`text-sm leading-tight ${
+                  feature === "Respect de la confidentialité"
+                    ? "text-foreground/70 italic"
+                    : "text-muted"
+                }`}>
                   {feature}
                 </span>
               </li>
@@ -296,10 +310,20 @@ export default function Pricing() {
             <span className="text-gradient">abonnement</span>
           </h2>
           <p className="text-muted max-w-2xl mx-auto text-lg">
-            Des abonnements flexibles avec crédits mensuels. 
+            Des formules simples pour restaurer et animer vos photos. 
             Résiliez à tout moment, sans engagement.
           </p>
         </motion.div>
+
+        {/* Infobox explicative */}
+        <div className="flex items-start gap-3 max-w-2xl mx-auto mb-10 p-4 bg-amber-500/10 border border-amber-500/20 rounded-xl text-sm text-muted">
+          <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
+          <p>
+            <strong className="text-foreground">Comment ça marche ?</strong>
+            {" "}Restaurations et animations partagent le même quota mensuel.
+            1 animation équivaut à 4 restaurations. Vous répartissez comme vous le souhaitez.
+          </p>
+        </div>
 
         {/* Cards — 5 columns on xl, 3 on lg, 2 on md, 1 on mobile */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 max-w-[90rem] mx-auto items-start">

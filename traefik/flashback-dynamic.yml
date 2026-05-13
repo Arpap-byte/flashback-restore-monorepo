@@ -9,7 +9,6 @@ http:
       middlewares:
         - flashback-cors
         - flashback-security
-        - flashback-basic-auth
 
     flashback-uploads:
       rule: "Host(`flashback-restore.com`) && PathPrefix(`/uploads`) || Host(`www.flashback-restore.com`) && PathPrefix(`/uploads`)"
@@ -19,7 +18,6 @@ http:
       service: flashback-api-svc
       middlewares:
         - flashback-security
-        - flashback-basic-auth
       priority: 150
 
     flashback-nextauth:
@@ -40,7 +38,6 @@ http:
       service: flashback-landing-svc
       middlewares:
         - flashback-security
-        - flashback-basic-auth
 
     n8n:
       rule: "Host(`n8n.cuisinetouslesjours.fr`)"

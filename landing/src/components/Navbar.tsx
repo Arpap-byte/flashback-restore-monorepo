@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, Sun, Moon, User, LogOut, History, LayoutDashboard } from "lucide-react";
+import { Menu, X, Sparkles, Sun, Moon, User, History, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import { useAuth } from "@/context/AuthContext";
+import { UserButton, SignInButton, useAuth } from "@clerk/nextjs";
 
 const navLinks = [
   { label: "Accueil", href: "/" },
@@ -17,7 +17,7 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
-  const { user, logout } = useAuth();
+  const { isSignedIn } = useAuth();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -80,7 +80,7 @@ export default function Navbar() {
               )}
             </button>
 
-            {user ? (
+            {isSignedIn ? (
               <>
                 <Link
                   href="/historique"
@@ -96,25 +96,31 @@ export default function Navbar() {
                   <LayoutDashboard className="w-4 h-4" />
                   Dashboard
                 </Link>
-                <span className="text-sm text-foreground px-3 py-2 flex items-center gap-1.5">
-                  <User className="w-4 h-4 text-accent" />
-                  {user.email.split("@")[0]}
-                </span>
-                <button
-                  onClick={logout}
-                  className="text-sm text-muted hover:text-red-400 transition-colors px-3 py-2 rounded-lg hover:bg-red-500/5 flex items-center gap-1.5"
-                >
-                  <LogOut className="w-4 h-4" />
-                </button>
+                <div className="flex items-center">
+                  <UserButton
+                    appearance={{
+                      elements: {
+                        userButtonBox: "flex items-center",
+                        userButtonTrigger:
+                          "rounded-full border border-card-border hover:border-accent/50 transition-all",
+                        userButtonPopoverCard:
+                          "bg-[#1c1917] border border-[#292524] shadow-2xl rounded-xl",
+                        userButtonPopoverActionButton:
+                          "text-muted hover:text-white hover:bg-[#292524] rounded-lg",
+                        userButtonPopoverActionButtonText: "text-muted",
+                        userButtonPopoverFooter: "hidden",
+                      },
+                    }}
+                  />
+                </div>
               </>
             ) : (
-              <Link
-                href="/auth"
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-card-border text-foreground hover:bg-surface text-sm font-medium transition-all"
-              >
-                <User className="w-4 h-4" />
-                Connexion
-              </Link>
+              <SignInButton mode="modal">
+                <button className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full border border-card-border text-foreground hover:bg-surface text-sm font-medium transition-all cursor-pointer">
+                  <User className="w-4 h-4" />
+                  Connexion
+                </button>
+              </SignInButton>
             )}
 
             {/* CTA */}
@@ -176,7 +182,7 @@ export default function Navbar() {
                   {link.label}
                 </Link>
               ))}
-              {user ? (
+              {isSignedIn ? (
                 <>
                   <Link
                     href="/historique"
@@ -192,24 +198,13 @@ export default function Navbar() {
                   >
                     Dashboard
                   </Link>
-                  <button
-                    onClick={() => {
-                      logout();
-                      setMobileOpen(false);
-                    }}
-                    className="block w-full text-left py-2.5 px-3 text-red-400 hover:bg-red-500/5 rounded-lg transition-colors font-medium"
-                  >
-                    Déconnexion
-                  </button>
                 </>
               ) : (
-                <Link
-                  href="/auth"
-                  onClick={() => setMobileOpen(false)}
-                  className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
-                >
-                  Connexion
-                </Link>
+                <SignInButton mode="modal">
+                  <button className="block w-full text-left py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium cursor-pointer">
+                    Connexion
+                  </button>
+                </SignInButton>
               )}
               <Link
                 href="/restore"

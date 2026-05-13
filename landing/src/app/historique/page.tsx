@@ -11,6 +11,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
+import { useUser } from "@clerk/nextjs";
 import {
   getUserHistory, getPhotoUrl, TravailHistorique,
   deleteTravail, deleteAllHistory,
@@ -73,6 +74,8 @@ function formatExpiration(iso: string | null): { text: string; urgent: boolean }
 
 export default function HistoriquePage() {
   const { user, loading: authLoading } = useAuth();
+  const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const isAuthenticated = !!user || !!clerkUser;
   const [data, setData] = useState<UserHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -95,7 +98,7 @@ export default function HistoriquePage() {
 
   useEffect(() => {
     if (authLoading) return;
-    if (!user) return;
+    if (!isAuthenticated) return;
     fetchData();
   }, [user, authLoading, fetchData]);
 
@@ -165,7 +168,7 @@ export default function HistoriquePage() {
     );
   }
 
-  if (!user) {
+  if (!isAuthenticated) {
     return (
       <div className="flex flex-col min-h-screen bg-background">
         <Navbar />
