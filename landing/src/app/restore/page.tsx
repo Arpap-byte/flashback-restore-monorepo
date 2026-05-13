@@ -142,11 +142,8 @@ export default function RestorePage() {
       const res = await fetch(restoredUrl!);
       const blob = await res.blob();
       const f = new File([blob], "restored.jpg", { type: "image/jpeg" });
-      const { jobId } = await colorizePhoto(f);
-      
-      // Poll for the async colorization result
-      const finalResult = await pollRestoreJob(jobId, () => {});
-      setRestoreResult(finalResult);
+      const result = await colorizePhoto(f);
+      setRestoreResult(result);
     } catch (err) {
       setError(
         err instanceof Error

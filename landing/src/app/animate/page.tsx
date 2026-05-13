@@ -29,8 +29,8 @@ import {
   AnimationStatus,
 } from "@/lib/api";
 
-const POLL_TIMEOUT = 120_000; // 2 minutes max
-const POLL_DELAYS = [5_000, 8_000, 12_000, 20_000]; // backoff exponentiel (5s → 8s → 12s → 20s)
+const POLL_TIMEOUT = 600_000; // 10 minutes max (D-ID peut être lent)
+const POLL_DELAYS = [5_000, 8_000, 12_000, 20_000, 30_000]; // backoff exponentiel
 
 const statusLabels: Record<string, string> = {
   en_attente: "En attente",

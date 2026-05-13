@@ -73,15 +73,49 @@ async def restauration_job(
         chemin_restaure = UPLOAD_DIR / nom_restaure
         await restaurer_photo_ia(chemin_original, str(chemin_restaure))
 
-        # Étape 3 : Colorisation optionnelle
         url_image = f"/uploads/{nom_restaure}"
         chemin_final = chemin_restaure
+
         if coloriser:
+            # Sauvegarder la version restaurée comme entrée séparée dans l'historique
+            await mettre_a_jour_travail(
+                travail_id,
+                statut="termine",
+                chemin_resultat=str(chemin_restaure),
+                taille_resultat=chemin_restaure.stat().st_size,
+                resultat_json=json.dumps({
+                    "analyse": analyse.model_dump(),
+                    "colorise": False,
+                    "credits_consommes": 1,
+                    "etape": "restauration",
+                }),
+            )
+
+            # Créer un nouveau travail pour la colorisation
+            from app.db.queries import creer_travail as _creer_travail
+            travail_color_id = await _creer_travail(
+                "colorisation",
+                chemin_photo=str(chemin_restaure),
+                utilisateur_id=utilisateur_id,
+            )
+            await mettre_a_jour_travail(
+                travail_color_id,
+                statut="en_cours",
+                taille_original=chemin_restaure.stat().st_size,
+            )
+
+            # Étape 3 : Colorisation
             nom_colorise = f"{nom_base}_colorized.jpg"
             chemin_colorise = UPLOAD_DIR / nom_colorise
             await coloriser_photo(str(chemin_restaure), str(chemin_colorise))
             url_image = f"/uploads/{nom_colorise}"
             chemin_final = chemin_colorise
+
+            # Mettre à jour le travail de colorisation
+            travail_id = travail_color_id  # pour les étapes suivantes
+            nb_credits_restant = nb_credits_total - 1
+        else:
+            nb_credits_restant = nb_credits_total
 
         # Succès : upload B2 + mise à jour du travail
         # Upload du résultat vers B2 (stockage cloud redondant)

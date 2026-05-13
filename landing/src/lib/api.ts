@@ -157,14 +157,13 @@ export async function restorePhoto(file: File, colorize?: boolean): Promise<Rest
   return { jobId: raw.job_id, travailId: raw.travail_id, message: raw.message };
 }
 
-export async function colorizePhoto(file: File): Promise<RestoreJobResponse> {
+export async function colorizePhoto(file: File): Promise<RestoreResult> {
   const formData = new FormData();
   formData.append("fichier", file);
-  const raw = await apiFetch<{ job_id: string; travail_id?: string; message: string; url_image?: string }>("/api/colorize", {
+  return apiFetch<RestoreResult>("/api/colorize", {
     method: "POST",
     body: formData,
   }, 60000);
-  return { jobId: raw.job_id, travailId: raw.travail_id || "", message: raw.message };
 }
 
 export async function pollRestoreJob(
