@@ -1,65 +1,55 @@
 "use client";
 
-import { SessionProvider, useSession, signOut as nextAuthSignOut } from "next-auth/react";
+import { useUser, useClerk } from "@clerk/nextjs";
 import React, { createContext, useContext, useMemo, useCallback } from "react";
 
 export interface User {
   id: string;
   email: string;
-  essais_restants: number;
-  est_abonne: boolean;
-  credits: number;
+  name?: string;
+  image?: string;
 }
 
 interface AuthState {
   user: User | null;
-  token: string | null;
   loading: boolean;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthState>({
   user: null,
-  token: null,
   loading: true,
-  logout: () => {},
+  logout: async () => {},
 });
 
 function AuthInner({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const { user: clerkUser, isLoaded } = useUser();
+  const { signOut } = useClerk();
 
   const user = useMemo(() => {
-    const id = (session?.user as any)?.id;
-    if (!id) return null;
-    return session?.user as User;
-  }, [(session?.user as any)?.id]);
+    if (!clerkUser || !isLoaded) return null;
+    const primaryEmail = clerkUser.emailAddresses?.[0]?.emailAddress;
+    return {
+      id: clerkUser.id,
+      email: primaryEmail || clerkUser.id,
+      name: `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || primaryEmail || undefined,
+      image: clerkUser.imageUrl,
+    };
+  }, [clerkUser, isLoaded]);
 
-  const token = useMemo(() => {
-    return (session as any)?.apiToken || null;
-  }, [(session as any)?.apiToken]);
-
-  const logout = useCallback(() => nextAuthSignOut({ callbackUrl: "/" }), []);
-
-  const value = useMemo(() => ({
-    user,
-    token,
-    loading: status === "loading",
-    logout,
-  }), [user, token, status, logout]);
+  const logout = useCallback(async () => {
+    await signOut();
+  }, [signOut]);
 
   return (
-    <AuthContext.Provider value={value}>
+    <AuthContext.Provider value={{ user, loading: !isLoaded, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  return (
-    <SessionProvider>
-      <AuthInner>{children}</AuthInner>
-    </SessionProvider>
-  );
+  return <AuthInner>{children}</AuthInner>;
 }
 
 export function useAuth() {

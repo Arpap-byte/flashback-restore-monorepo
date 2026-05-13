@@ -75,17 +75,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     }
   } catch {}
 
-  // 2. NextAuth JWT (legacy credentials)
-  try {
-    const { getSession } = await import("next-auth/react");
-    const session = await getSession();
-    const jwt = (session as any)?.jwt;
-    if (jwt) {
-      return { Authorization: `Bearer ${jwt}` };
-    }
-  } catch {}
-
-  // 3. Fallback: localStorage token (legacy email/password auth)
+  // 2. Fallback: localStorage token (legacy email/password auth)
   try {
     const stored = localStorage.getItem("flashback_auth");
     if (stored) {
