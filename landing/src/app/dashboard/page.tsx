@@ -558,15 +558,15 @@ export default function DashboardPage() {
                 )}
 
                 {/* Bouton changer de plan */}
-                <Link
-                  href="/#pricing"
-                  className="mt-2 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all text-sm font-medium"
+                <button
+                  onClick={() => { window.location.href = "/#pricing"; }}
+                  className="mt-2 w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-full border-2 border-card-border text-foreground hover:border-accent/30 hover:bg-surface transition-all text-sm font-medium cursor-pointer"
                 >
                   <RefreshCw className="w-4 h-4" />
                   {userMe?.plan === "gratuit"
                     ? "Passer à un abonnement"
                     : "Changer de plan"}
-                </Link>
+                </button>
               </div>
             </motion.div>
 
