@@ -84,6 +84,7 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
         mettre_a_jour_derniere_connexion,
         obtenir_utilisateur_par_email,
         obtenir_utilisateur_par_id,
+        obtenir_utilisateur_par_oauth,
     )
 
     utilisateur_id = payload.get("sub", "")
@@ -97,6 +98,13 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
             await mettre_a_jour_derniere_connexion(u["id"])
             return u
 
+    # Token Clerk : chercher par oauth_provider_id (sub Clerk)
+    if est_clerk and utilisateur_id:
+        u = await obtenir_utilisateur_par_oauth("clerk", utilisateur_id)
+        if u:
+            await mettre_a_jour_derniere_connexion(u["id"])
+            return u
+
     # Puis par email
     if email:
         u = await obtenir_utilisateur_par_email(email)
@@ -104,18 +112,20 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
             await mettre_a_jour_derniere_connexion(u["id"])
             return u
 
-        # Token Clerk : créer l'utilisateur automatiquement
-        if est_clerk:
-            provider_id = utilisateur_id or email
-            logger.info(
-                "Création automatique utilisateur Clerk: email=%s provider_id=%s",
-                email, provider_id,
-            )
-            nouvel_id = await creer_utilisateur_oauth(email, "clerk", provider_id)
-            if nouvel_id:
-                return await obtenir_utilisateur_par_id(nouvel_id)
+    # Token Clerk : créer l'utilisateur automatiquement
+    if est_clerk:
+        provider_id = utilisateur_id
+        email_a_utiliser = email or f"clerk_{utilisateur_id}@placeholder.local"
+        logger.info(
+            "Création automatique utilisateur Clerk: email=%s provider_id=%s",
+            email_a_utiliser, provider_id,
+        )
+        nouvel_id = await creer_utilisateur_oauth(email_a_utiliser, "clerk", provider_id)
+        if nouvel_id:
+            return await obtenir_utilisateur_par_id(nouvel_id)
 
-        # Token NextAuth ou autre : ne pas créer automatiquement
+    # Token NextAuth ou autre : ne pas créer automatiquement
+    if email:
         logger.warning("Tentative de connexion avec email inconnu: %s", email)
 
     return None
