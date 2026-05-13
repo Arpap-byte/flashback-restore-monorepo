@@ -90,3 +90,7 @@ logs/
 # --- Uploads utilisateurs (données sensibles) ---
 backend/uploads/*
 *.bak-*
+
+# SQLite test DB files
+file:test_*
+file:flashback_test_*
