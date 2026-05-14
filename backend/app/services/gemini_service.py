@@ -323,7 +323,7 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
         image_bytes = Path(chemin_image).read_bytes()
         image_b64 = base64.b64encode(image_bytes).decode("ascii")
 
-        async with httpx.AsyncClient(timeout=120.0) as http_client:
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as http_client:
             response = await http_client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_IMAGE_MODEL}:generateContent",
                 headers={"x-goog-api-key": GEMINI_API_KEY},
@@ -514,7 +514,7 @@ async def restaurer_photo_ia(chemin_image: str, chemin_sortie: str) -> str:
         image_bytes = Path(chemin_image).read_bytes()
         image_b64 = base64.b64encode(image_bytes).decode("ascii")
 
-        async with httpx.AsyncClient(timeout=120.0) as http_client:
+        async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as http_client:
             response = await http_client.post(
                 f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_IMAGE_MODEL}:generateContent",
                 headers={"x-goog-api-key": GEMINI_API_KEY},

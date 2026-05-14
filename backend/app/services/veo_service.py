@@ -98,7 +98,7 @@ async def _soumettre_veo(
     model: str = VEO_MODEL_LITE,
 ) -> str:
     """Soumet un job Veo et retourne le nom de l'opération."""
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
         resp = await client.post(
             f"{VEO_BASE_URL}/models/{model}:predictLongRunning",
             params={"key": GEMINI_API_KEY},
@@ -134,7 +134,7 @@ async def _poll_veo(
     debut = _time.monotonic()
     tentative = 0
 
-    async with httpx.AsyncClient(timeout=15.0) as client:
+    async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         while True:
             ecoule = _time.monotonic() - debut
             if ecoule >= timeout:
@@ -178,7 +178,7 @@ async def _poll_veo(
 
 async def _telecharger_video(file_id: str) -> bytes:
     """Télécharge la vidéo depuis l'API File de Gemini."""
-    async with httpx.AsyncClient(timeout=60.0) as client:
+    async with httpx.AsyncClient(timeout=60.0, follow_redirects=True) as client:
         resp = await client.get(
             f"{VEO_BASE_URL}/files/{file_id}:download",
             params={"key": GEMINI_API_KEY, "alt": "media"},
