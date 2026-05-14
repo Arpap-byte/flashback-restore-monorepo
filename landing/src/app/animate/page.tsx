@@ -59,6 +59,12 @@ export default function AnimatePage() {
         setPreview(url);
         try {
           const res = await fetch(url);
+          if (!res.ok) {
+            // Token expiré ou accès refusé → on ne peut pas charger l'image
+            // L'aperçu reste affiché (chargé avant tentative de fetch via setPreview)
+            console.error("Impossible de charger la photo pour animation:", res.status);
+            return;
+          }
           const blob = await res.blob();
           setFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
         } catch {}

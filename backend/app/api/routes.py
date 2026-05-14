@@ -220,6 +220,23 @@ def _valider_upload(fichier: UploadFile, contenu: bytes, nom_par_defaut: str = "
     # Validation par magic bytes (protection anti-MIME spoofing)
     if not _valider_upload_par_contenu(contenu):
         detected = magic.from_buffer(contenu, mime=True)
+        logger.warning(
+            "Fichier rejeté — magic bytes: %s, signature binaire: %s, taille: %d, "
+            "nom: %s, aperçu contenu: %s",
+            detected,
+            _valider_signature_image(contenu),
+            len(contenu),
+            fichier.filename or nom_par_defaut,
+            contenu[:200],
+        )
+        if detected == "application/json":
+            raise HTTPException(
+                status_code=400,
+                detail="Contenu JSON reçu au lieu d'une image. "
+                       "Votre token d'accès a peut-être expiré — "
+                       "veuillez rafraîchir la page et réessayer. "
+                       f"Formats acceptés : {', '.join(MAGIC_MIME_TYPES)}",
+            )
         raise HTTPException(
             status_code=400,
             detail=f"Type de fichier invalide détecté : {detected}. "

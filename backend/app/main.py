@@ -271,6 +271,10 @@ async def demarrage():
 async def arret():
     """Nettoyage à l'arrêt."""
     logger.info("Arrêt de Flashback Restore API.")
+    from app.db.session import close_db
+
+    await close_db()
+    logger.info("Moteur DB fermé proprement.")
 
 
 # ---------------------------------------------------------------------------

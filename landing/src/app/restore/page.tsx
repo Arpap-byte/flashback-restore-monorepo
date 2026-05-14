@@ -109,6 +109,10 @@ export default function RestorePage() {
         // Convert URL to File for API call
         try {
           const res = await fetch(url);
+          if (!res.ok) {
+            console.error("Impossible de charger la photo pour restauration:", res.status);
+            return;
+          }
           const blob = await res.blob();
           const f = new File([blob], "photo.jpg", { type: "image/jpeg" });
           setFile(f);

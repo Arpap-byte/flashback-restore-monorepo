@@ -47,15 +47,28 @@ fi
 
 echo -e "${JAUNE}📦 Sauvegarde de la base de données SQLite...${NC}"
 
-# Copie et compression du fichier SQLite
-if cp "$DB_SOURCE" "${DOSSIER_BACKUP}/flashback_tmp_${HORODATAGE}.db" 2>/dev/null; then
+# WAL checkpoint pour forcer l'écriture dans le fichier principal
+sqlite3 "$DB_SOURCE" "PRAGMA wal_checkpoint(TRUNCATE);" >/dev/null 2>&1
+
+# Sauvegarde cohérente via sqlite3 .backup (verrouillage correct)
+if sqlite3 "$DB_SOURCE" ".backup '${DOSSIER_BACKUP}/flashback_tmp_${HORODATAGE}.db'" 2>/dev/null; then
     gzip -c "${DOSSIER_BACKUP}/flashback_tmp_${HORODATAGE}.db" > "${DOSSIER_BACKUP}/${FICHIER_BACKUP}"
     rm -f "${DOSSIER_BACKUP}/flashback_tmp_${HORODATAGE}.db"
     TAILLE=$(du -h "${DOSSIER_BACKUP}/${FICHIER_BACKUP}" | cut -f1)
 
-    echo -e "${VERT}✅ Sauvegarde réussie !${NC}"
-    echo -e "   📁 Fichier : ${BLEU}${DOSSIER_BACKUP}/${FICHIER_BACKUP}${NC}"
-    echo -e "   📏 Taille  : ${TAILLE}"
+    # Vérification d'intégrité post-backup
+    gunzip -c "${DOSSIER_BACKUP}/${FICHIER_BACKUP}" > "${DOSSIER_BACKUP}/flashback_verify_${HORODATAGE}.db" 2>/dev/null
+    if sqlite3 "${DOSSIER_BACKUP}/flashback_verify_${HORODATAGE}.db" "PRAGMA integrity_check;" 2>/dev/null | grep -q "ok"; then
+        rm -f "${DOSSIER_BACKUP}/flashback_verify_${HORODATAGE}.db"
+        echo -e "${VERT}✅ Sauvegarde réussie et vérifiée !${NC}"
+        echo -e "   📁 Fichier : ${BLEU}${DOSSIER_BACKUP}/${FICHIER_BACKUP}${NC}"
+        echo -e "   📏 Taille  : ${TAILLE}"
+    else
+        rm -f "${DOSSIER_BACKUP}/flashback_verify_${HORODATAGE}.db"
+        echo -e "${ROUGE}❌ Backup créée mais ÉCHEC du test d'intégrité ! Fichier supprimé.${NC}"
+        rm -f "${DOSSIER_BACKUP}/${FICHIER_BACKUP}"
+        exit 1
+    fi
 
     # Rotation : garder les 30 derniers backups
     NB_BACKUPS=$(ls -1 "${DOSSIER_BACKUP}"/flashback_backup_*.db.gz 2>/dev/null | wc -l)
