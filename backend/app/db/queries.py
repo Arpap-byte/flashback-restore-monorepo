@@ -249,11 +249,16 @@ async def creer_abonnement(
     plan: Optional[str] = None,
     email_utilisateur: Optional[str] = None,
     derniere_attribution: Optional[str] = None,
+    session=None,
 ) -> str:
-    """Crée un nouvel abonnement dans la base locale."""
-    abonnement_id = _new_uuid()
-    maintenant = _utcnow()
-    async with async_session() as session:
+    """Crée un nouvel abonnement dans la base locale.
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
+        abonnement_id = _new_uuid()
+        maintenant = _utcnow()
         abo = Abonnement(
             id=abonnement_id,
             stripe_customer_id=stripe_customer_id,
@@ -265,9 +270,15 @@ async def creer_abonnement(
             cree_le=maintenant,
             modifie_le=maintenant,
         )
-        session.add(abo)
+        sess.add(abo)
+        return abonnement_id
+
+    if session is not None:
+        return await _do(session)
+    async with async_session() as session:
+        result = await _do(session)
         await session.commit()
-    return abonnement_id
+        return result
 
 
 async def obtenir_abonnement(
@@ -553,19 +564,29 @@ async def enregistrer_essai(
 # ===================================================================
 
 
-async def crediter_utilisateur(utilisateur_id: str, nombre: int) -> int:
-    """Ajoute des crédits à un utilisateur. Retourne le nouveau solde."""
-    async with async_session() as session:
+async def crediter_utilisateur(utilisateur_id: str, nombre: int, session=None) -> int:
+    """Ajoute des crédits à un utilisateur. Retourne le nouveau solde.
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
         stmt = (
             update(Utilisateur)
             .where(Utilisateur.id == utilisateur_id)
             .values(credits=Utilisateur.credits + nombre)
             .returning(Utilisateur.credits)
         )
-        result = await session.execute(stmt)
-        await session.commit()
+        result = await sess.execute(stmt)
         row = result.fetchone()
         return row[0] if row else 0
+
+    if session is not None:
+        return await _do(session)
+    async with async_session() as session:
+        result = await _do(session)
+        await session.commit()
+        return result
 
 
 async def consommer_credit(
@@ -749,11 +770,16 @@ async def enregistrer_achat_credits(
     stripe_session_id: str,
     nombre_credits: int,
     montant_euros: float,
+    session=None,
 ) -> str:
-    """Enregistre un achat de crédits. Retourne l'ID de l'achat."""
-    achat_id = _new_uuid()
-    maintenant = _utcnow()
-    async with async_session() as session:
+    """Enregistre un achat de crédits. Retourne l'ID de l'achat.
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
+        achat_id = _new_uuid()
+        maintenant = _utcnow()
         achat = AchatCredits(
             id=achat_id,
             utilisateur_id=utilisateur_id,
@@ -762,9 +788,15 @@ async def enregistrer_achat_credits(
             montant_euros=montant_euros,
             cree_le=maintenant,
         )
-        session.add(achat)
+        sess.add(achat)
+        return achat_id
+
+    if session is not None:
+        return await _do(session)
+    async with async_session() as session:
+        result = await _do(session)
         await session.commit()
-    return achat_id
+        return result
 
 
 async def obtenir_credits_restants(utilisateur_id: str) -> dict:
@@ -836,30 +868,50 @@ async def verifier_token_reinitialisation(token: str) -> Optional[dict]:
         return entry
 
 
-async def marquer_token_utilise(token: str) -> bool:
-    """Marque un token comme utilisé."""
-    async with async_session() as session:
+async def marquer_token_utilise(token: str, session=None) -> bool:
+    """Marque un token comme utilisé.
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
         stmt = (
             update(ReinitialisationMdp)
             .where(ReinitialisationMdp.token == token)
             .values(utilise=1)
         )
-        result = await session.execute(stmt)
-        await session.commit()
+        result = await sess.execute(stmt)
         return result.rowcount > 0
 
-
-async def changer_mot_de_passe(utilisateur_id: str, nouveau_hash: str) -> bool:
-    """Change le mot de passe d'un utilisateur."""
+    if session is not None:
+        return await _do(session)
     async with async_session() as session:
+        result = await _do(session)
+        await session.commit()
+        return result
+
+
+async def changer_mot_de_passe(utilisateur_id: str, nouveau_hash: str, session=None) -> bool:
+    """Change le mot de passe d'un utilisateur.
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
         stmt = (
             update(Utilisateur)
             .where(Utilisateur.id == utilisateur_id)
             .values(password_hash=nouveau_hash)
         )
-        result = await session.execute(stmt)
-        await session.commit()
+        result = await sess.execute(stmt)
         return result.rowcount > 0
+
+    if session is not None:
+        return await _do(session)
+    async with async_session() as session:
+        result = await _do(session)
+        await session.commit()
+        return result
 
 
 # ===================================================================
@@ -1019,17 +1071,27 @@ async def enregistrer_animation(utilisateur_id: str) -> dict:
         }
 
 
-async def mettre_a_jour_plan_utilisateur(utilisateur_id: str, plan: str) -> bool:
-    """Met à jour le plan d'un utilisateur (appelé lors de la souscription Stripe)."""
-    async with async_session() as session:
+async def mettre_a_jour_plan_utilisateur(utilisateur_id: str, plan: str, session=None) -> bool:
+    """Met à jour le plan d'un utilisateur (appelé lors de la souscription Stripe).
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
         stmt = (
             update(Utilisateur)
             .where(Utilisateur.id == utilisateur_id)
             .values(plan=plan, est_abonne=1)
         )
-        result = await session.execute(stmt)
-        await session.commit()
+        result = await sess.execute(stmt)
         return result.rowcount > 0
+
+    if session is not None:
+        return await _do(session)
+    async with async_session() as session:
+        result = await _do(session)
+        await session.commit()
+        return result
 
 
 # ===================================================================
@@ -1268,17 +1330,27 @@ async def stripe_event_deja_traite(event_id: str) -> bool:
         return result.scalar_one_or_none() is not None
 
 
-async def marquer_stripe_event_traite(event_id: str, type_evenement: str) -> str:
-    """Marque un événement Stripe comme traité. Retourne l'ID local."""
-    stripe_event_id = _new_uuid()
-    maintenant = _utcnow()
-    async with async_session() as session:
+async def marquer_stripe_event_traite(event_id: str, type_evenement: str, session=None) -> str:
+    """Marque un événement Stripe comme traité. Retourne l'ID local.
+
+    Si session est fournie, utilise cette session sans committer
+    (permet l'atomicité multi-opérations).
+    """
+    async def _do(sess):
+        stripe_event_id = _new_uuid()
+        maintenant = _utcnow()
         entry = StripeEvent(
             id=stripe_event_id,
             event_id=event_id,
             type_evenement=type_evenement,
             traite_le=maintenant,
         )
-        session.add(entry)
+        sess.add(entry)
+        return stripe_event_id
+
+    if session is not None:
+        return await _do(session)
+    async with async_session() as session:
+        result = await _do(session)
         await session.commit()
-    return stripe_event_id
+        return result

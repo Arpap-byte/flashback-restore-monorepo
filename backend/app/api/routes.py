@@ -1551,10 +1551,13 @@ async def webhook_stripe(request: Request):
 
                 utilisateur = await obtenir_utilisateur_par_email(email) if email else None
                 if utilisateur:
-                    await crediter_utilisateur(utilisateur["id"], nb_credits)
-                    await enregistrer_achat_credits(
-                        utilisateur["id"], session_id, nb_credits, montant
-                    )
+                    from app.db.session import async_session
+                    async with async_session() as session:
+                        async with session.begin():
+                            await crediter_utilisateur(utilisateur["id"], nb_credits, session=session)
+                            await enregistrer_achat_credits(
+                                utilisateur["id"], session_id, nb_credits, montant, session=session
+                            )
                     logger.info(
                         f"Crédits ajoutés : email={email}, credits={nb_credits}, "
                         f"montant={montant}€, session={session_id}"
@@ -1575,34 +1578,41 @@ async def webhook_stripe(request: Request):
                 stripe_subscription_id = donnees.get("subscription")
                 maintenant = datetime.now(timezone.utc).isoformat()
 
-                # Créer l'abonnement en base avec le plan et l'email
-                await creer_abonnement(
-                    stripe_customer_id=stripe_customer_id,
-                    stripe_subscription_id=stripe_subscription_id,
-                    statut="actif",
-                    plan=plan,
-                    email_utilisateur=email,
-                    derniere_attribution=maintenant,
-                )
+                # Session unique pour l'atomicité abonnement + crédits + plan
+                from app.db.session import async_session
+                async with async_session() as session:
+                    async with session.begin():
+                        # Créer l'abonnement en base
+                        await creer_abonnement(
+                            stripe_customer_id=stripe_customer_id,
+                            stripe_subscription_id=stripe_subscription_id,
+                            statut="actif",
+                            plan=plan,
+                            email_utilisateur=email,
+                            derniere_attribution=maintenant,
+                            session=session,
+                        )
 
-                # Créditer l'utilisateur avec l'allocation mensuelle
-                nb_credits = CREDITS_PAR_PLAN.get(plan, 0)
-                if nb_credits > 0 and email:
-                    utilisateur = await obtenir_utilisateur_par_email(email)
-                    if utilisateur:
-                        await crediter_utilisateur(utilisateur["id"], nb_credits)
-                        await mettre_a_jour_plan_utilisateur(utilisateur["id"], plan)
-                        logger.info(
-                            f"Crédits d'abonnement ajoutés : email={email}, "
-                            f"plan={plan}, credits={nb_credits}, "
-                            f"subscription={stripe_subscription_id}"
-                        )
-                    else:
-                        logger.warning(
-                            f"Utilisateur introuvable pour crédits abonnement : email={email}"
-                        )
-                else:
-                    logger.warning(f"Plan inconnu ou sans email : plan={plan}, email={email}")
+                        # Créditer l'utilisateur avec l'allocation mensuelle
+                        nb_credits = CREDITS_PAR_PLAN.get(plan, 0)
+                        if nb_credits > 0 and email:
+                            utilisateur = await obtenir_utilisateur_par_email(email)
+                            if utilisateur:
+                                await crediter_utilisateur(utilisateur["id"], nb_credits, session=session)
+                                await mettre_a_jour_plan_utilisateur(utilisateur["id"], plan, session=session)
+                                logger.info(
+                                    f"Crédits d'abonnement ajoutés : email={email}, "
+                                    f"plan={plan}, credits={nb_credits}, "
+                                    f"subscription={stripe_subscription_id}"
+                                )
+                            else:
+                                logger.warning(
+                                    f"Utilisateur introuvable pour crédits abonnement : email={email}"
+                                )
+                        else:
+                            logger.warning(f"Plan inconnu ou sans email : plan={plan}, email={email}")
+
+                    # ← commit atomique à la sortie du session.begin()
 
                 logger.info(
                     f"Abonnement créé : client={stripe_customer_id}, "

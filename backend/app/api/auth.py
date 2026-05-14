@@ -267,13 +267,14 @@ async def reset_password(request: Request, body: ResetPasswordRequest):
         body.password.encode("utf-8"), bcrypt.gensalt()
     ).decode("utf-8")
 
-    # Changer le mot de passe
-    ok = await changer_mot_de_passe(entry["utilisateur_id"], password_hash)
-    if not ok:
-        raise HTTPException(status_code=500, detail="Erreur lors du changement de mot de passe.")
-
-    # Marquer le token comme utilisé
-    await marquer_token_utilise(body.token)
+    # Changer le mot de passe et marquer le token (atomique)
+    from app.db.session import async_session
+    async with async_session() as session:
+        async with session.begin():
+            ok = await changer_mot_de_passe(entry["utilisateur_id"], password_hash, session=session)
+            if not ok:
+                raise HTTPException(status_code=500, detail="Erreur lors du changement de mot de passe.")
+            await marquer_token_utilise(body.token, session=session)
 
     logger.info(f"Mot de passe réinitialisé pour l'utilisateur {entry['utilisateur_id']}")
 

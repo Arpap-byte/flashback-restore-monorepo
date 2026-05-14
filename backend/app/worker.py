@@ -155,10 +155,13 @@ async def restauration_job(
 
     except Exception as e:
         logger.exception(f"[ARQ] Erreur restauration — travail_id={travail_id} : {e}")
+        msg_erreur = await _rembourser_si_echec(
+            utilisateur_id, travail_id, e, "restauration"
+        )
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=str(e),
+            message_erreur=msg_erreur,
         )
         raise
 
@@ -258,26 +261,9 @@ async def animation_job(
 
     except Exception as e:
         logger.exception(f"[ARQ] Erreur animation Veo — travail_id={travail_id} : {e}")
-        msg_erreur = str(e)
-
-        # Rembourser le crédit consommé si l'erreur est externe (filtre sécurité, API overload, etc.)
-        est_erreur_externe = any(kw in msg_erreur.lower() for kw in [
-            "filtré", "filtered", "sécurité", "safety",
-            "high demand", "overload", "internal server error",
-        ])
-        if est_erreur_externe:
-            try:
-                from app.services.credits import rembourser_operation
-                remb = await rembourser_operation(utilisateur_id, travail_id)
-                if remb["succes"]:
-                    msg_erreur += f" ({remb['message']})"
-                    logger.info(
-                        f"[ARQ] Crédit remboursé — travail_id={travail_id}, "
-                        f"type={remb['type']}"
-                    )
-            except Exception as remb_e:
-                logger.error(f"[ARQ] Échec remboursement — travail_id={travail_id}: {remb_e}")
-
+        msg_erreur = await _rembourser_si_echec(
+            utilisateur_id, travail_id, e, "animation"
+        )
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
@@ -290,19 +276,59 @@ async def animation_job(
 # Configuration du worker ARQ
 # ---------------------------------------------------------------------------
 
+async def _rembourser_si_echec(
+    utilisateur_id: str,
+    travail_id: str,
+    exception: Exception,
+    job_name: str,
+) -> str:
+    """Tente le remboursement des crédits pour tout échec de job ARQ.
+
+    Returns:
+        Le message d'erreur enrichi (avec mention du remboursement si réussi).
+    """
+    msg_erreur = str(exception)
+
+    try:
+        from app.services.credits import rembourser_operation
+        remb = await rembourser_operation(utilisateur_id, travail_id)
+        if remb["succes"]:
+            logger.info(
+                f"[ARQ] Crédit remboursé — {job_name}, travail_id={travail_id}, "
+                f"type={remb['type']}"
+            )
+            return f"{msg_erreur} ({remb['message']})"
+        else:
+            logger.warning(
+                f"[ARQ] Aucun remboursement possible — {job_name}, "
+                f"travail_id={travail_id}: {remb['message']}"
+            )
+    except Exception as remb_e:
+        logger.error(
+            f"[ARQ] Échec remboursement — {job_name}, "
+            f"travail_id={travail_id}: {remb_e}"
+        )
+
+    return msg_erreur
+
+
 async def _worker_shutdown(ctx):
     """Appelé par ARQ à l'arrêt du worker (SIGTERM/SIGINT).
 
-    Force un WAL checkpoint avant de quitter pour éviter la perte de données
-    dans les transactions écrites par les jobs du worker.
+    Force un WAL checkpoint avant de quitter pour éviter la perte de données.
+    Ne dispose PAS l'engine SQLAlchemy (partagé avec le backend).
     """
     logger.info("[ARQ] Arrêt du worker — WAL checkpoint en cours...")
     try:
-        from app.db.session import close_db
-        await close_db()
-        logger.info("[ARQ] Worker arrêté proprement — DB flushée.")
+        import sqlite3
+        from pathlib import Path
+        from app.config import DB_PATH
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        conn.close()
+        logger.info("[ARQ] Worker arrêté proprement — WAL checkpoint OK.")
     except Exception as e:
-        logger.error(f"[ARQ] Erreur lors du shutdown DB worker : {e}")
+        logger.error(f"[ARQ] Erreur lors du WAL checkpoint worker : {e}")
 
 
 class WorkerSettings:

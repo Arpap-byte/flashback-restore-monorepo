@@ -34,12 +34,16 @@ gzip -c "${DOSSIER_BACKUP}/predeploy_tmp_${HORODATAGE}.db" > "${DOSSIER_BACKUP}/
 rm "${DOSSIER_BACKUP}/predeploy_tmp_${HORODATAGE}.db"
 
 # 4. Vérification d'intégrité
-if gunzip -c "${DOSSIER_BACKUP}/${FICHIER_BACKUP}" | sqlite3 /dev/stdin "PRAGMA integrity_check;" | grep -q "ok"; then
+TMP_DB="${DOSSIER_BACKUP}/predeploy_check_${HORODATAGE}.db"
+gunzip -c "${DOSSIER_BACKUP}/${FICHIER_BACKUP}" > "$TMP_DB"
+if sqlite3 "$TMP_DB" "PRAGMA integrity_check;" | grep -q "ok"; then
     echo "   ✅ Backup intègre (${FICHIER_BACKUP})"
 else
     echo "   ❌ Backup CORROMPUE ! Vérifier immédiatement."
+    rm -f "$TMP_DB"
     exit 1
 fi
+rm -f "$TMP_DB"
 
 # 5. Rotation : garder les 10 derniers backups pré-déploiement
 ls -1t "${DOSSIER_BACKUP}"/predeploy_*.db.gz 2>/dev/null | tail -n +11 | xargs -r rm
