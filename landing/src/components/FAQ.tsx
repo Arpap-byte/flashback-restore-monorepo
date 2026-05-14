@@ -46,6 +46,16 @@ const faqs = [
     answer:
       "Notre IA de restauration analyse, nettoie et répare vos photos anciennes. Notre IA d&apos;animation transforme vos portraits restaurés en vidéos animées avec des expressions faciales réalistes, comme les portraits magiques d&apos;Harry Potter.",
   },
+  {
+    question: "Comment fonctionnent les crédits ?",
+    answer:
+      "Chaque opération consomme des crédits selon la qualité choisie. Une restauration de base en 720p coûte 1 crédit, en 1080p 2 crédits, et en 4K 4 crédits. La colorisation optionnelle ajoute le même nombre de crédits que la résolution (1, 2 ou 4). Une animation faciale coûte 10 crédits en 720p et 20 crédits en 1080p. Votre forfait vous donne un certain nombre de crédits mensuels — vous les répartissez comme vous le souhaitez entre restaurations, colorisations et animations.",
+  },
+  {
+    question: "Quels sont les tarifs détaillés ?",
+    answer:
+      "Restauration : 1 crédit (720p) / 2 crédits (1080p) / 4 crédits (4K). Colorisation : +1 crédit (720p) / +2 crédits (1080p) / +4 crédits (4K). Animation : 10 crédits (720p) / 20 crédits (1080p). Exemple : une restauration 1080p avec colorisation coûte 4 crédits (2+2). Une animation 1080p coûte 20 crédits. Les forfaits payants incluent un quota mensuel de crédits. Le forfait Gratuit offre 3 essais.",
+  },
 ];
 
 function FAQItem({

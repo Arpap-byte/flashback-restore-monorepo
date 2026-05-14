@@ -13,12 +13,12 @@ const plans = [
     price: "0€",
     period: "à vie",
     description: "Pour découvrir la magie de Flashback Restore.",
-    credits: "3 restaurations offertes",
+    credits: "3 essais gratuits",
     features: [
-      "Jusqu'à 3 restaurations",
+      "3 essais offerts",
+      "Qualité 720p",
       "Animations non incluses",
-      "Qualité standard",
-      "Galerie de base",
+      "Conservation 30 jours",
       "Respect de la confidentialité",
     ],
     cta: "Commencer gratuitement",
@@ -35,10 +35,11 @@ const plans = [
     price: "4,99€",
     period: "/mois",
     description: "Idéal pour débuter avec la restauration HD.",
-    credits: "Jusqu'à 10 restaurations/mois",
+    credits: "10 crédits/mois",
     features: [
-      "Jusqu'à 10 restaurations HD/mois",
-      "Jusqu'à 2 animations/mois",
+      "10 crédits/mois",
+      "Qualité 720p et 1080p",
+      "Animations incluses (10 crédits)",
       "Sans filigrane",
       "Galerie cloud",
       "Support email",
@@ -58,11 +59,11 @@ const plans = [
     price: "29€",
     period: "/mois",
     description: "Pour les passionnés de souvenirs.",
-    credits: "Jusqu'à 100 restaurations/mois",
+    credits: "100 crédits/mois",
     features: [
-      "Jusqu'à 100 restaurations HD/mois",
-      "Jusqu'à 25 animations/mois",
-      "Niveau de restauration maximal",
+      "100 crédits/mois",
+      "Toutes les qualités (720p, 1080p, 4K)",
+      "Animations 1080p incluses",
       "Sans filigrane",
       "Galerie cloud",
       "Support prioritaire",
@@ -82,12 +83,12 @@ const plans = [
     icon: Crown,
     price: "249€",
     period: "/an",
-    description: "Jusqu'à 100 restaurations/mois — 2 mois offerts !",
-    credits: "Jusqu'à 100 restaurations/mois",
+    description: "100 crédits/mois — 2 mois offerts !",
+    credits: "100 crédits/mois",
     features: [
-      "Jusqu'à 100 restaurations HD/mois",
-      "Jusqu'à 25 animations/mois",
-      "Niveau de restauration maximal",
+      "100 crédits/mois",
+      "Toutes les qualités (720p, 1080p, 4K)",
+      "Animations 1080p incluses",
       "Sans filigrane",
       "Galerie cloud",
       "Support prioritaire",
@@ -111,9 +112,8 @@ const plans = [
     description: "Pour les studios, archives et gros volumes.",
     credits: "Volume sur mesure",
     features: [
-      "Restaurations illimitées",
-      "Animations illimitées",
-      "Niveau de restauration maximal",
+      "Crédits illimités",
+      "Toutes les qualités",
       "API dédiée",
       "Support 24/7",
       "Traitement par lot",
@@ -320,8 +320,8 @@ export default function Pricing() {
           <Info className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
           <p>
             <strong className="text-foreground">Comment ça marche ?</strong>
-            {" "}Restaurations et animations partagent le même quota mensuel.
-            1 animation équivaut à 4 restaurations. Vous répartissez comme vous le souhaitez.
+            {" "}Chaque opération consomme des crédits selon la qualité : restauration (1 à 4 crédits), colorisation (+1 à +4), animation (10 ou 20 crédits).
+            Les forfaits payants vous donnent un quota mensuel de crédits à répartir librement.
           </p>
         </div>
 
