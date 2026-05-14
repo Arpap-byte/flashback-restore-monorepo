@@ -10,6 +10,7 @@ de façon asynchrone par le worker, libérant ainsi les workers HTTP.
 
 import json
 import logging
+import signal
 from pathlib import Path
 
 from arq.connections import RedisSettings
@@ -289,6 +290,21 @@ async def animation_job(
 # Configuration du worker ARQ
 # ---------------------------------------------------------------------------
 
+async def _worker_shutdown(ctx):
+    """Appelé par ARQ à l'arrêt du worker (SIGTERM/SIGINT).
+
+    Force un WAL checkpoint avant de quitter pour éviter la perte de données
+    dans les transactions écrites par les jobs du worker.
+    """
+    logger.info("[ARQ] Arrêt du worker — WAL checkpoint en cours...")
+    try:
+        from app.db.session import close_db
+        await close_db()
+        logger.info("[ARQ] Worker arrêté proprement — DB flushée.")
+    except Exception as e:
+        logger.error(f"[ARQ] Erreur lors du shutdown DB worker : {e}")
+
+
 class WorkerSettings:
     """
     Configuration du worker ARQ.
@@ -300,3 +316,4 @@ class WorkerSettings:
     max_jobs = 10  # Limite de jobs concurrents par worker
     job_timeout = 600  # Timeout max par job (10 minutes, Veo peut être lent)
     keep_result = 3600  # Garde les résultats 1h dans Redis
+    on_shutdown = _worker_shutdown  # WAL checkpoint à l'arrêt

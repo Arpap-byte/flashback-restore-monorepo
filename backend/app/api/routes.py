@@ -1008,11 +1008,8 @@ async def restaurer(
     travail_id = await creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Consommation des crédits (déjà vérifiés avant la sauvegarde du fichier)
-    for i in range(nb_credits_total):
-        await consommer_operation(utilisateur["id"], "restauration", travail_id)
-
-    # Délégation au worker ARQ (non-bloquant)
+    # Délégation au worker ARQ (non-bloquant) AVANT consommation des crédits
+    # pour garantir l'atomicité : si l'enqueue échoue, aucun crédit n'est perdu.
     try:
         pool = await _get_arq_pool()
         job = await pool.enqueue_job(
@@ -1024,27 +1021,29 @@ async def restaurer(
             nb_credits_total,
             resolution,
         )
-        # Stocker le job_id ARQ dans le travail pour le suivi
-        await mettre_a_jour_travail(
-            travail_id,
-            resultat_json=json.dumps({"arq_job_id": job.job_id, "coloriser": coloriser, "resolution": resolution}),
-        )
-        return {
-            "message": "Traitement de restauration en cours.",
-            "job_id": job.job_id,
-            "travail_id": travail_id,
-        }
     except Exception as e:
         logger.exception(f"Erreur lors de l'envoi du job ARQ (restauration) : {e}")
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=f"Échec d'envoi au worker : {str(e)}",
+            message_erreur=f"Service de traitement indisponible ({e})",
         )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur lors de la mise en file d'attente : {str(e)}",
-        )
+        raise HTTPException(status_code=503, detail="Service de traitement indisponible. Aucun crédit débité.")
+
+    # Consommation des crédits (seulement après enqueue réussie)
+    for i in range(nb_credits_total):
+        await consommer_operation(utilisateur["id"], "restauration", travail_id)
+
+    # Stocker le job_id ARQ dans le travail pour le suivi
+    await mettre_a_jour_travail(
+        travail_id,
+        resultat_json=json.dumps({"arq_job_id": job.job_id, "coloriser": coloriser, "resolution": resolution}),
+    )
+    return {
+        "message": "Traitement de restauration en cours.",
+        "job_id": job.job_id,
+        "travail_id": travail_id,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -1182,7 +1181,7 @@ async def animer(
     travail_id = await creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Vérification des crédits et de la limite d'animations par forfait
+    # Vérification des crédits et de la limite d'animations par forfait (sans consommer)
     nb_credits_anim = TARIF_ANIMATION.get(resolution, 10)
     for i in range(nb_credits_anim):
         peut, raison = await peut_animer(utilisateur["id"])
@@ -1193,10 +1192,9 @@ async def animer(
                 message_erreur=raison,
             )
             raise HTTPException(status_code=403, detail=raison)
-        # Consommer le crédit/essai (et incrémenter le compteur d'animations)
-        await consommer_operation(utilisateur["id"], "animation", travail_id)
 
-    # Délégation au worker ARQ (non-bloquant)
+    # Délégation au worker ARQ (non-bloquant) AVANT consommation
+    # Atomicité : si l'enqueue échoue, aucun crédit n'est perdu.
     try:
         pool = await _get_arq_pool()
         job = await pool.enqueue_job(
@@ -1207,24 +1205,26 @@ async def animer(
             travail_id,
             resolution,
         )
-        # Sauvegarder l'ID du job ARQ pour le suivi via GET /api/animate/{job_id}
-        await mettre_a_jour_job_externe_id(travail_id, job.job_id)
-        return {
-            "message": "Traitement d'animation en cours.",
-            "job_id": job.job_id,
-            "travail_id": travail_id,
-        }
     except Exception as e:
         logger.exception(f"Erreur lors de l'envoi du job ARQ (animation) : {e}")
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=f"Échec d'envoi au worker : {str(e)}",
+            message_erreur=f"Service de traitement indisponible ({e})",
         )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur lors de la mise en file d'attente : {str(e)}",
-        )
+        raise HTTPException(status_code=503, detail="Service de traitement indisponible. Aucun crédit débité.")
+
+    # Consommation des crédits (seulement après enqueue réussie)
+    for i in range(nb_credits_anim):
+        await consommer_operation(utilisateur["id"], "animation", travail_id)
+
+    # Sauvegarder l'ID du job ARQ pour le suivi
+    await mettre_a_jour_job_externe_id(travail_id, job.job_id)
+    return {
+        "message": "Traitement d'animation en cours.",
+        "job_id": job.job_id,
+        "travail_id": travail_id,
+    }
 
 
 @router.get("/animate/{job_id}", response_model=StatutAnimationReponse)

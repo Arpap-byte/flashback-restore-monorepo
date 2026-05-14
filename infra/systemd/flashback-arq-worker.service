@@ -11,6 +11,9 @@ Environment="ENVIRONMENT=production"
 ExecStart=/opt/flashback-restore-monorepo/backend/.venv/bin/arq app.worker.WorkerSettings
 Restart=always
 RestartSec=5
+TimeoutStopSec=30
+StartLimitBurst=3
+StartLimitIntervalSec=60
 StandardOutput=journal
 StandardError=journal
 
