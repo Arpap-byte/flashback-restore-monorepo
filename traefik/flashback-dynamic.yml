@@ -86,7 +86,7 @@ http:
     flashback-basic-auth:
       basicAuth:
         users:
-          - "admin:$apr1$HKSxdnl4$in/TA3x.MDAvTtk8FTqTZ."
+          - "flashback:$apr1$livlkDQ1$W5viQrWY3FoZd.DvtEMXn/"
 
   services:
     flashback-api-svc:
