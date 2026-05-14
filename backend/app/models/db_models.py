@@ -99,7 +99,7 @@ class Travail(Base):
         Index("idx_travaux_type", "type"),
         Index("idx_travaux_user_date", "utilisateur_id", text("cree_le DESC")),
         CheckConstraint(
-            "type IN ('analyse', 'restauration', 'animation')",
+            "type IN ('analyse', 'restauration', 'animation', 'colorisation')",
             name="ck_travaux_type",
         ),
         CheckConstraint(

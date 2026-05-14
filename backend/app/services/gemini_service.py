@@ -287,8 +287,23 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
 # ---------------------------------------------------------------------------
 
 PROMPT_COLORISATION = (
-    "Colorise cette photo en noir et blanc de façon naturelle et réaliste. "
-    "Conserve tous les détails restaurés. Produis une image en couleurs naturelles."
+    "Colorise cette photographie en noir et blanc avec une précision extrême "
+    "et une exactitude historique.\n\n"
+    "INSTRUCTIONS CRITIQUES :\n"
+    "1. PRÉSERVE chaque détail de l'image restaurée — pas de flou, lissage "
+    "ou altération des textures.\n"
+    "2. PEAU : Tons chair réalistes. Évite les peaux orange ou plastiques. "
+    "Inclus des variations subtiles (joues légèrement rosées, ombres froides).\n"
+    "3. TISSUS : Couleurs historiquement plausibles pour l'époque. Les tissus "
+    "foncés restent foncés (marine, charbon, brun). Les tissus clairs "
+    "restent clairs (crème, blanc, beige). PAS de couleurs synthétiques vives.\n"
+    "4. ARRIÈRE-PLAN : Ciel en bleu/gris pâle selon la météo apparente. "
+    "Végétation en verts naturels. Architecture en pierre, brique ou bois.\n"
+    "5. ÉVITE : Bavures de couleur aux frontières, halos autour des sujets, "
+    "sursaturation, teinte uniforme façon sépia.\n"
+    "6. ZONES AMBIGUËS : Tons sobres et conservateurs, pas de couleurs "
+    "vives devinées.\n"
+    "7. RÉSULTAT : Une photo d'époque crédible, pas un rendu artificiel."
 )
 
 

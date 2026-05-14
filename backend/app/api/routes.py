@@ -7,7 +7,7 @@ Endpoints :
 - POST /api/animate   : Créer une animation (non-bloquant via ARQ)
 - GET  /api/animate/{id} : Suivre le statut d'une animation
 - GET  /api/job/{job_id} : Statut d'un job ARQ (restauration/animation)
-- GET  /api/health    : Vérifier la santé du service (Gemini, D-ID, DB, Stripe)
+- GET  /api/health    : Vérifier la santé du service (IA, animation, DB, Stripe)
 - GET  /api/stats     : Statistiques globales (protégé par X-Admin-Key)
 """
 
@@ -178,8 +178,8 @@ async def sante(request: Request):
     Vérification de l'état du service.
 
     Teste RÉELLEMENT la connectivité aux services externes :
-    - Gemini : appel API pour lister les modèles (timeout 5s)
-    - D-ID : vérifie que la clé API est configurée
+    - IA de restauration : appel API pour lister les modèles (timeout 5s)
+    - Animation : vérifie que la clé API est configurée
     - Base de données : exécute un SELECT 1 sur SQLite
     - Stripe : vérifie que la clé API est configurée
     """
@@ -470,6 +470,265 @@ async def dashboard_admin(request: Request):
 
 
 # ---------------------------------------------------------------------------
+# Admin — Détails drill-down
+# ---------------------------------------------------------------------------
+
+@router.get("/admin/utilisateurs")
+async def admin_liste_utilisateurs(
+    request: Request,
+    plan: Optional[str] = None,
+    limite: int = 50,
+):
+    """
+    Liste détaillée des utilisateurs pour le dashboard admin.
+
+    **Protégé par token admin**.
+    """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    from app.db.session import async_session
+    from sqlalchemy import text as _sa_text
+
+    async with async_session() as session:
+        if plan:
+            rows = (await session.execute(
+                _sa_text("""
+                    SELECT u.id, u.email, u.plan, u.credits,
+                           u.derniere_activite, u.cree_le, u.essais_restants,
+                           COALESCE(c.credits_utilises, 0) as credits_utilises
+                    FROM utilisateurs u
+                    LEFT JOIN (
+                        SELECT utilisateur_id, SUM(credits_utilises) as credits_utilises
+                        FROM consommation_credits
+                        GROUP BY utilisateur_id
+                    ) c ON u.id = c.utilisateur_id
+                    WHERE u.plan = :plan
+                    ORDER BY u.cree_le DESC
+                    LIMIT :limite
+                """),
+                {"plan": plan, "limite": limite}
+            )).fetchall()
+        else:
+            rows = (await session.execute(
+                _sa_text("""
+                    SELECT u.id, u.email, u.plan, u.credits,
+                           u.derniere_activite, u.cree_le, u.essais_restants,
+                           COALESCE(c.credits_utilises, 0) as credits_utilises
+                    FROM utilisateurs u
+                    LEFT JOIN (
+                        SELECT utilisateur_id, SUM(credits_utilises) as credits_utilises
+                        FROM consommation_credits
+                        GROUP BY utilisateur_id
+                    ) c ON u.id = c.utilisateur_id
+                    ORDER BY u.cree_le DESC
+                    LIMIT :limite
+                """),
+                {"limite": limite}
+            )).fetchall()
+
+    return {
+        "total": len(rows),
+        "utilisateurs": [
+            {
+                "id": r[0],
+                "email": r[1],
+                "plan": r[2] or "gratuit",
+                "credits": r[3] or 0,
+                "derniere_activite": r[4].isoformat() if r[4] and hasattr(r[4], 'isoformat') else (r[4] or None),
+                "cree_le": r[5].isoformat() if r[5] and hasattr(r[5], 'isoformat') else (r[5] or None),
+                "essais_restants": r[6] or 0,
+                "credits_utilises": r[7] if len(r) > 7 else 0,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/admin/travaux")
+async def admin_liste_travaux(
+    request: Request,
+    type: Optional[str] = None,
+    statut: Optional[str] = None,
+    limite: int = 50,
+):
+    """
+    Liste détaillée des travaux pour le dashboard admin.
+
+    **Protégé par token admin**.
+    Filtres optionnels : type (restauration, animation, colorisation, analyse),
+    statut (termine, en_cours, erreur, cree).
+    """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    from app.db.session import async_session
+    from sqlalchemy import text as _sa_text
+
+    async with async_session() as session:
+        query = """
+            SELECT t.id, t.type, t.statut, t.cree_le, t.taille_original,
+                   t.taille_resultat, t.message_erreur, u.email as user_email
+            FROM travaux t
+            LEFT JOIN utilisateurs u ON t.utilisateur_id = u.id
+            WHERE 1=1
+        """
+        params = {"limite": limite}
+
+        if type:
+            query += " AND t.type = :type"
+            params["type"] = type
+        if statut:
+            query += " AND t.statut = :statut"
+            params["statut"] = statut
+
+        query += " ORDER BY t.cree_le DESC LIMIT :limite"
+
+        rows = (await session.execute(_sa_text(query), params)).fetchall()
+
+    return {
+        "total": len(rows),
+        "travaux": [
+            {
+                "id": r[0],
+                "type": r[1],
+                "statut": r[2],
+                "cree_le": r[3].isoformat() if r[3] and hasattr(r[3], 'isoformat') else (r[3] or None),
+                "taille_original": r[4],
+                "taille_resultat": r[5],
+                "message_erreur": r[6],
+                "email_utilisateur": r[7],
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.get("/admin/utilisateurs/{user_id}")
+async def admin_detail_utilisateur(
+    request: Request,
+    user_id: str,
+):
+    """
+    Détail complet d'un utilisateur : infos, travaux, stockage utilisé.
+
+    **Protégé par token admin**.
+    """
+    admin_key = request.headers.get("X-Admin-Key")
+    if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Accès non autorisé.")
+
+    from app.db.session import async_session
+    from sqlalchemy import text as _sa_text
+
+    async with async_session() as session:
+        # Infos utilisateur
+        user_row = (await session.execute(
+            _sa_text("""
+                SELECT id, email, plan, credits, derniere_activite, cree_le,
+                       essais_restants
+                FROM utilisateurs WHERE id = :uid
+            """),
+            {"uid": user_id}
+        )).fetchone()
+
+        if not user_row:
+            raise HTTPException(status_code=404, detail="Utilisateur non trouvé.")
+
+        # Crédits consommés
+        credits_consommes = (await session.execute(
+            _sa_text("""
+                SELECT COALESCE(SUM(credits_utilises), 0)
+                FROM consommation_credits
+                WHERE utilisateur_id = :uid
+            """),
+            {"uid": user_id}
+        )).fetchone()[0]
+
+        # Travaux : compteur par type et statut
+        travaux_rows = (await session.execute(
+            _sa_text("""
+                SELECT type, statut, COUNT(*) as nb
+                FROM travaux
+                WHERE utilisateur_id = :uid
+                GROUP BY type, statut
+                ORDER BY nb DESC
+            """),
+            {"uid": user_id}
+        )).fetchall()
+
+        # Stockage
+        stockage_row = (await session.execute(
+            _sa_text("""
+                SELECT
+                    COALESCE(SUM(COALESCE(taille_original, 0)), 0) as stock_original,
+                    COALESCE(SUM(COALESCE(taille_resultat, 0)), 0) as stock_resultat,
+                    COUNT(*) as total_travaux,
+                    COUNT(CASE WHEN type = 'restauration' THEN 1 END) as nb_photos,
+                    COUNT(CASE WHEN type = 'animation' THEN 1 END) as nb_videos
+                FROM travaux
+                WHERE utilisateur_id = :uid AND statut = 'termine'
+            """),
+            {"uid": user_id}
+        )).fetchone()
+
+        # Derniers travaux
+        derniers_rows = (await session.execute(
+            _sa_text("""
+                SELECT id, type, statut, cree_le, taille_original,
+                       taille_resultat, message_erreur
+                FROM travaux
+                WHERE utilisateur_id = :uid
+                ORDER BY cree_le DESC
+                LIMIT 20
+            """),
+            {"uid": user_id}
+        )).fetchall()
+
+    stock_original = stockage_row[0] or 0
+    stock_resultat = stockage_row[1] or 0
+
+    return {
+        "utilisateur": {
+            "id": user_row[0],
+            "email": user_row[1],
+            "plan": user_row[2] or "gratuit",
+            "credits": user_row[3] or 0,
+            "credits_consommes": credits_consommes,
+            "derniere_activite": user_row[4].isoformat() if user_row[4] and hasattr(user_row[4], 'isoformat') else (user_row[4] or None),
+            "cree_le": user_row[5].isoformat() if user_row[5] and hasattr(user_row[5], 'isoformat') else (user_row[5] or None),
+            "essais_restants": user_row[6] or 0,
+        },
+        "stockage": {
+            "original_mb": round(stock_original / (1024 * 1024), 2),
+            "resultat_mb": round(stock_resultat / (1024 * 1024), 2),
+            "total_mb": round((stock_original + stock_resultat) / (1024 * 1024), 2),
+            "nb_photos": stockage_row[3] or 0,
+            "nb_videos": stockage_row[4] or 0,
+            "total_travaux_termines": stockage_row[2] or 0,
+        },
+        "travaux_par_type": [
+            {"type": r[0], "statut": r[1], "nb": r[2]}
+            for r in travaux_rows
+        ],
+        "derniers_travaux": [
+            {
+                "id": r[0],
+                "type": r[1],
+                "statut": r[2],
+                "cree_le": r[3].isoformat() if r[3] and hasattr(r[3], 'isoformat') else (r[3] or None),
+                "taille_original": r[4],
+                "taille_resultat": r[5],
+                "message_erreur": r[6],
+            }
+            for r in derniers_rows
+        ],
+    }
+
+
+# ---------------------------------------------------------------------------
 # Analyse
 # ---------------------------------------------------------------------------
 
@@ -600,7 +859,7 @@ def _appliquer_restauration_pillow(
 
 
 @router.post("/restore")
-@limiter.limit("10/minute")
+@limiter.limit("20/hour")
 async def restaurer(
     request: Request,
     fichier: UploadFile = File(...),
@@ -615,7 +874,7 @@ async def restaurer(
 
     Processus (exécuté par le worker) :
     1. La photo est analysée pour détecter ses défauts.
-    2. L'IA restaure l'image (Gemini Image Model).
+    2. L'IA restaure l'image.
     3. Si coloriser=True, l'image est colorisée.
     4. Le travail est mis à jour avec le résultat.
 
@@ -649,7 +908,7 @@ async def restaurer(
     try:
         from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
         if b2_est_disponible():
-            cle = generer_cle_distant("photos", nom_original)
+            cle = generer_cle_distant("photos", nom_original, utilisateur["id"])
             uploader_bytes(contenu, cle, fichier.content_type or "image/jpeg")
     except Exception as e:
         logger.warning("Échec upload B2 (fallback local): %s", e)
@@ -731,7 +990,7 @@ async def coloriser_standalone(
     try:
         from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
         if b2_est_disponible():
-            cle = generer_cle_distant("photos", nom_original)
+            cle = generer_cle_distant("photos", nom_original, utilisateur["id"])
             uploader_bytes(contenu, cle, fichier.content_type or "image/jpeg")
     except Exception as e:
         logger.warning("Échec upload B2 (fallback local): %s", e)
@@ -779,19 +1038,20 @@ async def coloriser_standalone(
 
 
 # ---------------------------------------------------------------------------
-# Animation (D-ID)
+# Animation
 # ---------------------------------------------------------------------------
 
 @router.post("/animate")
-@limiter.limit("10/minute")
+@limiter.limit("20/hour")
 async def animer(
     request: Request,
     fichier: UploadFile = File(...),
     comportement: str = Form("naturel"),
+    resolution: str = Form("720p"),
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
-    Crée une animation faciale sans parole (micro-expressions naturelles).
+    Crée une animation faciale sans parole via Google Veo 3.1.
 
     **Non-bloquant** : le traitement est délégué à un worker ARQ.
     La réponse immédiate contient un job_id pour suivre la progression.
@@ -801,11 +1061,16 @@ async def animer(
     Args:
         fichier: La photo du visage à animer.
         comportement: Type d'expression (« sourire », « rire », « respirer »,
-                      « clin_oeil », « naturel »). Défaut: « naturel ».
+                      « clin_oeil », « salut », « naturel »). Défaut: « naturel ».
+        resolution: "720p" (défaut) ou "1080p".
 
     Returns:
         job_id pour suivre la progression + message de confirmation.
     """
+    # Validation de la résolution
+    if resolution not in ("720p", "1080p"):
+        raise HTTPException(status_code=400, detail="Résolution invalide. Choisir '720p' ou '1080p'.")
+
     # Validation et sauvegarde
     contenu = await fichier.read()
     nom_fichier = _valider_upload(fichier, contenu, nom_par_defaut="portrait.jpg")
@@ -841,6 +1106,7 @@ async def animer(
             str(chemin),
             comportement,
             travail_id,
+            resolution,
         )
         return {
             "message": "Traitement d'animation en cours.",
@@ -934,6 +1200,71 @@ async def statut_animation(
             status_code=500,
             detail=f"Erreur lors du suivi d'animation : {str(e)}",
         )
+
+
+@router.get("/animate/travail/{travail_id}")
+async def statut_animation_par_travail(
+    travail_id: str,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """
+    Vérifie le statut d'une animation directement depuis la base de données.
+
+    Contrairement à /animate/{job_id}, cet endpoint ne fait PAS d'appel à
+    le worker ARQ (qui gère le polling côté serveur).
+
+    **Résilient à la fermeture du navigateur** : la vidéo est sauvegardée
+    même si l'utilisateur quitte la page pendant le traitement.
+
+    Args:
+        travail_id: L'identifiant du travail (retourné par POST /api/animate).
+
+    Returns:
+        Le statut actuel et l'URL de la vidéo si terminée.
+    """
+    travail = await obtenir_travail(travail_id)
+    if travail is None:
+        raise HTTPException(status_code=404, detail="Travail introuvable.")
+    if travail.get("utilisateur_id") != utilisateur["id"]:
+        raise HTTPException(status_code=403, detail="Ce travail ne vous appartient pas.")
+
+    # Mapping statut DB → statut frontend
+    statut_db = travail.get("statut", "cree")
+    correspondance = {
+        "cree": StatutAnimation.EN_ATTENTE,
+        "en_cours": StatutAnimation.EN_COURS,
+        "termine": StatutAnimation.TERMINE,
+        "erreur": StatutAnimation.ERREUR,
+    }
+    statut_frontend = correspondance.get(statut_db, StatutAnimation.EN_ATTENTE)
+
+    # Progression estimée
+    progression = {
+        StatutAnimation.EN_ATTENTE: 15,
+        StatutAnimation.EN_COURS: 50,
+        StatutAnimation.TERMINE: 100,
+        StatutAnimation.ERREUR: 0,
+    }.get(statut_frontend, 0)
+
+    url_video = None
+    if statut_frontend == StatutAnimation.TERMINE:
+        # Priorité : fichier local → URL D-ID → chemin_resultat
+        chemin_local = travail.get("chemin_animation")
+        if chemin_local:
+            # Transformer chemin absolu en URL relative /uploads/...
+            from pathlib import Path as _Path
+            nom_fichier = _Path(chemin_local).name
+            url_video = f"/uploads/{nom_fichier}"
+        else:
+            url_video = travail.get("chemin_resultat")
+
+    return {
+        "status": statut_frontend.value if hasattr(statut_frontend, 'value') else statut_frontend,
+        "progress": progression,
+        "url_video": url_video,
+        "message": travail.get("message_erreur") if statut_frontend == StatutAnimation.ERREUR else None,
+        "travail_id": travail_id,
+    }
 
 
 # ---------------------------------------------------------------------------

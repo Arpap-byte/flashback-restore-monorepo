@@ -184,15 +184,18 @@ def b2_est_disponible() -> bool:
         return False
 
 
-def generer_cle_distant(prefixe: str, nom_fichier: str) -> str:
+def generer_cle_distant(prefixe: str, nom_fichier: str, user_id: str | None = None) -> str:
     """
     Génère une clé unique dans le bucket.
 
-    Format: {prefixe}/{YYYY/MM}/{uuid}_{nom_fichier}
+    Format: {prefixe}/{user_id}/{YYYY/MM}/{uuid}_{nom_fichier}
+    Le user_id isole les fichiers par client.
     """
     import uuid
     from datetime import datetime
 
     maintenant = datetime.utcnow()
     dossier = f"{maintenant.year}/{maintenant.month:02d}"
+    if user_id:
+        return f"{prefixe}/{user_id}/{dossier}/{uuid.uuid4().hex[:12]}_{nom_fichier}"
     return f"{prefixe}/{dossier}/{uuid.uuid4().hex[:12]}_{nom_fichier}"

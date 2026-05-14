@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Sparkles, Sun, Moon, User, History, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
@@ -11,6 +12,7 @@ import { LogOut } from "lucide-react";
 const navLinks = [
   { label: "Accueil", href: "/" },
   { label: "Restaurer", href: "/restore" },
+  { label: "Animer", href: "/animate" },
   { label: "Tarifs", href: "/#pricing" },
 ];
 
@@ -20,6 +22,7 @@ export default function Navbar() {
   const { theme, toggleTheme } = useTheme();
   const { isSignedIn } = useAuth();
   const { signOut } = useClerk();
+  const pathname = usePathname();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -56,15 +59,21 @@ export default function Navbar() {
 
           {/* Desktop nav */}
           <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
+            {navLinks.map((link) => {
+              const isActive = pathname === link.href || (link.href !== "/" && pathname.startsWith(link.href));
+              return (
               <Link
                 key={link.href}
                 href={link.href}
-                className="text-sm text-muted hover:text-accent transition-colors font-medium px-3 py-2 rounded-lg hover:bg-accent/5"
+                className={`text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
+                  isActive
+                    ? "text-accent bg-accent/5 font-semibold"
+                    : "text-muted hover:text-accent hover:bg-accent/5"
+                }`}
               >
                 {link.label}
               </Link>
-            ))}
+            )})}
           </div>
 
           {/* Right side */}

@@ -29,12 +29,13 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY must be set in environment or .env file")
-GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-image-preview")
 
 # --- API D-ID ---
 DID_API_KEY: str = os.getenv("DID_API_KEY", "")
 if not DID_API_KEY:
-    raise RuntimeError("DID_API_KEY must be set in environment or .env file")
+    import warnings
+    warnings.warn("DID_API_KEY not set — animation service will use Veo 3.1 only. D-ID legacy support disabled.", RuntimeWarning)
 DID_BASE_URL: str = os.getenv(
     "DID_BASE_URL",
     "https://api.d-id.com",

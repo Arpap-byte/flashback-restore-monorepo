@@ -29,7 +29,17 @@ const faqs = [
   {
     question: "L'animation fonctionne-t-elle sur toutes les photos ?",
     answer:
-      "L&apos;animation IA est optimisée pour les portraits et les photos de personnes. L&apos;IA détecte les visages et applique des expressions naturelles. Pour les paysages ou objets sans visage, l&apos;animation sera plus subtile mais apporte tout de même une touche de vie.",
+      "L&apos;animation IA est optimisée pour les portraits de personnes. L&apos;IA détecte les visages et applique des expressions naturelles. Attention : pour des raisons de sécurité, notre IA d&apos;animation n&apos;accepte pas les photos contenant des enfants. Les photos de paysages ou d&apos;objets sans visage ne sont pas adaptées à l&apos;animation.",
+  },
+  {
+    question: "Mes photos sont-elles privées ? L&apos;entreprise y a-t-elle accès ?",
+    answer:
+      "Vos photos sont strictement privées. L&apos;équipe Flashback Restore n&apos;a aucun accès à vos images. Elles sont traitées automatiquement par notre IA puis supprimées selon votre politique de conservation. Nous ne pouvons pas voir, télécharger ou utiliser vos photos — c&apos;est une garantie fondamentale de notre service.",
+  },
+  {
+    question: "Pouvez-vous restaurer des photos que j&apos;ai perdues ou supprimées ?",
+    answer:
+      "Non, nous ne pouvons pas restaurer des photos que vous avez perdues ou supprimées de votre appareil. Flashback Restore améliore la qualité des photos que vous possédez déjà, mais ne récupère pas de données perdues. Aucune demande de restauration de photos perdues ne pourra être traitée : nous ne conservons pas de copie de vos images.",
   },
   {
     question: "Quelle est la différence entre la restauration et l&apos;animation ?",

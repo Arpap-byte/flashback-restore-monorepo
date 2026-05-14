@@ -6,7 +6,7 @@ import Image from "next/image";
 import {
   History, Image as ImageIcon, Sparkles, AlertTriangle,
   ExternalLink, Clock, Trash2, RotateCw, Video, ShieldCheck,
-  Calendar, Download, ChevronDown
+  Calendar, Download, ChevronDown, Wand2, Film,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -448,6 +448,33 @@ export default function HistoriquePage() {
                             <ImageIcon className="w-3 h-3" />
                             Original
                           </a>
+                        )}
+                        {/* Boutons d'action rapide */}
+                        {(t.url_original || t.url_resultat) && (
+                          <>
+                            <button
+                              onClick={() => {
+                                const src = t.url_resultat || t.url_original;
+                                if (src) sessionStorage.setItem("flashback_photo", getPhotoUrl(src));
+                                window.location.href = "/animate";
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
+                            >
+                              <Film className="w-3 h-3" />
+                              Animer
+                            </button>
+                            <button
+                              onClick={() => {
+                                const src = t.url_resultat || t.url_original;
+                                if (src) sessionStorage.setItem("flashback_photo", getPhotoUrl(src));
+                                window.location.href = "/restore?mode=colorize-only";
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs hover:bg-amber-500/20 transition-colors"
+                            >
+                              <Wand2 className="w-3 h-3" />
+                              Coloriser
+                            </button>
+                          </>
                         )}
                       </div>
                     </div>

@@ -32,6 +32,7 @@ export interface RestoreResult {
 export interface AnimateResult {
   message: string;
   job_id: string;
+  travail_id: string;
 }
 
 export interface AnimationStatus {
@@ -40,6 +41,8 @@ export interface AnimationStatus {
   result_url?: string;
   url_video?: string;
   message?: string;
+  travail_id?: string;
+  resolution?: string;
 }
 
 export interface CheckoutResult {
@@ -229,11 +232,13 @@ export function getPhotoUrl(chemin: string): string {
 
 export async function animatePhoto(
   file: File,
-  comportement: string = "naturel"
+  comportement: string = "naturel",
+  resolution: string = "720p"
 ): Promise<AnimateResult> {
   const formData = new FormData();
   formData.append("fichier", file);
   formData.append("comportement", comportement);
+  formData.append("resolution", resolution);
   return apiFetch<AnimateResult>("/api/animate", {
     method: "POST",
     body: formData,
@@ -241,9 +246,9 @@ export async function animatePhoto(
 }
 
 export async function checkAnimationStatus(
-  jobId: string
+  travailId: string
 ): Promise<AnimationStatus> {
-  return apiFetch<AnimationStatus>(`/api/animate/${jobId}`);
+  return apiFetch<AnimationStatus>(`/api/animate/travail/${travailId}`);
 }
 
 export async function createCheckout(

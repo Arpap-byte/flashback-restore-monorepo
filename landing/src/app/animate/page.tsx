@@ -9,6 +9,7 @@ import { useUser } from "@clerk/nextjs";
 import {
   Upload, Sparkles, AlertTriangle, X, Download, Play,
   RefreshCw, Film, Heart, Smile, Eye, Wind, Loader2,
+  Hand, Clock, Monitor,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -23,6 +24,7 @@ const COMPORTEMENTS = [
   { id: "rire", label: "Rire léger", icon: Sparkles, desc: "Un petit rire spontané et joyeux" },
   { id: "respirer", label: "Respiration", icon: Wind, desc: "Respiration visible, présence vivante" },
   { id: "clin_oeil", label: "Clin d'œil", icon: Eye, desc: "Un clin d'œil complice et naturel" },
+  { id: "salut", label: "Salut", icon: Hand, desc: "Un signe de tête et sourire pour dire bonjour" },
 ];
 
 export default function AnimatePage() {
@@ -33,8 +35,9 @@ export default function AnimatePage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [comportement, setComportement] = useState("naturel");
+  const [resolution, setResolution] = useState("720p"); // 720p par défaut
   const [animating, setAnimating] = useState(false);
-  const [jobId, setJobId] = useState<string | null>(null);
+  const [travailId, setTravailId] = useState<string | null>(null);
   const [status, setStatus] = useState<AnimationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
@@ -57,7 +60,7 @@ export default function AnimatePage() {
   }, []);
 
   useEffect(() => {
-    if (!jobId || status?.status === "termine" || status?.status === "erreur") return;
+    if (!travailId || status?.status === "termine" || status?.status === "erreur") return;
     if (pollAttempts.current === 0) pollStartTime.current = Date.now();
 
     let cancelled = false;
@@ -69,7 +72,7 @@ export default function AnimatePage() {
         return;
       }
       try {
-        const result = await checkAnimationStatus(jobId);
+        const result = await checkAnimationStatus(travailId);
         if (cancelled) return;
         setStatus(result);
         if (result.status === "termine" || result.status === "erreur") return;
@@ -85,7 +88,7 @@ export default function AnimatePage() {
     };
     poll();
     return () => { cancelled = true; if (pollRef.current) clearTimeout(pollRef.current); };
-  }, [jobId, status?.status]);
+  }, [travailId, status?.status]);
 
   const handleFile = useCallback((f: File) => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
@@ -100,7 +103,7 @@ export default function AnimatePage() {
     }
     setError(null);
     setStatus(null);
-    setJobId(null);
+    setTravailId(null);
     setFile(f);
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result as string);
@@ -121,8 +124,8 @@ export default function AnimatePage() {
     pollAttempts.current = 0;
     pollStartTime.current = 0;
     try {
-      const result = await animatePhoto(file, comportement);
-      setJobId(result.job_id);
+      const result = await animatePhoto(file, comportement, resolution);
+      setTravailId(result.travail_id);
       setStatus({ status: "en_cours" });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erreur lors du lancement de l'animation.");
@@ -134,7 +137,7 @@ export default function AnimatePage() {
 
   const handleClear = () => {
     setFile(null); setPreview(null); setStatus(null);
-    setJobId(null); setError(null); setComportement("naturel");
+    setTravailId(null); setError(null); setComportement("naturel"); setResolution("720p");
     pollAttempts.current = 0; pollStartTime.current = 0;
     sessionStorage.removeItem("flashback_photo");
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -256,6 +259,37 @@ export default function AnimatePage() {
                           <Sparkles className="w-4 h-4 text-violet-400 flex-shrink-0 mt-0.5" />
                           Animation sans parole — micro-expressions naturelles en ~5 secondes. Résultat vidéo MP4.
                         </p>
+                      </div>
+
+                      <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
+                        <p className="text-sm text-muted flex items-start gap-2">
+                          <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                          La création de l&apos;animation peut prendre <strong>2 à 3 minutes</strong>. Le temps dépend du service d&apos;animation et de la photo.
+                        </p>
+                      </div>
+
+                      {/* Toggle 1080p */}
+                      <div className="bg-card border border-card-border rounded-xl p-4">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <Monitor className="w-5 h-5 text-muted" />
+                          <div className="flex-1">
+                            <p className="text-sm font-semibold text-foreground">Qualité 1080p</p>
+                            <p className="text-xs text-muted">Haute définition — consomme <strong>+2 crédits</strong></p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={resolution === "1080p"}
+                            onClick={() => setResolution(resolution === "1080p" ? "720p" : "1080p")}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                              resolution === "1080p" ? "bg-violet-500" : "bg-muted/30"
+                            }`}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                              resolution === "1080p" ? "translate-x-6" : "translate-x-1"
+                            }`} />
+                          </button>
+                        </label>
                       </div>
 
                       <button

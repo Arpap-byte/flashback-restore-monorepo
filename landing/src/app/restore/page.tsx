@@ -26,10 +26,12 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
+import { useSearchParams } from "next/navigation";
 import { restorePhoto, colorizePhoto, getRestoredImageUrl, RestoreResult, pollRestoreJob } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
   const isAuthenticated = !!user || !!clerkUser;
@@ -63,7 +65,50 @@ export default function RestorePage() {
         })
         .catch(() => {});
     }
-  }, []);
+    // Si on vient depuis l'historique avec ?tab=colorize, pré-cocher la colorisation
+    if (searchParams.get("tab") === "colorize") {
+      setColorize(true);
+    }
+  }, [searchParams]);
+
+  // Auto-restauration quand on vient de l'historique avec ?tab=colorize
+  const hasAutoRestored = useRef(false);
+  useEffect(() => {
+    if (
+      file &&
+      !restoreResult &&
+      !restoring &&
+      searchParams.get("tab") === "colorize" &&
+      !hasAutoRestored.current
+    ) {
+      hasAutoRestored.current = true;
+      setColorize(true);
+      // Petit délai pour que l'UI s'affiche avant le traitement
+      const timer = setTimeout(() => {
+        handleRestore();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [file, restoreResult, restoring, searchParams]);
+
+  // Colorisation directe depuis l'historique (?mode=colorize-only)
+  const hasAutoColorized = useRef(false);
+  useEffect(() => {
+    if (
+      file &&
+      !restoreResult &&
+      !colorizing &&
+      searchParams.get("mode") === "colorize-only" &&
+      !hasAutoColorized.current
+    ) {
+      hasAutoColorized.current = true;
+      // Petit délai pour que l'UI s'affiche avant le traitement
+      const timer = setTimeout(() => {
+        handleColorizeDirect();
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [file, restoreResult, colorizing, searchParams]);
 
   const handleFile = useCallback((f: File) => {
     const validTypes = ["image/jpeg", "image/png", "image/webp"];
@@ -150,6 +195,29 @@ export default function RestorePage() {
           ? err.message
           : "Erreur lors de la colorisation. Veuillez réessayer."
       );
+      setTimeout(() => setError(null), 6000);
+    } finally {
+      setColorizing(false);
+    }
+  };
+
+  // Colorisation standalone (depuis l'historique, sans re-restauration)
+  const handleColorizeDirect = async () => {
+    if (!file) return;
+    setColorizing(true);
+    setError(null);
+    setRestoreProgress("Colorisation en cours...");
+    try {
+      const result = await colorizePhoto(file);
+      setRestoreResult(result);
+      setRestoreProgress("");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erreur lors de la colorisation. Veuillez réessayer."
+      );
+      setRestoreProgress("");
       setTimeout(() => setError(null), 6000);
     } finally {
       setColorizing(false);
@@ -314,7 +382,7 @@ export default function RestorePage() {
               )}
 
               {/* Restore button or progress */}
-              {!restoring && !restoreResult ? (
+              {!restoring && !colorizing && !restoreResult ? (
                 /* Photo loaded, ready to restore */
                 <div className="flex flex-col items-center gap-4">
                   <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-surface border border-card-border">
@@ -344,8 +412,8 @@ export default function RestorePage() {
                     </button>
                   </div>
                 </div>
-              ) : restoring && !restoreResult ? (
-                /* Restoring in progress */
+              ) : (restoring || colorizing) && !restoreResult ? (
+                /* Processing in progress */
                 <div className="flex flex-col items-center py-12">
                   <div className="w-20 h-20 relative mb-6">
                     <div className="absolute inset-0 rounded-full border-4 border-accent/20" />

@@ -17,6 +17,7 @@ from app.db.queries import (
     enregistrer_animation,
     obtenir_credits_restants,
     peut_animer as _db_peut_animer,
+    rembourser_credit,
 )
 
 logger = logging.getLogger(__name__)
@@ -98,3 +99,31 @@ async def consommer_operation(utilisateur_id: str, type_operation: str, travail_
             f"Crédit consommé pour {type_operation}, "
             f"utilisateur={utilisateur_id}, travail={travail_id}"
         )
+
+
+async def rembourser_operation(utilisateur_id: str, travail_id: str) -> dict:
+    """
+    Rembourse un crédit/essai pour une opération annulée ou échouée.
+
+    Utilisé quand le traitement externe (ex: Veo) échoue APRÈS
+    que le crédit a été consommé (filtre sécurité, erreur API, etc.).
+
+    Args:
+        utilisateur_id: Identifiant de l'utilisateur.
+        travail_id: Identifiant du travail associé à la consommation.
+
+    Returns:
+        dict: {"succes": bool, "type": "essai"|"credit"|"aucun", "message": str}
+    """
+    resultat = await rembourser_credit(utilisateur_id, travail_id)
+    if resultat["succes"]:
+        logger.info(
+            f"Remboursement {resultat['type']} — "
+            f"utilisateur={utilisateur_id}, travail={travail_id}"
+        )
+    else:
+        logger.warning(
+            f"Échec remboursement — utilisateur={utilisateur_id}, "
+            f"travail={travail_id}: {resultat['message']}"
+        )
+    return resultat

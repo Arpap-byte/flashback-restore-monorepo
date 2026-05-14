@@ -47,7 +47,10 @@ async def _nettoyer_async() -> dict:
 
         for travail, retention in rows:
             retention = retention or 30
-            date_expiration = travail.cree_le + timedelta(days=retention)
+            cree_le = travail.cree_le
+            if cree_le.tzinfo is None:
+                cree_le = cree_le.replace(tzinfo=timezone.utc)
+            date_expiration = cree_le + timedelta(days=retention)
 
             if maintenant <= date_expiration:
                 continue  # Pas encore expiré

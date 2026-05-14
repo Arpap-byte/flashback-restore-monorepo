@@ -640,6 +640,97 @@ async def consommer_credit(
             }
 
 
+async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
+    """
+    Rembourse un crédit/essai consommé pour un travail.
+
+    Vérifie si le travail a consommé un essai gratuit ou un crédit
+    payant, et annule la consommation. L'incrémentation du compteur
+    d'animations est également annulée.
+
+    Returns:
+        {"succes": True/False, "type": "essai"|"credit"|"aucun", "message": ...}
+    """
+    async with async_session() as session:
+        async with session.begin():
+            # 1. Vérifier si c'était un essai gratuit
+            stmt_essai = select(EssaiGratuit).where(
+                and_(
+                    EssaiGratuit.utilisateur_id == utilisateur_id,
+                    EssaiGratuit.travail_id == travail_id,
+                )
+            )
+            result_essai = await session.execute(stmt_essai)
+            essai = result_essai.scalar_one_or_none()
+
+            if essai:
+                # Rembourser l'essai
+                await session.delete(essai)
+                await session.execute(
+                    update(Utilisateur)
+                    .where(Utilisateur.id == utilisateur_id)
+                    .values(essais_restants=Utilisateur.essais_restants + 1)
+                )
+                # Annuler l'incrémentation du compteur d'animations
+                await session.execute(
+                    update(Utilisateur)
+                    .where(
+                        and_(
+                            Utilisateur.id == utilisateur_id,
+                            Utilisateur.animations_utilisees > 0,
+                        )
+                    )
+                    .values(animations_utilisees=Utilisateur.animations_utilisees - 1)
+                )
+                return {
+                    "succes": True,
+                    "type": "essai",
+                    "message": "Essai gratuit remboursé",
+                }
+
+            # 2. Vérifier si c'était un crédit payant
+            stmt_credit = select(ConsommationCredits).where(
+                and_(
+                    ConsommationCredits.utilisateur_id == utilisateur_id,
+                    ConsommationCredits.travail_id == travail_id,
+                )
+            )
+            result_credit = await session.execute(stmt_credit)
+            conso = result_credit.scalar_one_or_none()
+
+            if conso:
+                credits_utilises = conso.credits_utilises
+                await session.delete(conso)
+                await session.execute(
+                    update(Utilisateur)
+                    .where(Utilisateur.id == utilisateur_id)
+                    .values(credits=Utilisateur.credits + credits_utilises)
+                )
+                # Annuler l'incrémentation du compteur d'animations
+                await session.execute(
+                    update(Utilisateur)
+                    .where(
+                        and_(
+                            Utilisateur.id == utilisateur_id,
+                            Utilisateur.animations_utilisees > 0,
+                        )
+                    )
+                    .values(animations_utilisees=Utilisateur.animations_utilisees - 1)
+                )
+                return {
+                    "succes": True,
+                    "type": "credit",
+                    "message": f"{credits_utilises} crédit(s) remboursé(s)",
+                }
+
+            # Aucune consommation trouvée
+            return {
+                "succes": False,
+                "type": "aucun",
+                "message": "Aucune consommation trouvée pour ce travail",
+            }
+
+
 async def enregistrer_achat_credits(
     utilisateur_id: str,
     stripe_session_id: str,

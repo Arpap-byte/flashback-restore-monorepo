@@ -1,7 +1,7 @@
 "use client";
 
 import { useUser, useClerk } from "@clerk/nextjs";
-import React, { createContext, useContext, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useMemo, useCallback, useEffect } from "react";
 
 export interface User {
   id: string;
@@ -38,8 +38,26 @@ function AuthInner({ children }: { children: React.ReactNode }) {
   }, [clerkUser, isLoaded]);
 
   const logout = useCallback(async () => {
+    // Nettoyer les donnees de session partagees avant la deconnexion
+    sessionStorage.removeItem("flashback_photo");
+    sessionStorage.removeItem("flashback_user_id");
     await signOut();
   }, [signOut]);
+
+  // Nettoyer sessionStorage quand l'utilisateur change (empeche les fuites cross-compte)
+  useEffect(() => {
+    if (user?.id) {
+      const storedId = sessionStorage.getItem("flashback_user_id");
+      if (storedId && storedId !== user.id) {
+        sessionStorage.removeItem("flashback_photo");
+      }
+      sessionStorage.setItem("flashback_user_id", user.id);
+    } else if (isLoaded) {
+      // Deconnecte
+      sessionStorage.removeItem("flashback_photo");
+      sessionStorage.removeItem("flashback_user_id");
+    }
+  }, [user?.id, isLoaded]);
 
   return (
     <AuthContext.Provider value={{ user, loading: !isLoaded, logout }}>

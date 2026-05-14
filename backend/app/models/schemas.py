@@ -36,7 +36,7 @@ class AnalyseReponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class ParametresRestauration(BaseModel):
-    """Paramètres de restauration extraits par Gemini."""
+    "Paramètres de restauration extraits par notre IA."
 
     luminosite: float = Field(
         default=1.0, ge=0.5, le=2.0,
@@ -83,11 +83,11 @@ class RestaurationReponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Animation (D-ID)
+# Animation
 # ---------------------------------------------------------------------------
 
 class AnimationRequete(BaseModel):
-    """Requête pour créer une animation D-ID."""
+    "Requête pour créer une animation."
 
     texte: str = Field(
         default="Bonjour ! Je suis un souvenir restauré.",
@@ -103,11 +103,11 @@ class AnimationReponse(BaseModel):
     """Réponse après soumission d'une animation."""
 
     message: str = Field(..., description="Message de confirmation")
-    job_id: str = Field(..., description="Identifiant du travail D-ID pour suivi")
+    job_id: str = Field(..., description="Identifiant du travail pour suivi")
 
 
 class StatutAnimation(str, Enum):
-    """Statuts possibles d'une animation D-ID."""
+    """Statut d'une animation."""
 
     EN_ATTENTE = "en_attente"
     EN_COURS = "en_cours"

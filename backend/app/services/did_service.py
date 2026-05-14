@@ -14,7 +14,10 @@ from typing import Optional
 
 import httpx
 
-from app.config import DID_API_KEY, DID_BASE_URL
+from app.config import DID_API_KEY, DID_BASE_URL, PUBLIC_BACKEND_URL
+
+# URL du fichier audio silencieux (5 secondes) pour les animations sans parole
+SILENCE_AUDIO_URL = f"{PUBLIC_BACKEND_URL}/uploads/silence_5s.wav"
 
 logger = logging.getLogger(__name__)
 
@@ -25,13 +28,24 @@ _HEADERS = {
     "Accept": "application/json",
 }
 
-# Scripts silencieux pour les comportements sans parole
-COMPORTEMENT_SCRIPTS: dict[str, str] = {
-    "sourire": "            ",  # 12 espaces → ~0.5s de silence, le driver fait le reste
-    "rire": "                    ",
-    "respirer": "               ",
-    "clin_oeil": "            ",
-    "naturel": "               ",
+# Mapping des comportements FR → expressions D-ID (anglais obligatoire)
+COMPORTEMENT_VERS_EXPRESSION: dict[str, str] = {
+    "naturel": "neutral",
+    "sourire": "happy",
+    "rire": "happy",
+    "respirer": "neutral",
+    "clin_oeil": "surprise",
+    "salut": "happy",
+}
+
+# Intensité par comportement (certains sont plus marqués)
+INTENSITE_PAR_COMPORTEMENT: dict[str, float] = {
+    "naturel": 0.3,
+    "sourire": 0.6,
+    "rire": 0.8,
+    "respirer": 0.2,
+    "clin_oeil": 0.7,
+    "salut": 0.5,
 }
 
 
@@ -46,31 +60,26 @@ async def creer_animation(
     Args:
         url_photo: URL publique de la photo à animer.
         comportement: Type de micro-expression (« sourire », « rire »,
-                      « respirer », « clin_oeil », « naturel »).
+                      « respirer », « clin_oeil », « salut », « naturel »).
         duree_sec: Durée cible en secondes (défaut 5s).
 
     Returns:
         L'identifiant du travail D-ID (job ID).
     """
-    # Script minimal pour déclencher l'animation faciale sans parole
-    script_silencieux = COMPORTEMENT_SCRIPTS.get(
-        comportement,
-        " " * (duree_sec * 3),  # fallback : espaces proportionnels à la durée
-    )
+    # Traduction FR → EN pour l'API D-ID
+    expression_en = COMPORTEMENT_VERS_EXPRESSION.get(comportement, "neutral")
+    intensite = INTENSITE_PAR_COMPORTEMENT.get(comportement, 0.4)
 
     logger.info(
-        f"Création animation D-ID sans parole : comportement={comportement}, "
-        f"duree={duree_sec}s, photo={url_photo}"
+        f"Création animation D-ID sans parole : comportement={comportement} "
+        f"→ expression={expression_en}, intensité={intensite}, "
+        f"photo={url_photo}"
     )
 
     corps: dict = {
         "script": {
-            "type": "text",
-            "input": script_silencieux,
-            "provider": {
-                "type": "microsoft",
-                "voice_id": "fr-FR-DeniseNeural",
-            },
+            "type": "audio",
+            "audio_url": SILENCE_AUDIO_URL,  # 5s de silence → pas de parole
         },
         "source_url": url_photo,
         "config": {
@@ -78,15 +87,15 @@ async def creer_animation(
             "stitch": True,
             "driver_expressions": {
                 "expressions": [
-                    {"expression": comportement, "start_frame": 0, "intensity": 0.7}
+                    {
+                        "expression": expression_en,
+                        "start_frame": 0,
+                        "intensity": intensite,
+                    }
                 ]
-            } if comportement != "naturel" else {},
+            },
         },
     }
-
-    # Ajouter le driver d'expression seulement si pas "naturel"
-    if comportement == "naturel":
-        del corps["config"]["driver_expressions"]
 
     async with httpx.AsyncClient(timeout=30.0) as client:
         response = await client.post(
@@ -94,6 +103,11 @@ async def creer_animation(
             headers=_HEADERS,
             json=corps,
         )
+        # En cas d'erreur 400, log le corps de la réponse pour diagnostic
+        if response.status_code >= 400:
+            logger.error(
+                f"D-ID API error {response.status_code}: {response.text[:500]}"
+            )
         response.raise_for_status()
         data = response.json()
 

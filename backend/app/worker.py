@@ -123,7 +123,7 @@ async def restauration_job(
         try:
             from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
             if b2_est_disponible():
-                cle = generer_cle_distant("resultats", chemin_final.name)
+                cle = generer_cle_distant("resultats", chemin_final.name, utilisateur_id)
                 url_b2 = uploader_bytes(chemin_final.read_bytes(), cle, "image/jpeg")
                 logger.info("Résultat uploadé vers B2: %s", url_b2)
         except Exception as e:
@@ -162,63 +162,124 @@ async def restauration_job(
 
 
 # ---------------------------------------------------------------------------
-# Job : Animation D-ID
+# Job : Animation Veo
 # ---------------------------------------------------------------------------
 
 async def animation_job(
     ctx: dict,
-    utilisateur_id: int,
+    utilisateur_id: str,
     chemin_original: str,
     comportement: str,
-    travail_id: int,
+    travail_id: str,
+    resolution: str = "720p",
 ) -> dict:
     """
-    Crée une animation faciale D-ID sans parole dans le worker ARQ.
+    Crée une animation faciale via Google Veo 3.1 dans le worker ARQ.
 
     Le fichier est déjà sauvegardé par le handler HTTP.
-    Le job appelle l'API D-ID et met à jour le travail en base.
+    Le job soumet à Veo (Lite → fallback Fast si overload),
+    fait un polling côté serveur, et sauvegarde la vidéo localement.
+    Aucune dépendance au navigateur de l'utilisateur.
 
     Returns:
-        dict avec les clés : message, job_id (D-ID)
+        dict avec les clés : message, url_video
     """
-    from app.services.did_service import creer_animation
+    from app.services.veo_service import creer_animation_veo
 
-    nom_fichier = Path(chemin_original).name
     logger.info(
-        f"[ARQ] Démarrage animation — travail_id={travail_id}, "
-        f"comportement={comportement}, fichier={chemin_original}"
+        f"[ARQ] Démarrage animation Veo — travail_id={travail_id}, "
+        f"comportement={comportement}, resolution={resolution}, "
+        f"fichier={chemin_original}"
     )
 
     try:
-        # Construction de l'URL publique
-        url_photo = f"{PUBLIC_BACKEND_URL}/uploads/{nom_fichier}"
-
-        # Appel à l'API D-ID (animation sans parole, 5 secondes)
-        job_did = await creer_animation(url_photo, comportement=comportement)
-
-        # Association du job D-ID au travail local
+        # Mise à jour statut
         await mettre_a_jour_travail(
             travail_id,
             statut="en_cours",
-            resultat_json=json.dumps({"job_did": job_did}),
+            resultat_json=json.dumps({
+                "comportement": comportement,
+                "resolution": resolution,
+            }),
         )
-        await mettre_a_jour_job_externe_id(travail_id, job_did)
+
+        # Appel Veo (polling + download inclus dans le service)
+        chemin_video, url_video = await creer_animation_veo(
+            chemin_photo=chemin_original,
+            comportement=comportement,
+            duree=6,
+            resolution=resolution,
+        )
+
+        taille_video = Path(chemin_video).stat().st_size
+        logger.info(
+            f"[ARQ] Veo animation sauvegardée — {chemin_video} "
+            f"({taille_video} octets)"
+        )
+
+        # Upload B2
+        url_b2 = None
+        try:
+            from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
+            if b2_est_disponible():
+                cle = generer_cle_distant("animations", Path(chemin_video).name, utilisateur_id)
+                url_b2 = uploader_bytes(
+                    Path(chemin_video).read_bytes(), cle, "video/mp4"
+                )
+                logger.info("Animation uploadée vers B2: %s", url_b2)
+        except Exception as e:
+            logger.warning("Échec upload B2 animation (fallback local): %s", e)
+
+        # Mise à jour finale du travail
+        await mettre_a_jour_chemin_animation(travail_id, chemin_video)
+        await mettre_a_jour_travail(
+            travail_id,
+            statut="termine",
+            chemin_resultat=url_video,
+            taille_resultat=taille_video,
+            resultat_json=json.dumps({
+                "local": chemin_video,
+                "url_video": url_video,
+                "url_b2": url_b2,
+                "comportement": comportement,
+                "resolution": resolution,
+            }),
+        )
 
         logger.info(
-            f"[ARQ] Animation créée — travail_id={travail_id}, "
-            f"job_did={job_did}"
+            f"[ARQ] Veo animation terminée avec succès — travail_id={travail_id}"
         )
         return {
-            "message": "Animation créée avec succès. Vous pouvez suivre sa progression.",
-            "job_id": job_did,
+            "message": "Animation terminée avec succès.",
+            "url_video": url_video,
         }
 
     except Exception as e:
-        logger.exception(f"[ARQ] Erreur animation — travail_id={travail_id} : {e}")
+        logger.exception(f"[ARQ] Erreur animation Veo — travail_id={travail_id} : {e}")
+        msg_erreur = str(e)
+
+        # Rembourser le crédit consommé si l'erreur est externe (filtre sécurité, API overload, etc.)
+        est_erreur_externe = any(kw in msg_erreur.lower() for kw in [
+            "filtré", "filtered", "sécurité", "safety",
+            "high demand", "overload", "internal server error",
+        ])
+        if est_erreur_externe:
+            try:
+                from app.services.credits import rembourser_operation
+                remb = await rembourser_operation(utilisateur_id, travail_id)
+                if remb["succes"]:
+                    msg_erreur += f" ({remb['message']})"
+                    logger.info(
+                        f"[ARQ] Crédit remboursé — travail_id={travail_id}, "
+                        f"type={remb['type']}"
+                    )
+            except Exception as remb_e:
+                logger.error(f"[ARQ] Échec remboursement — travail_id={travail_id}: {remb_e}")
+
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
-            message_erreur=str(e),
+            message_erreur=msg_erreur,
         )
         raise
 
@@ -236,5 +297,5 @@ class WorkerSettings:
     functions = [restauration_job, animation_job]
     redis_settings = RedisSettings(host='localhost', port=6379)
     max_jobs = 10  # Limite de jobs concurrents par worker
-    job_timeout = 600  # Timeout max par job (10 minutes, D-ID peut être lent)
+    job_timeout = 600  # Timeout max par job (10 minutes, Veo peut être lent)
     keep_result = 3600  # Garde les résultats 1h dans Redis

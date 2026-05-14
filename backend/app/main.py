@@ -10,10 +10,9 @@ import os
 import sys
 
 import sentry_sdk
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
 from sentry_sdk.integrations.starlette import StarletteIntegration
@@ -21,6 +20,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from app.api.auth import router as auth_router
 from app.api.routes import router
 from app.api.user import router as user_router
+from app.auth import exiger_utilisateur
 from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT, SENTRY_DSN
 from app.db.session import init_db as async_initialiser_base
 from app.rate_limit_middleware import check_rate_limit
@@ -137,6 +137,15 @@ async def ajouter_headers_securite(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Strict-Transport-Security"] = "max-age=63072000"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' https://js.stripe.com; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.com; "
+        "frame-src 'self' https://*.clerk.accounts.dev https://js.stripe.com"
+    )
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
 
 
@@ -144,7 +153,7 @@ async def ajouter_headers_securite(request: Request, call_next):
 async def ajouter_cache_control_uploads(request: Request, call_next):
     response = await call_next(request)
     if request.url.path.startswith("/uploads/"):
-        response.headers["Cache-Control"] = "public, max-age=86400"
+        response.headers["Cache-Control"] = "no-store, private"
     return response
 
 
@@ -157,10 +166,64 @@ app.include_router(auth_router)
 app.include_router(user_router)
 
 # ---------------------------------------------------------------------------
-# Fichiers statiques (uploads)
+# Fichiers uploads — protégé par authentification + ownership
 # ---------------------------------------------------------------------------
 
-app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+# IMPORTANT : Les uploads NE SONT PLUS publics.
+# Le montage StaticFiles a été remplacé par un endpoint protégé.
+
+
+@app.get("/uploads/{filename:path}")
+async def servir_upload_protege(
+    filename: str,
+    request: Request,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """
+    Sert un fichier uploadé UNIQUEMENT à son propriétaire.
+
+    - Authentification obligatoire via Bearer token
+    - Vérification que le fichier appartient à l'utilisateur connecté
+    - Les admins (X-Admin-Key) peuvent accéder aux fichiers orphelins
+    """
+    from pathlib import Path as _Path
+
+    from fastapi.responses import FileResponse
+    from sqlalchemy import text as _sa_text
+
+    from app.config import ADMIN_API_KEY
+    from app.db.session import async_session
+
+    chemin = (_Path(UPLOAD_DIR) / filename).resolve()
+    upload_root = _Path(UPLOAD_DIR).resolve()
+
+    # Anti directory traversal
+    if not str(chemin).startswith(str(upload_root)):
+        raise HTTPException(status_code=403, detail="Chemin interdit.")
+    if not chemin.is_file():
+        raise HTTPException(status_code=404, detail="Fichier introuvable.")
+
+    # Vérifier ownership
+    async with async_session() as session:
+        row = (await session.execute(
+            _sa_text("""
+                SELECT utilisateur_id FROM travaux
+                WHERE chemin_photo = :c OR chemin_resultat = :c
+                   OR chemin_animation = :c
+                LIMIT 1
+            """),
+            {"c": str(chemin)}
+        )).fetchone()
+
+    if row is None:
+        # Fichier orphelin — admin only
+        admin_key = request.headers.get("X-Admin-Key")
+        if not ADMIN_API_KEY or admin_key != ADMIN_API_KEY:
+            raise HTTPException(status_code=403, detail="Accès non autorisé.")
+    elif row[0] != utilisateur["id"]:
+        raise HTTPException(status_code=403, detail="Ce fichier ne vous appartient pas.")
+
+    return FileResponse(str(chemin))
 
 
 # ---------------------------------------------------------------------------
