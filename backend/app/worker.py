@@ -37,6 +37,7 @@ async def restauration_job(
     coloriser: bool,
     travail_id: int,
     nb_credits_total: int,
+    resolution: str = "720p",
 ) -> dict:
     """
     Exécute le pipeline complet de restauration dans le worker ARQ.
@@ -61,7 +62,7 @@ async def restauration_job(
 
     logger.info(
         f"[ARQ] Démarrage restauration — travail_id={travail_id}, "
-        f"fichier={chemin_original}, coloriser={coloriser}"
+        f"fichier={chemin_original}, coloriser={coloriser}, resolution={resolution}"
     )
 
     try:

@@ -344,7 +344,7 @@ export default function DashboardPage() {
     ? userMe.plan === "pro"
       ? "Illimités"
       : userMe.plan === "gratuit"
-        ? `${Math.max(0, userMe.essais_restants)}`
+        ? `${Math.max(0, userMe.credits)}`
         : `${Math.max(0, userMe.credits)}`
     : "—";
 

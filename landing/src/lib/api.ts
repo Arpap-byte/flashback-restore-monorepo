@@ -187,11 +187,14 @@ export interface RestoreJobResponse {
   message: string;
 }
 
-export async function restorePhoto(file: File, colorize?: boolean): Promise<RestoreJobResponse> {
+export async function restorePhoto(file: File, colorize?: boolean, resolution?: string): Promise<RestoreJobResponse> {
   const formData = new FormData();
   formData.append("fichier", file);
   if (colorize) {
     formData.append("coloriser", "true");
+  }
+  if (resolution) {
+    formData.append("resolution", resolution);
   }
   const raw = await apiFetch<{ job_id: string; travail_id: string; message: string }>("/api/restore", {
     method: "POST",
@@ -277,8 +280,8 @@ export function getPhotoUrl(chemin: string, token?: string | null): string {
     ? window.location.origin
     : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
   let url = `${base}${chemin}`;
-  // Côté client avec token : ajouter le query param (contourne l'absence de header Authorization sur <img>)
-  if (typeof window !== "undefined" && token && url.includes("/uploads/")) {
+  // Si l'URL contient déjà un ?token= (ajouté par le backend), ne pas en rajouter
+  if (typeof window !== "undefined" && token && url.includes("/uploads/") && !url.includes("?token=")) {
     url += `?token=${encodeURIComponent(token)}`;
   }
   return url;

@@ -6,7 +6,7 @@ import Image from "next/image";
 import {
   History, Image as ImageIcon, Sparkles, AlertTriangle,
   ExternalLink, Clock, Trash2, RotateCw, Video, ShieldCheck,
-  Calendar, Download, ChevronDown, Wand2, Film,
+  Calendar, Download, ChevronDown, Wand2, Film, Upload, Camera,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -84,6 +84,7 @@ export default function HistoriquePage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [retentionOpen, setRetentionOpen] = useState(false);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<"importees" | "retouchees" | "animations">("retouchees");
 
   // Récupérer le token JWT pour les URLs d'images (nécessaire car <img> ne peut pas envoyer de header Authorization)
   useEffect(() => {
@@ -203,6 +204,28 @@ export default function HistoriquePage() {
   const travaux = data?.travaux || [];
   const retention = data?.retention_jours || 30;
 
+  // Filtrer + dédoublonner selon l'onglet actif
+  const filteredTravaux = (() => {
+    if (activeTab === "importees") {
+      // Photos brutes : url_original des restaurations/colorisations, dédoublonnées
+      const seen = new Set<string>();
+      return travaux.filter((t) => {
+        if (t.type === "animation") return false; // pas de photo brute pour les animations
+        const key = t.url_original || "";
+        if (!key || seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    if (activeTab === "retouchees") {
+      return travaux.filter((t) =>
+        (t.type === "restauration" || t.type === "colorisation") && t.statut === "termine"
+      );
+    }
+    // animations
+    return travaux.filter((t) => t.type === "animation");
+  })();
+
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <Navbar />
@@ -231,8 +254,47 @@ export default function HistoriquePage() {
             </h1>
           </motion.div>
 
+          {/* Barre d'onglets */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-center mb-8"
+          >
+            <div className="inline-flex bg-card border border-card-border rounded-2xl p-1.5 gap-1">
+              {([
+                { key: "importees", label: "Importées", icon: Upload },
+                { key: "retouchees", label: "Retouchées", icon: Sparkles },
+                { key: "animations", label: "Animations", icon: Film },
+              ] as const).map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                    activeTab === key
+                      ? "bg-accent text-white dark:text-gray-950 shadow-lg shadow-accent/20"
+                      : "text-muted hover:text-foreground hover:bg-surface-alt"
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* Count */}
+          {filteredTravaux.length > 0 && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center text-xs text-muted mb-4"
+            >
+              {filteredTravaux.length} élément{filteredTravaux.length > 1 ? "s" : ""}
+            </motion.p>
+          )}
+
           {/* Retention + Delete all bar */}
-          {travaux.length > 0 && (
+          {filteredTravaux.length > 0 && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -317,7 +379,7 @@ export default function HistoriquePage() {
           )}
 
           {/* Empty state */}
-          {travaux.length === 0 ? (
+          {filteredTravaux.length === 0 ? (
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -344,9 +406,15 @@ export default function HistoriquePage() {
               animate={{ opacity: 1, y: 0 }}
               className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              {travaux.map((t, i) => {
+              {filteredTravaux.map((t, i) => {
                 const Icon = TYPE_ICONS[t.type] || ImageIcon;
                 const expiration = formatExpiration(t.expire_le);
+                // Choisir l'URL selon l'onglet
+                const photoUrl = activeTab === "importees"
+                  ? (t.url_original || null)
+                  : activeTab === "retouchees"
+                    ? (t.url_resultat || t.url_original || null)
+                    : (t.url_animation || t.url_original || null);
                 const hasResult = t.url_resultat && t.statut === "termine";
                 const hasAnimation = t.url_animation && t.statut === "termine";
                 const isDeleting = deleting === t.id;
@@ -360,10 +428,10 @@ export default function HistoriquePage() {
                     className="bg-card border border-card-border rounded-2xl overflow-hidden hover:border-accent/30 transition-all group relative"
                   >
                     {/* Photo preview */}
-                    {(t.url_resultat || t.url_original) && (
+                    {photoUrl && (
                       <div className="aspect-[4/3] bg-surface-alt overflow-hidden relative">
                         <Image
-                          src={getPhotoUrl(t.url_resultat || t.url_original!, authToken)}
+                          src={getPhotoUrl(photoUrl, authToken)}
                           alt={TYPE_LABELS[t.type] || t.type}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -424,42 +492,44 @@ export default function HistoriquePage() {
 
                       {/* Action buttons */}
                       <div className="flex flex-wrap gap-1.5 mt-3">
-                        {hasResult && (
-                          <a
-                            href={getPhotoUrl(t.url_resultat!, authToken)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            Résultat
-                          </a>
-                        )}
-                        {hasAnimation && (
-                          <a
-                            href={getPhotoUrl(t.url_animation!, authToken)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
-                          >
-                            <Video className="w-3 h-3" />
-                            Animation
-                          </a>
-                        )}
-                        {t.url_original && (
-                          <a
-                            href={getPhotoUrl(t.url_original!, authToken)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface text-muted text-xs hover:text-foreground hover:bg-surface-alt transition-colors"
-                          >
-                            <ImageIcon className="w-3 h-3" />
-                            Original
-                          </a>
-                        )}
-                        {/* Boutons d'action rapide */}
-                        {(t.url_original || t.url_resultat) && (
+                        {/* Importées : boutons Restaurer + Animer */}
+                        {activeTab === "importees" && (
                           <>
+                            <a
+                              href={`/restore?photo=${encodeURIComponent(getPhotoUrl(t.url_original!, authToken))}`}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
+                            >
+                              <Sparkles className="w-3 h-3" />
+                              Restaurer
+                            </a>
+                            <button
+                              onClick={async () => {
+                                const url = await getPhotoUrlAsync(t.url_original!);
+                                sessionStorage.setItem("flashback_photo", url);
+                                window.location.href = "/animate";
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
+                            >
+                              <Film className="w-3 h-3" />
+                              Animer
+                            </button>
+                          </>
+                        )}
+
+                        {/* Retouchées : Résultat + Animer + Coloriser */}
+                        {activeTab === "retouchees" && (
+                          <>
+                            {hasResult && (
+                              <a
+                                href={getPhotoUrl(t.url_resultat!, authToken)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                                Résultat
+                              </a>
+                            )}
                             <button
                               onClick={async () => {
                                 const src = t.url_resultat || t.url_original;
@@ -474,20 +544,50 @@ export default function HistoriquePage() {
                               <Film className="w-3 h-3" />
                               Animer
                             </button>
-                            <button
-                              onClick={async () => {
-                                const src = t.url_resultat || t.url_original;
-                                if (src) {
-                                  const url = await getPhotoUrlAsync(src);
-                                  sessionStorage.setItem("flashback_photo", url);
-                                }
-                                window.location.href = "/restore?mode=colorize-only";
-                              }}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs hover:bg-amber-500/20 transition-colors"
-                            >
-                              <Wand2 className="w-3 h-3" />
-                              Coloriser
-                            </button>
+                            {t.type === "restauration" && (
+                              <button
+                                onClick={async () => {
+                                  const src = t.url_resultat || t.url_original;
+                                  if (src) {
+                                    const url = await getPhotoUrlAsync(src);
+                                    sessionStorage.setItem("flashback_photo", url);
+                                  }
+                                  window.location.href = "/restore?mode=colorize-only";
+                                }}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs hover:bg-amber-500/20 transition-colors"
+                              >
+                                <Wand2 className="w-3 h-3" />
+                                Coloriser
+                              </button>
+                            )}
+                          </>
+                        )}
+
+                        {/* Animations : Vidéo ou erreur */}
+                        {activeTab === "animations" && (
+                          <>
+                            {hasAnimation && (
+                              <a
+                                href={getPhotoUrl(t.url_animation!, authToken)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
+                              >
+                                <Video className="w-3 h-3" />
+                                Voir l'animation
+                              </a>
+                            )}
+                            {t.url_original && (
+                              <a
+                                href={getPhotoUrl(t.url_original!, authToken)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface text-muted text-xs hover:text-foreground hover:bg-surface-alt transition-colors"
+                              >
+                                <ImageIcon className="w-3 h-3" />
+                                Photo source
+                              </a>
+                            )}
                           </>
                         )}
                       </div>
@@ -499,13 +599,13 @@ export default function HistoriquePage() {
           )}
 
           {/* Summary footer */}
-          {travaux.length > 0 && data && (
+          {filteredTravaux.length > 0 && data && (
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="text-center text-xs text-muted mt-8"
             >
-              {data.total} travail{data.total > 1 ? "x" : ""} · Conservation : {RETENTION_LABELS[retention]} ·{" "}
+              {data.total} travail{data.total > 1 ? "x" : ""} au total · Conservation : {RETENTION_LABELS[retention]} ·{" "}
               Les fichiers sont automatiquement supprimés après expiration.
             </motion.p>
           )}

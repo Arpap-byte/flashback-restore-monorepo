@@ -308,7 +308,7 @@ export default function AnimatePage() {
                           <Monitor className="w-5 h-5 text-muted" />
                           <div className="flex-1">
                             <p className="text-sm font-semibold text-foreground">Qualité 1080p</p>
-                            <p className="text-xs text-muted">Haute définition — consomme <strong>+2 crédits</strong></p>
+                            <p className="text-xs text-muted">Haute définition — <strong>20 crédits</strong> (au lieu de 10)</p>
                           </div>
                           <button
                             type="button"
@@ -324,6 +324,14 @@ export default function AnimatePage() {
                             }`} />
                           </button>
                         </label>
+                      </div>
+
+                      {/* Résumé coût */}
+                      <div className="bg-surface rounded-xl p-3 flex items-center justify-between">
+                        <span className="text-sm text-muted">Coût de l&apos;animation</span>
+                        <span className="text-sm font-semibold text-foreground">
+                          {resolution === "1080p" ? "20" : "10"} crédits
+                        </span>
                       </div>
 
                       <button

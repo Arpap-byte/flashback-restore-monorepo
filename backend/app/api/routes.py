@@ -82,6 +82,27 @@ from app.services.stripe_service import (
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Grille tarifaire — résolutions et crédits
+# ---------------------------------------------------------------------------
+
+TARIF_RESTAURATION: dict[str, int] = {
+    "720p": 1,
+    "1080p": 2,
+    "4k": 4,
+}
+
+TARIF_COLORISATION: dict[str, int] = {
+    "720p": 1,
+    "1080p": 2,
+    "4k": 4,
+}
+
+TARIF_ANIMATION: dict[str, int] = {
+    "720p": 10,
+    "1080p": 20,
+}
+
 router = APIRouter(prefix="/api")
 
 # ---------------------------------------------------------------------------
@@ -863,6 +884,7 @@ async def restaurer(
     request: Request,
     fichier: UploadFile = File(...),
     coloriser: bool = Form(False),
+    resolution: str = Form("720p"),
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
@@ -887,9 +909,13 @@ async def restaurer(
     Returns:
         job_id pour suivre la progression + message de confirmation.
     """
-    nb_credits_total = 1  # restauration de base = 1 crédit
+    # Valider la résolution
+    if resolution not in TARIF_RESTAURATION:
+        raise HTTPException(status_code=400, detail=f"Résolution invalide : {resolution}. Options : 720p, 1080p, 4k")
+
+    nb_credits_total = TARIF_RESTAURATION[resolution]
     if coloriser:
-        nb_credits_total = 2
+        nb_credits_total += TARIF_COLORISATION[resolution]
 
     # Vérifier les crédits AVANT de sauvegarder le fichier
     for i in range(nb_credits_total):
@@ -933,11 +959,12 @@ async def restaurer(
             coloriser,
             travail_id,
             nb_credits_total,
+            resolution,
         )
         # Stocker le job_id ARQ dans le travail pour le suivi
         await mettre_a_jour_travail(
             travail_id,
-            resultat_json=json.dumps({"arq_job_id": job.job_id, "coloriser": coloriser}),
+            resultat_json=json.dumps({"arq_job_id": job.job_id, "coloriser": coloriser, "resolution": resolution}),
         )
         return {
             "message": "Traitement de restauration en cours.",
@@ -966,19 +993,27 @@ async def restaurer(
 async def coloriser_standalone(
     request: Request,
     fichier: UploadFile = File(...),
+    resolution: str = Form("720p"),
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
     Colorise une photo déjà restaurée (ou toute photo N&B).
 
-    **Authentification requise** : 1 crédit est consommé.
+    **Authentification requise** : crédits selon la résolution.
 
     Args:
         fichier: La photo à coloriser (JPEG, PNG, WebP, TIFF).
+        resolution: Qualité de sortie (720p, 1080p, 4k).
 
     Returns:
         L'URL de l'image colorisée et le nombre de crédits consommés.
     """
+    # Valider la résolution
+    if resolution not in TARIF_COLORISATION:
+        raise HTTPException(status_code=400, detail=f"Résolution invalide : {resolution}. Options : 720p, 1080p, 4k")
+
+    nb_credits = TARIF_COLORISATION[resolution]
+
     # Validation et sauvegarde
     contenu = await fichier.read()
     nom_original = _valider_upload(fichier, contenu)
@@ -1004,11 +1039,12 @@ async def coloriser_standalone(
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     # Vérification des crédits
-    peut, raison = await peut_restaurer(utilisateur["id"])
-    if not peut:
-        await mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
-        raise HTTPException(status_code=402, detail=raison)
-    await consommer_operation(utilisateur["id"], "colorisation", travail_id)
+    for i in range(nb_credits):
+        peut, raison = await peut_restaurer(utilisateur["id"])
+        if not peut:
+            await mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
+            raise HTTPException(status_code=402, detail=raison)
+        await consommer_operation(utilisateur["id"], "colorisation", travail_id)
 
     try:
         nom_colorise = f"{nom_base}_colorized.jpg"
@@ -1019,14 +1055,14 @@ async def coloriser_standalone(
             message="Photo colorisée avec succès !",
             analyse=None,  # type: ignore — pas d'analyse pour la colorisation standalone
             url_image=f"/uploads/{nom_colorise}",
-            credits_consommes=1,
+            credits_consommes=nb_credits,
         )
         await mettre_a_jour_travail(
             travail_id,
             statut="termine",
             chemin_resultat=str(chemin_colorise),
             taille_resultat=chemin_colorise.stat().st_size,
-            resultat_json=json.dumps({"colorise": True, "credits_consommes": 1}),
+            resultat_json=json.dumps({"colorise": True, "credits_consommes": nb_credits, "resolution": resolution}),
         )
         return resultat
 
@@ -1084,17 +1120,18 @@ async def animer(
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
     # Vérification des crédits et de la limite d'animations par forfait
-    peut, raison = await peut_animer(utilisateur["id"])
-    if not peut:
-        await mettre_a_jour_travail(
-            travail_id,
-            statut="erreur",
-            message_erreur=raison,
-        )
-        raise HTTPException(status_code=403, detail=raison)
-
-    # Consommer le crédit/essai (et incrémenter le compteur d'animations)
-    await consommer_operation(utilisateur["id"], "animation", travail_id)
+    nb_credits_anim = TARIF_ANIMATION.get(resolution, 10)
+    for i in range(nb_credits_anim):
+        peut, raison = await peut_animer(utilisateur["id"])
+        if not peut:
+            await mettre_a_jour_travail(
+                travail_id,
+                statut="erreur",
+                message_erreur=raison,
+            )
+            raise HTTPException(status_code=403, detail=raison)
+        # Consommer le crédit/essai (et incrémenter le compteur d'animations)
+        await consommer_operation(utilisateur["id"], "animation", travail_id)
 
     # Délégation au worker ARQ (non-bloquant)
     try:

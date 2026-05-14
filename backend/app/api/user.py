@@ -15,9 +15,10 @@ import logging
 import os
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from app.auth import exiger_utilisateur
+from app.db.session import async_session
 from app.db.queries import (
     ANIMATIONS_PAR_PLAN,
     lister_travaux_par_utilisateur,
@@ -31,6 +32,7 @@ from app.db.queries import (
     supprimer_tous_travaux_utilisateur as _supprimer_tous_db,
 )
 from app.models.schemas import PreferencesRequete
+from sqlalchemy import text as _sa_text
 
 logger = logging.getLogger(__name__)
 
@@ -73,6 +75,27 @@ async def me(utilisateur: dict = Depends(exiger_utilisateur)):
     animations_limite = ANIMATIONS_PAR_PLAN.get(plan, 0)
     retention = await obtenir_retention(utilisateur["id"])
 
+    # Compter photos restaurées et animations ce mois-ci
+    debut_mois = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    async with async_session() as session:
+        nb_restaurees = (
+            await session.execute(
+                _sa_text(
+                    "SELECT COUNT(*) FROM travaux WHERE utilisateur_id = :uid AND type = 'restauration' AND cree_le >= :debut"
+                ),
+                {"uid": utilisateur["id"], "debut": debut_mois},
+            )
+        ).scalar() or 0
+
+        nb_animations = (
+            await session.execute(
+                _sa_text(
+                    "SELECT COUNT(*) FROM travaux WHERE utilisateur_id = :uid AND type = 'animation' AND cree_le >= :debut"
+                ),
+                {"uid": utilisateur["id"], "debut": debut_mois},
+            )
+        ).scalar() or 0
+
     return {
         "id": detail["id"],
         "email": detail["email"],
@@ -82,6 +105,8 @@ async def me(utilisateur: dict = Depends(exiger_utilisateur)):
         "plan": plan,
         "animations_utilisees": detail.get("animations_utilisees", 0),
         "animations_limite": animations_limite,
+        "photos_restaurees_mois": nb_restaurees,
+        "animations_creees": nb_animations,
         "retention_jours": retention,
         "derniere_activite": detail.get("derniere_activite"),
     }
@@ -132,27 +157,38 @@ async def lire_preferences(utilisateur: dict = Depends(exiger_utilisateur)):
 # ---------------------------------------------------------------------------
 
 
-def _vers_url(chemin: str | None) -> str | None:
-    """Convertit un chemin absolu en URL publique relative."""
+def _vers_url(chemin: str | None, token: str | None = None) -> str | None:
+    """Convertit un chemin absolu en URL publique relative avec token d'accès."""
     if not chemin:
         return None
     nom_fichier = os.path.basename(chemin)
-    return f"/uploads/{nom_fichier}"
+    url = f"/uploads/{nom_fichier}"
+    if token:
+        url += f"?token={token}"
+    return url
 
 
 @router.get("/history")
 async def history(
     utilisateur: dict = Depends(exiger_utilisateur),
     limite: int = 50,
+    request: Request = None,  # type: ignore[assignment]
 ):
     """
     Retourne l'historique enrichi des travaux de l'utilisateur connecté.
     
     Chaque travail inclut :
-    - URLs des 3 versions (original, résultat, animation)
+    - URLs des 3 versions (original, résultat, animation) avec token d'accès
     - Tailles de fichiers
     - Date d'expiration calculée selon la rétention configurée
     """
+    # Extraire le token JWT pour l'injecter dans les URLs des miniatures
+    token_jwt = None
+    if request:
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            token_jwt = auth[7:]
+
     travaux = await lister_travaux_par_utilisateur(utilisateur["id"], limite)
     retention = await obtenir_retention(utilisateur["id"])
 
@@ -172,9 +208,9 @@ async def history(
             "id": t["id"],
             "type": t["type"],
             "statut": t["statut"],
-            "url_original": _vers_url(t.get("chemin_photo")),
-            "url_resultat": _vers_url(t.get("chemin_resultat")),
-            "url_animation": _vers_url(t.get("chemin_animation")),
+            "url_original": _vers_url(t.get("chemin_photo"), token_jwt),
+            "url_resultat": _vers_url(t.get("chemin_resultat"), token_jwt),
+            "url_animation": _vers_url(t.get("chemin_animation"), token_jwt),
             "taille_original": t.get("taille_original"),
             "taille_resultat": t.get("taille_resultat"),
             "message_erreur": t.get("message_erreur"),

@@ -21,6 +21,7 @@ import {
   Zap,
   Palette,
   Loader2,
+  Check,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -28,6 +29,21 @@ import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob } from "@/lib/api";
+
+function getCreditTotal(resolution: string, colorize: boolean): number {
+  const base = resolution === "4k" ? 4 : resolution === "1080p" ? 2 : 1;
+  const colorExtra = resolution === "4k" ? 4 : resolution === "1080p" ? 2 : 1;
+  return base + (colorize ? colorExtra : 0);
+}
+
+function Label({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>, label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <Icon className="w-4 h-4 text-accent" />
+      <span className="text-sm font-medium text-foreground">{label}</span>
+    </div>
+  );
+}
 
 export default function RestorePage() {
   const router = useRouter();
@@ -47,6 +63,7 @@ export default function RestorePage() {
   const [compareMode, setCompareMode] = useState(false);
   const [sliderPos, setSliderPos] = useState(50);
   const [colorize, setColorize] = useState(false);
+  const [resolution, setResolution] = useState<"720p" | "1080p" | "4k">("720p");
   const [colorizing, setColorizing] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState<string>("");
   const [restoredUrl, setRestoredUrl] = useState<string | null>(null);
@@ -179,7 +196,7 @@ export default function RestorePage() {
     setError(null);
     setRestoreProgress("Envoi de la photo...");
     try {
-      const { jobId, travailId } = await restorePhoto(file, colorize);
+      const { jobId, travailId } = await restorePhoto(file, colorize, resolution);
       
       // Poll for the async job result
       setRestoreProgress("Restauration IA en cours...");
@@ -223,7 +240,12 @@ export default function RestorePage() {
     setError(null);
     try {
       // Fetch the restored image as a File (URL already includes token from useEffect)
-      const res = await fetch(restoredUrl);
+      let res = await fetch(restoredUrl);
+      // F8: Si l'URL avec token a expiré, rafraîchir le token
+      if (!res.ok && (res.status === 401 || res.status === 403)) {
+        const freshUrl = await getPhotoUrlAsync(restoreResult.url_image);
+        res = await fetch(freshUrl);
+      }
       // F7: Vérifier que la réponse est OK avant de lire le blob (évite d'envoyer un blob d'erreur HTML à colorizePhoto)
       if (!res.ok) {
         throw new Error(`Impossible de récupérer l'image restaurée (${res.status}).`);
@@ -402,29 +424,11 @@ export default function RestorePage() {
           {/* Photo loaded + result */}
           {preview && (
             <div className="max-w-4xl mx-auto">
-              {/* Colorize toggle */}
+              {/* Panneau d'options de traitement */}
               {!restoreResult && !restoring && (
-                <div className="flex items-center justify-center gap-3 mb-6">
-                  <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={colorize}
-                      onChange={(e) => setColorize(e.target.checked)}
-                      className="w-4 h-4 rounded accent-accent"
-                    />
-                    <Palette className="w-4 h-4 text-muted" />
-                    <span className="text-sm text-muted">
-                      Coloriser après restauration
-                    </span>
-                  </label>
-                </div>
-              )}
-
-              {/* Restore button or progress */}
-              {!restoring && !colorizing && !restoreResult ? (
-                /* Photo loaded, ready to restore */
-                <div className="flex flex-col items-center gap-4">
-                  <div className="relative w-full max-w-xl rounded-2xl overflow-hidden bg-surface border border-card-border">
+                <div className="max-w-xl mx-auto mb-6">
+                  {/* Photo preview */}
+                  <div className="relative w-full rounded-2xl overflow-hidden bg-surface border border-card-border mb-4">
                     <Image
                       src={preview}
                       alt="Photo à restaurer"
@@ -434,7 +438,75 @@ export default function RestorePage() {
                       unoptimized
                     />
                   </div>
-                  <div className="flex gap-3">
+
+                  {/* Options */}
+                  <div className="bg-card border border-card-border rounded-2xl p-5 space-y-5">
+                    {/* Résolution */}
+                    <div>
+                      <Label icon={Zap} label="Résolution" />
+                      <div className="grid grid-cols-3 gap-2 mt-2">
+                        {([
+                          { key: "720p" as const, label: "720p", credits: 1, desc: "Standard" },
+                          { key: "1080p" as const, label: "1080p", credits: 2, desc: "Haute déf." },
+                          { key: "4k" as const, label: "4K", credits: 4, desc: "Ultra HD" },
+                        ]).map(({ key, label, credits, desc }) => (
+                          <button
+                            key={key}
+                            onClick={() => setResolution(key)}
+                            className={`p-3 rounded-xl border text-center transition-all ${
+                              resolution === key
+                                ? "border-accent bg-accent/10 text-accent"
+                                : "border-card-border text-muted hover:border-accent/30"
+                            }`}
+                          >
+                            <div className="text-sm font-semibold">{label}</div>
+                            <div className="text-xs text-muted">{desc}</div>
+                            <div className="text-xs mt-1 font-medium">
+                              {credits} crédit{credits > 1 ? "s" : ""}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Colorisation */}
+                    <div>
+                      <Label icon={Palette} label="Colorisation" />
+                      <button
+                        onClick={() => setColorize(!colorize)}
+                        className={`w-full mt-2 p-3 rounded-xl border text-left transition-all flex items-center justify-between ${
+                          colorize
+                            ? "border-orange-400 bg-orange-400/10 text-orange-400"
+                            : "border-card-border text-muted hover:border-orange-400/30"
+                        }`}
+                      >
+                        <div>
+                          <div className="text-sm font-semibold">
+                            {colorize ? "Colorisation activée" : "Ajouter la colorisation"}
+                          </div>
+                          <div className="text-xs text-muted">
+                            +{resolution === "4k" ? "4" : resolution === "1080p" ? "2" : "1"} crédit{resolution === "4k" || resolution === "1080p" ? "s" : ""}
+                          </div>
+                        </div>
+                        <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                          colorize ? "border-orange-400 bg-orange-400" : "border-card-border"
+                        }`}>
+                          {colorize && <Check className="w-3 h-3 text-white" />}
+                        </div>
+                      </button>
+                    </div>
+
+                    {/* Récapitulatif */}
+                    <div className="bg-surface rounded-xl p-3 flex items-center justify-between">
+                      <span className="text-sm text-muted">Total</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {getCreditTotal(resolution, colorize)} crédit{getCreditTotal(resolution, colorize) > 1 ? "s" : ""}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Boutons */}
+                  <div className="flex gap-3 mt-4 justify-center">
                     <button
                       onClick={handleClear}
                       className="px-5 py-2.5 rounded-full border border-card-border text-muted hover:text-foreground text-sm transition-all"
@@ -447,11 +519,14 @@ export default function RestorePage() {
                       className="px-6 py-2.5 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all flex items-center gap-2"
                     >
                       <Sparkles className="w-4 h-4" />
-                      Restaurer la photo
+                      Restaurer ({getCreditTotal(resolution, colorize)} crédit{getCreditTotal(resolution, colorize) > 1 ? "s" : ""})
                     </button>
                   </div>
                 </div>
-              ) : (restoring || colorizing) && !restoreResult ? (
+              )}
+
+              {/* Processing in progress — unchanged */}
+              {(restoring || colorizing) && !restoreResult ? (
                 /* Processing in progress */
                 <div className="flex flex-col items-center py-12">
                   <div className="w-20 h-20 relative mb-6">
