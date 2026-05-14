@@ -222,6 +222,7 @@ export default function AnimatePage() {
 
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
             {!preview ? (
+              <>
               <div
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
                 onDragLeave={() => setDragOver(false)}
@@ -237,10 +238,16 @@ export default function AnimatePage() {
                   <div className="w-20 h-20 rounded-2xl bg-violet-500/10 flex items-center justify-center">
                     <Film className="w-10 h-10 text-violet-400" />
                   </div>
-                  <p className="text-foreground text-lg font-semibold">Glissez-déposez votre photo ici</p>
-                  <p className="text-muted text-sm">ou cliquez pour parcourir vos fichiers</p>
+                  <div>
+                    <h3 className="text-lg font-semibold text-foreground mb-1">Glissez une photo ici</h3>
+                    <p className="text-muted text-sm">ou cliquez pour sélectionner — JPG, PNG, WebP, max 20 Mo</p>
+                  </div>
                 </div>
               </div>
+              <p className="text-center text-sm text-muted mt-4">
+                📸 Vous pouvez aussi <a href="/restore" className="text-accent hover:underline">restaurer une photo</a> d'abord, puis revenir l'animer.
+              </p>
+              </>
             ) : (
               <div className="grid lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-2">

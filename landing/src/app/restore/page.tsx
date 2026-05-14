@@ -44,6 +44,7 @@ export default function RestorePage() {
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
   const [showAfter, setShowAfter] = useState(true);
+  const [compareMode, setCompareMode] = useState(false);
   const [sliderPos, setSliderPos] = useState(50);
   const [colorize, setColorize] = useState(false);
   const [colorizing, setColorizing] = useState(false);
@@ -470,9 +471,9 @@ export default function RestorePage() {
                   {/* Toggle buttons */}
                   <div className="flex items-center justify-center gap-2">
                     <button
-                      onClick={() => setShowAfter(false)}
+                      onClick={() => { setShowAfter(false); setCompareMode(false); }}
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        !showAfter
+                        !showAfter && !compareMode
                           ? "bg-accent text-white dark:text-gray-950"
                           : "bg-surface text-muted hover:text-foreground border border-card-border"
                       }`}
@@ -480,9 +481,9 @@ export default function RestorePage() {
                       Avant
                     </button>
                     <button
-                      onClick={() => setShowAfter(true)}
+                      onClick={() => { setShowAfter(true); setCompareMode(false); }}
                       className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        showAfter
+                        showAfter && !compareMode
                           ? "bg-accent text-white dark:text-gray-950"
                           : "bg-surface text-muted hover:text-foreground border border-card-border"
                       }`}
@@ -490,8 +491,12 @@ export default function RestorePage() {
                       ✨ Après
                     </button>
                     <button
-                      onClick={() => setShowAfter(!showAfter)}
-                      className="px-4 py-2 rounded-full text-sm font-medium bg-surface text-muted hover:text-foreground border border-card-border transition-all flex items-center gap-1.5"
+                      onClick={() => { setShowAfter(true); setCompareMode(true); }}
+                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
+                        compareMode
+                          ? "bg-accent text-white dark:text-gray-950"
+                          : "bg-surface text-muted hover:text-foreground border border-card-border"
+                      }`}
                     >
                       <ArrowLeftRight className="w-4 h-4" />
                       Comparer
@@ -503,7 +508,7 @@ export default function RestorePage() {
                     ref={sliderRef}
                     className="relative w-full max-w-2xl mx-auto rounded-2xl overflow-hidden bg-surface border border-card-border select-none"
                   >
-                    {/* Before image (full width) */}
+                    {/* Before image (always shown as background) */}
                     <Image
                       src={preview!}
                       alt="Photo originale"
@@ -513,13 +518,15 @@ export default function RestorePage() {
                       unoptimized
                     />
 
-                    {/* After image overlays with clip-path slider */}
-                    {!showAfter ? null : restoredUrl ? (
+                    {/* After image overlay */}
+                    {restoredUrl && (showAfter || compareMode) && (
                       <>
                         <div
                           className="absolute inset-0 overflow-hidden"
                           style={{
-                            clipPath: `inset(0 ${100 - sliderPos}% 0 0)`,
+                            clipPath: compareMode
+                              ? `inset(0 ${100 - sliderPos}% 0 0)`
+                              : "inset(0 0 0 0)",
                           }}
                         >
                           <Image
@@ -532,7 +539,8 @@ export default function RestorePage() {
                           />
                         </div>
 
-                        {/* Slider handle */}
+                        {/* Slider handle — only in compare mode */}
+                        {compareMode && (
                         <div
                           className="absolute top-0 bottom-0 w-1 bg-white shadow-lg cursor-ew-resize z-10"
                           style={{ left: `${sliderPos}%` }}
@@ -559,8 +567,9 @@ export default function RestorePage() {
                             <ArrowLeftRight className="w-5 h-5 text-gray-700" />
                           </div>
                         </div>
+                        )}
                       </>
-                    ) : null}
+                    )}
                   </div>
 
                   {/* Labels */}
