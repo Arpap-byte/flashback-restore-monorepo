@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { animatePhoto, checkAnimationStatus, AnimationStatus } from "@/lib/api";
+import { animatePhoto, checkAnimationStatus, getPhotoUrlAsync, AnimationStatus, ApiError } from "@/lib/api";
 
 const POLL_TIMEOUT = 600_000; // 10 minutes
 const POLL_DELAYS = [5_000, 8_000, 12_000, 20_000, 30_000];
@@ -41,6 +41,7 @@ export default function AnimatePage() {
   const [status, setStatus] = useState<AnimationStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState(false);
+  const [videoUrl, setVideoUrl] = useState<string | null>(null); // URL avec token JWT pour <video>
   const pollRef = useRef<NodeJS.Timeout | null>(null);
   const pollAttempts = useRef(0);
   const pollStartTime = useRef(0);
@@ -49,13 +50,19 @@ export default function AnimatePage() {
   useEffect(() => {
     const stored = sessionStorage.getItem("flashback_photo");
     if (stored) {
-      setPreview(stored);
-      fetch(stored)
-        .then((res) => res.blob())
-        .then((blob) => {
+      (async () => {
+        // Si l'URL ne contient pas déjà un token JWT, on en ajoute un
+        let url = stored;
+        if (!url.includes("?token=") && url.includes("/uploads/")) {
+          url = await getPhotoUrlAsync(url);
+        }
+        setPreview(url);
+        try {
+          const res = await fetch(url);
+          const blob = await res.blob();
           setFile(new File([blob], "photo.jpg", { type: "image/jpeg" }));
-        })
-        .catch(() => {});
+        } catch {}
+      })();
     }
   }, []);
 
@@ -79,8 +86,14 @@ export default function AnimatePage() {
         const delay = POLL_DELAYS[Math.min(pollAttempts.current, POLL_DELAYS.length - 1)];
         pollAttempts.current += 1;
         pollRef.current = setTimeout(poll, delay);
-      } catch {
+      } catch (err) {
         if (cancelled) return;
+        // F6: Arrêter le polling sur les erreurs d'authentification (401/403)
+        if (err instanceof ApiError && (err.status === 401 || err.status === 403)) {
+          setStatus({ status: "erreur", message: err.message || "Session expirée. Veuillez vous reconnecter." });
+          return;
+        }
+        // Erreur réseau temporaire : on continue le polling
         const delay = POLL_DELAYS[Math.min(pollAttempts.current, POLL_DELAYS.length - 1)];
         pollAttempts.current += 1;
         pollRef.current = setTimeout(poll, delay);
@@ -89,6 +102,19 @@ export default function AnimatePage() {
     poll();
     return () => { cancelled = true; if (pollRef.current) clearTimeout(pollRef.current); };
   }, [travailId, status?.status]);
+
+  // F2: Convertir url_video en URL avec token JWT (balise <video> ne peut pas envoyer de header Authorization)
+  useEffect(() => {
+    let cancelled = false;
+    if (status?.url_video) {
+      getPhotoUrlAsync(status.url_video).then((url) => {
+        if (!cancelled) setVideoUrl(url);
+      });
+    } else {
+      setVideoUrl(null);
+    }
+    return () => { cancelled = true; };
+  }, [status?.url_video]);
 
   const handleFile = useCallback((f: File) => {
     if (!["image/jpeg", "image/png", "image/webp"].includes(f.type)) {
@@ -138,6 +164,7 @@ export default function AnimatePage() {
   const handleClear = () => {
     setFile(null); setPreview(null); setStatus(null);
     setTravailId(null); setError(null); setComportement("naturel"); setResolution("720p");
+    setVideoUrl(null);
     pollAttempts.current = 0; pollStartTime.current = 0;
     sessionStorage.removeItem("flashback_photo");
     if (pollRef.current) clearTimeout(pollRef.current);
@@ -321,11 +348,11 @@ export default function AnimatePage() {
                         </div>
                       </div>
 
-                      {status.status === "termine" && status.url_video && (
+                      {status.status === "termine" && videoUrl && (
                         <div className="space-y-3">
-                          <video src={status.url_video} controls className="w-full rounded-xl" />
+                          <video src={videoUrl} controls className="w-full rounded-xl" />
                           <div className="flex gap-3">
-                            <button onClick={() => window.open(status.url_video!, "_blank")} className="flex-1 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-medium text-sm hover:brightness-110 flex items-center justify-center gap-2">
+                            <button onClick={() => window.open(videoUrl!, "_blank")} className="flex-1 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-medium text-sm hover:brightness-110 flex items-center justify-center gap-2">
                               <Download className="w-4 h-4" /> Télécharger
                             </button>
                             <button onClick={handleClear} className="px-6 py-3 rounded-full border border-card-border text-muted hover:text-foreground text-sm flex items-center gap-2">

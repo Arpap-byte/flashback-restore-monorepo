@@ -11,9 +11,9 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useAuth as useClerkAuth } from "@clerk/nextjs";
 import {
-  getUserHistory, getPhotoUrl, TravailHistorique,
+  getUserHistory, getPhotoUrl, getPhotoUrlAsync, TravailHistorique,
   deleteTravail, deleteAllHistory,
   getUserPreferences, updatePreferences,
   UserHistoryResponse
@@ -75,6 +75,7 @@ function formatExpiration(iso: string | null): { text: string; urgent: boolean }
 export default function HistoriquePage() {
   const { user, loading: authLoading } = useAuth();
   const { user: clerkUser, isLoaded: clerkLoaded } = useUser();
+  const { getToken } = useClerkAuth();
   const isAuthenticated = !!user || !!clerkUser;
   const [data, setData] = useState<UserHistoryResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,6 +83,13 @@ export default function HistoriquePage() {
   const [confirmDeleteAll, setConfirmDeleteAll] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [retentionOpen, setRetentionOpen] = useState(false);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+
+  // Récupérer le token JWT pour les URLs d'images (nécessaire car <img> ne peut pas envoyer de header Authorization)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    getToken().then((t) => setAuthToken(t || null)).catch(() => setAuthToken(null));
+  }, [isAuthenticated, getToken]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -355,7 +363,7 @@ export default function HistoriquePage() {
                     {(t.url_resultat || t.url_original) && (
                       <div className="aspect-[4/3] bg-surface-alt overflow-hidden relative">
                         <Image
-                          src={getPhotoUrl(t.url_resultat || t.url_original!)}
+                          src={getPhotoUrl(t.url_resultat || t.url_original!, authToken)}
                           alt={TYPE_LABELS[t.type] || t.type}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
@@ -418,7 +426,7 @@ export default function HistoriquePage() {
                       <div className="flex flex-wrap gap-1.5 mt-3">
                         {hasResult && (
                           <a
-                            href={getPhotoUrl(t.url_resultat!)}
+                            href={getPhotoUrl(t.url_resultat!, authToken)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
@@ -429,7 +437,7 @@ export default function HistoriquePage() {
                         )}
                         {hasAnimation && (
                           <a
-                            href={t.url_animation!}
+                            href={getPhotoUrl(t.url_animation!, authToken)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
@@ -440,7 +448,7 @@ export default function HistoriquePage() {
                         )}
                         {t.url_original && (
                           <a
-                            href={getPhotoUrl(t.url_original!)}
+                            href={getPhotoUrl(t.url_original!, authToken)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-surface text-muted text-xs hover:text-foreground hover:bg-surface-alt transition-colors"
@@ -453,9 +461,12 @@ export default function HistoriquePage() {
                         {(t.url_original || t.url_resultat) && (
                           <>
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 const src = t.url_resultat || t.url_original;
-                                if (src) sessionStorage.setItem("flashback_photo", getPhotoUrl(src));
+                                if (src) {
+                                  const url = await getPhotoUrlAsync(src);
+                                  sessionStorage.setItem("flashback_photo", url);
+                                }
                                 window.location.href = "/animate";
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
@@ -464,9 +475,12 @@ export default function HistoriquePage() {
                               Animer
                             </button>
                             <button
-                              onClick={() => {
+                              onClick={async () => {
                                 const src = t.url_resultat || t.url_original;
-                                if (src) sessionStorage.setItem("flashback_photo", getPhotoUrl(src));
+                                if (src) {
+                                  const url = await getPhotoUrlAsync(src);
+                                  sessionStorage.setItem("flashback_photo", url);
+                                }
                                 window.location.href = "/restore?mode=colorize-only";
                               }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-400 text-xs hover:bg-amber-500/20 transition-colors"

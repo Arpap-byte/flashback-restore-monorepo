@@ -2,6 +2,17 @@ const API_BASE = typeof window === "undefined"
   ? (process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000")
   : (process.env.NEXT_PUBLIC_API_URL || ""); // client : chemin relatif → même domaine HTTPS
 
+/** Erreur API avec code de statut HTTP pour discrimination (ex: 401/403 fatals vs erreurs réseau temporaires) */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export interface AnalysisResult {
   rayures: boolean;
   decoloration: boolean;
@@ -152,7 +163,7 @@ async function apiFetch<T>(
       } catch {
         message = body || `Erreur ${res.status}`;
       }
-      throw new Error(message);
+      throw new ApiError(message, res.status);
     }
 
     return res.json();
@@ -201,12 +212,18 @@ export async function colorizePhoto(file: File): Promise<RestoreResult> {
 export async function pollRestoreJob(
   jobId: string,
   onProgress?: (msg: string) => void,
-  maxWaitMs = 120000
+  maxWaitMs = 120000,
+  signal?: AbortSignal,
 ): Promise<RestoreResult> {
   const start = Date.now();
   const pollInterval = 2000;
 
   while (Date.now() - start < maxWaitMs) {
+    // Vérifier l'annulation avant chaque itération
+    if (signal?.aborted) {
+      throw new Error("Polling annulé.");
+    }
+
     const status = await apiFetch<{
       statut: string;
       resultat?: { url_image?: string; message?: string; analyse?: AnalysisResult; credits_consommes?: number };
@@ -234,33 +251,20 @@ export async function pollRestoreJob(
     const elapsed = Math.round((Date.now() - start) / 1000);
     onProgress?.(`Restauration IA en cours... (${elapsed}s)`);
     await new Promise((r) => setTimeout(r, pollInterval));
+    // Re-vérifier après le sleep au cas où l'annulation est survenue pendant l'attente
+    if (signal?.aborted) {
+      throw new Error("Polling annulé.");
+    }
   }
 
   throw new Error("La restauration a pris trop de temps. Veuillez réessayer.");
 }
 
-export async function getRestoredImageUrl(urlImage: string): Promise<string> {
-  if (!urlImage) return "";
-  if (urlImage.startsWith("http")) return urlImage;
-  const base = typeof window !== "undefined"
-    ? window.location.origin
-    : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
-  let url = `${base}${urlImage}`;
-  // Ajouter le token JWT en query param pour les URLs /uploads/ (nécessaire car <img> ne peut pas envoyer de header Authorization)
-  if (url.includes("/uploads/")) {
-    const token = await getAuthToken();
-    if (token) {
-      url += `?token=${encodeURIComponent(token)}`;
-    }
-  }
-  return url;
-}
-
 /**
- * Convertit un chemin serveur en URL publique.
+ * Convertit un chemin serveur en URL publique avec token JWT.
  *
- * Côté client : ajoute ?token=... pour les URLs /uploads/ (contourne l'impossibilité
- * d'envoyer un header Authorization sur les balises <img>).
+ * Pour les URLs /uploads/ : côté client, ajoute automatiquement ?token=...
+ * (contourne l'impossibilité d'envoyer un header Authorization sur les balises <img>).
  * Côté serveur (SSR) : retourne l'URL sans token (pas d'accès au token client).
  *
  * @param chemin - Chemin relatif (ex: "/uploads/abc123.jpg") ou URL absolue
@@ -269,13 +273,12 @@ export async function getRestoredImageUrl(urlImage: string): Promise<string> {
 export function getPhotoUrl(chemin: string, token?: string | null): string {
   if (!chemin) return "";
   if (chemin.startsWith("http")) return chemin;
-  const filename = chemin.split("/").pop();
   const base = typeof window !== "undefined"
     ? window.location.origin
     : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
-  let url = `${base}/uploads/${filename}`;
+  let url = `${base}${chemin}`;
   // Côté client avec token : ajouter le query param (contourne l'absence de header Authorization sur <img>)
-  if (typeof window !== "undefined" && token) {
+  if (typeof window !== "undefined" && token && url.includes("/uploads/")) {
     url += `?token=${encodeURIComponent(token)}`;
   }
   return url;

@@ -27,7 +27,7 @@ import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
-import { restorePhoto, colorizePhoto, getRestoredImageUrl, getPhotoUrl, RestoreResult, pollRestoreJob } from "@/lib/api";
+import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
@@ -49,12 +49,20 @@ export default function RestorePage() {
   const [colorizing, setColorizing] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState<string>("");
   const [restoredUrl, setRestoredUrl] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Calculer l'URL restaurée avec le token JWT (getRestoredImageUrl est async car elle récupère le token)
+  // Nettoyer l'AbortController au démontage du composant (F5)
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  // Calculer l'URL restaurée avec le token JWT (getPhotoUrlAsync récupère le token automatiquement)
   useEffect(() => {
     let cancelled = false;
     if (restoreResult?.url_image) {
-      getRestoredImageUrl(restoreResult.url_image).then((url) => {
+      getPhotoUrlAsync(restoreResult.url_image).then((url) => {
         if (!cancelled) setRestoredUrl(url || null);
       });
     } else {
@@ -65,19 +73,25 @@ export default function RestorePage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
-  // On mount, check for photo passed from upload page
+  // On mount, check for photo passed from upload page or historique
   useEffect(() => {
     const stored = sessionStorage.getItem("flashback_photo");
     if (stored) {
-      setPreview(stored);
-      // Convert data URL to File for API call
-      fetch(stored)
-        .then((res) => res.blob())
-        .then((blob) => {
+      (async () => {
+        // Si l'URL ne contient pas déjà un token JWT, on en ajoute un
+        let url = stored;
+        if (!url.includes("?token=") && url.includes("/uploads/")) {
+          url = await getPhotoUrlAsync(url);
+        }
+        setPreview(url);
+        // Convert URL to File for API call
+        try {
+          const res = await fetch(url);
+          const blob = await res.blob();
           const f = new File([blob], "photo.jpg", { type: "image/jpeg" });
           setFile(f);
-        })
-        .catch(() => {});
+        } catch {}
+      })();
     }
     // Si on vient depuis l'historique avec ?tab=colorize, pré-cocher la colorisation
     if (searchParams.get("tab") === "colorize") {
@@ -138,6 +152,7 @@ export default function RestorePage() {
     }
     setError(null);
     setRestoreResult(null);
+    setRestoreProgress("");
     setFile(f);
     const reader = new FileReader();
     reader.onloadend = () => setPreview(reader.result as string);
@@ -156,6 +171,9 @@ export default function RestorePage() {
 
   const handleRestore = async () => {
     if (!file) return;
+    // F5: Créer un AbortController pour pouvoir annuler le polling
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setRestoring(true);
     setError(null);
     setRestoreProgress("Envoi de la photo...");
@@ -166,11 +184,13 @@ export default function RestorePage() {
       setRestoreProgress("Restauration IA en cours...");
       const finalResult = await pollRestoreJob(jobId, (progress) => {
         setRestoreProgress(progress);
-      });
+      }, 120000, controller.signal);
       
       setRestoreResult(finalResult);
       setRestoreProgress("");
     } catch (err) {
+      // Ignorer les erreurs d'annulation (composant démonté)
+      if (err instanceof Error && err.message === "Polling annulé.") return;
       setError(
         err instanceof Error
           ? err.message
@@ -179,10 +199,14 @@ export default function RestorePage() {
       setTimeout(() => setError(null), 6000);
     } finally {
       setRestoring(false);
+      abortControllerRef.current = null;
     }
   };
 
   const handleClear = () => {
+    // F5: Annuler tout polling en cours
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
     setFile(null);
     setPreview(null);
     setRestoreResult(null);
@@ -199,6 +223,10 @@ export default function RestorePage() {
     try {
       // Fetch the restored image as a File (URL already includes token from useEffect)
       const res = await fetch(restoredUrl);
+      // F7: Vérifier que la réponse est OK avant de lire le blob (évite d'envoyer un blob d'erreur HTML à colorizePhoto)
+      if (!res.ok) {
+        throw new Error(`Impossible de récupérer l'image restaurée (${res.status}).`);
+      }
       const blob = await res.blob();
       const f = new File([blob], "restored.jpg", { type: "image/jpeg" });
       const result = await colorizePhoto(f);
