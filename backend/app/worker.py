@@ -315,20 +315,25 @@ async def _rembourser_si_echec(
 async def _worker_shutdown(ctx):
     """Appelé par ARQ à l'arrêt du worker (SIGTERM/SIGINT).
 
-    Force un WAL checkpoint avant de quitter pour éviter la perte de données.
+    Force un WAL checkpoint avant de quitter si SQLite.
     Ne dispose PAS l'engine SQLAlchemy (partagé avec le backend).
     """
-    logger.info("[ARQ] Arrêt du worker — WAL checkpoint en cours...")
-    try:
-        import sqlite3
-        from pathlib import Path
-        from app.config import DB_PATH
-        conn = sqlite3.connect(str(DB_PATH))
-        conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-        conn.close()
-        logger.info("[ARQ] Worker arrêté proprement — WAL checkpoint OK.")
-    except Exception as e:
-        logger.error(f"[ARQ] Erreur lors du WAL checkpoint worker : {e}")
+    from app.config import DATABASE_URL as _DB_URL
+
+    if "sqlite" in _DB_URL:
+        logger.info("[ARQ] Arrêt du worker — WAL checkpoint en cours...")
+        try:
+            import sqlite3
+            from pathlib import Path
+            from app.config import DB_PATH
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+            conn.close()
+            logger.info("[ARQ] Worker arrêté proprement — WAL checkpoint OK.")
+        except Exception as e:
+            logger.error(f"[ARQ] Erreur lors du WAL checkpoint worker : {e}")
+    else:
+        logger.info("[ARQ] Worker arrêté proprement (PostgreSQL).")
 
 
 class WorkerSettings:
