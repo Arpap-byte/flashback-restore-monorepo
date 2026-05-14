@@ -27,7 +27,7 @@ import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
-import { restorePhoto, colorizePhoto, getRestoredImageUrl, RestoreResult, pollRestoreJob } from "@/lib/api";
+import { restorePhoto, colorizePhoto, getRestoredImageUrl, getPhotoUrl, RestoreResult, pollRestoreJob } from "@/lib/api";
 
 export default function RestorePage() {
   const router = useRouter();
@@ -48,6 +48,20 @@ export default function RestorePage() {
   const [colorize, setColorize] = useState(false);
   const [colorizing, setColorizing] = useState(false);
   const [restoreProgress, setRestoreProgress] = useState<string>("");
+  const [restoredUrl, setRestoredUrl] = useState<string | null>(null);
+
+  // Calculer l'URL restaurée avec le token JWT (getRestoredImageUrl est async car elle récupère le token)
+  useEffect(() => {
+    let cancelled = false;
+    if (restoreResult?.url_image) {
+      getRestoredImageUrl(restoreResult.url_image).then((url) => {
+        if (!cancelled) setRestoredUrl(url || null);
+      });
+    } else {
+      setRestoredUrl(null);
+    }
+    return () => { cancelled = true; };
+  }, [restoreResult]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sliderRef = useRef<HTMLDivElement>(null);
 
@@ -179,12 +193,12 @@ export default function RestorePage() {
   };
 
   const handleColorize = async () => {
-    if (!file || !restoreResult) return;
+    if (!file || !restoreResult || !restoredUrl) return;
     setColorizing(true);
     setError(null);
     try {
-      // Fetch the restored image as a File
-      const res = await fetch(restoredUrl!);
+      // Fetch the restored image as a File (URL already includes token from useEffect)
+      const res = await fetch(restoredUrl);
       const blob = await res.blob();
       const f = new File([blob], "restored.jpg", { type: "image/jpeg" });
       const result = await colorizePhoto(f);
@@ -223,10 +237,6 @@ export default function RestorePage() {
       setColorizing(false);
     }
   };
-
-  const restoredUrl = restoreResult
-    ? getRestoredImageUrl(restoreResult.url_image)
-    : null;
 
   // Download handler
   const handleDownload = async (url: string, name: string) => {

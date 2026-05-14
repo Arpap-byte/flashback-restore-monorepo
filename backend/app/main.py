@@ -9,8 +9,10 @@ import logging
 import os
 import sys
 
+from typing import Optional
+
 import sentry_sdk
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -20,7 +22,7 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from app.api.auth import router as auth_router
 from app.api.routes import router
 from app.api.user import router as user_router
-from app.auth import exiger_utilisateur
+from app.auth import decoder_token, _trouver_ou_creer_utilisateur
 from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT, SENTRY_DSN
 from app.db.session import init_db as async_initialiser_base
 from app.rate_limit_middleware import check_rate_limit
@@ -177,12 +179,14 @@ app.include_router(user_router)
 async def servir_upload_protege(
     filename: str,
     request: Request,
-    utilisateur: dict = Depends(exiger_utilisateur),
+    token: Optional[str] = Query(None, description="JWT token alternatif au header Authorization"),
 ):
     """
     Sert un fichier uploadé UNIQUEMENT à son propriétaire.
 
-    - Authentification obligatoire via Bearer token
+    - Accepte l'authentification via header Authorization Bearer OU query param ?token=
+    - Si le header Authorization est présent, il est utilisé en priorité
+    - Sinon, le query parameter 'token' est utilisé comme fallback (pour les balises <img>)
     - Vérification que le fichier appartient à l'utilisateur connecté
     - Les admins (X-Admin-Key) peuvent accéder aux fichiers orphelins
     """
@@ -202,6 +206,29 @@ async def servir_upload_protege(
         raise HTTPException(status_code=403, detail="Chemin interdit.")
     if not chemin.is_file():
         raise HTTPException(status_code=404, detail="Fichier introuvable.")
+
+    # --- Authentification : header Authorization (prioritaire) ou query param token ---
+    utilisateur: Optional[dict] = None
+    auth_header = request.headers.get("Authorization")
+
+    if auth_header and auth_header.startswith("Bearer "):
+        # Essayer le header Authorization en premier
+        try:
+            payload = decoder_token(auth_header[7:])
+            utilisateur = await _trouver_ou_creer_utilisateur(payload)
+        except Exception:
+            pass  # On essaiera le query param ensuite
+
+    if utilisateur is None and token:
+        # Fallback : token JWT passé en query parameter (pour <img src>)
+        try:
+            payload = decoder_token(token)
+            utilisateur = await _trouver_ou_creer_utilisateur(payload)
+        except Exception:
+            pass
+
+    if utilisateur is None:
+        raise HTTPException(status_code=401, detail="Authentification requise.")
 
     # Vérifier ownership
     async with async_session() as session:

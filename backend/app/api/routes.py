@@ -68,7 +68,6 @@ from app.models.schemas import (
     StatutAnimationReponse,
     WebhookReponse,
 )
-from app.services.did_service import creer_animation, verifier_statut_animation
 from app.services.gemini_service import (
     analyser_photo,
     coloriser_photo,
@@ -1108,6 +1107,8 @@ async def animer(
             travail_id,
             resolution,
         )
+        # Sauvegarder l'ID du job ARQ pour le suivi via GET /api/animate/{job_id}
+        await mettre_a_jour_job_externe_id(travail_id, job.job_id)
         return {
             "message": "Traitement d'animation en cours.",
             "job_id": job.job_id,
@@ -1132,74 +1133,53 @@ async def statut_animation(
     utilisateur: dict = Depends(exiger_utilisateur),
 ):
     """
-    Vérifie le statut d'une animation.
+    [DÉPRÉCIÉ] Vérifie le statut d'une animation via l'ID du job ARQ.
 
-    **Authentification requise** : l'utilisateur doit être propriétaire du travail.
+    **Préférez /api/animate/travail/{travail_id}** qui est plus fiable et
+    ne dépend pas de l'ID de job ARQ (éphémère). Cet endpoint est conservé
+    pour rétrocompatibilité.
 
-    Interroge le service d'animation pour connaître l'avancement d'une animation.
-    Lorsque le statut est « done », l'URL de la vidéo est retournée.
+    Interroge **la base de données locale** (le worker ARQ Veo met à jour
+    le statut côté serveur). Aucun appel à l'API D-ID n'est effectué.
 
     Args:
-        job_id: L'identifiant du travail d'animation (retourné par POST /api/animate).
+        job_id: L'identifiant du job ARQ (retourné par POST /api/animate).
 
     Returns:
         Le statut actuel et l'URL de la vidéo si terminée.
     """
-    # Vérifier que le job appartient à l'utilisateur
+    # Chercher le travail par job_externe_id (ARQ job_id)
     travail = await obtenir_travail_par_job_externe(job_id)
     if travail is None:
         raise HTTPException(status_code=404, detail="Travail introuvable.")
     if travail.get("utilisateur_id") != utilisateur["id"]:
         raise HTTPException(status_code=403, detail="Ce travail ne vous appartient pas.")
-    try:
-        data = await verifier_statut_animation(job_id)
 
-        # Correspondance des statuts D-ID vers nos statuts
-        correspondance_statut = {
-            "created": StatutAnimation.EN_ATTENTE,
-            "started": StatutAnimation.EN_COURS,
-            "processing": StatutAnimation.EN_COURS,
-            "done": StatutAnimation.TERMINE,
-            "error": StatutAnimation.ERREUR,
-        }
-        statut_interne = correspondance_statut.get(
-            data["statut"], StatutAnimation.EN_ATTENTE
-        )
+    # Mapping statut DB → statut frontend (même logique que /animate/travail/{travail_id})
+    statut_db = travail.get("statut", "cree")
+    correspondance = {
+        "cree": StatutAnimation.EN_ATTENTE,
+        "en_cours": StatutAnimation.EN_COURS,
+        "termine": StatutAnimation.TERMINE,
+        "erreur": StatutAnimation.ERREUR,
+    }
+    statut_frontend = correspondance.get(statut_db, StatutAnimation.EN_ATTENTE)
 
-        # Mise à jour du travail local
-        travail = await obtenir_travail_par_job_externe(job_id)
-        if travail:
-            if statut_interne == StatutAnimation.TERMINE:
-                url_video = data.get("url_video")
-                await mettre_a_jour_travail(
-                    travail["id"],
-                    statut="termine",
-                    chemin_resultat=url_video,
-                    resultat_json=json.dumps(data),
-                )
-                # Sauvegarder aussi dans chemin_animation pour l'historique
-                if url_video:
-                    await mettre_a_jour_chemin_animation(travail["id"], url_video)
-            elif statut_interne == StatutAnimation.ERREUR:
-                await mettre_a_jour_travail(
-                    travail["id"],
-                    statut="erreur",
-                    message_erreur=data.get("message", "Erreur inconnue"),
-                )
+    url_video = None
+    if statut_frontend == StatutAnimation.TERMINE:
+        chemin_local = travail.get("chemin_animation")
+        if chemin_local:
+            nom_fichier = Path(chemin_local).name
+            url_video = f"/uploads/{nom_fichier}"
+        else:
+            url_video = travail.get("chemin_resultat")
 
-        return StatutAnimationReponse(
-            job_id=job_id,
-            statut=statut_interne,
-            url_video=data.get("url_video"),
-            message=data.get("message"),
-        )
-
-    except Exception as e:
-        logger.exception(f"Erreur lors du suivi d'animation : {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erreur lors du suivi d'animation : {str(e)}",
-        )
+    return StatutAnimationReponse(
+        job_id=job_id,
+        statut=statut_frontend,
+        url_video=url_video,
+        message=travail.get("message_erreur") if statut_frontend == StatutAnimation.ERREUR else None,
+    )
 
 
 @router.get("/animate/travail/{travail_id}")

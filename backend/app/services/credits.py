@@ -58,12 +58,23 @@ async def peut_animer(utilisateur_id: str) -> tuple[bool, str]:
     # 1. Vérifier la disponibilité de crédits/essais
     credits_info = await obtenir_credits_restants(utilisateur_id)
     if credits_info["essais_restants"] <= 0 and credits_info["credits"] <= 0:
-        return (False, "Crédits insuffisants. Achetez des crédits pour continuer.")
+        return (
+            False,
+            f"Crédits insuffisants (crédits restants : {credits_info['credits']}, "
+            f"essais gratuits : {credits_info['essais_restants']}). "
+            "Achetez des crédits pour continuer.",
+        )
 
     # 2. Vérifier les limites d'animation par forfait
     verif = await _db_peut_animer(utilisateur_id)
     if not verif["autorise"]:
-        return (False, verif["raison"])
+        return (
+            False,
+            f"{verif['raison']} "
+            f"(crédits : {credits_info['credits']}, "
+            f"essais : {credits_info['essais_restants']}, "
+            f"animations utilisées : {verif.get('utilisees', '?')}/{verif.get('limite', '?')})",
+        )
 
     return (True, "")
 

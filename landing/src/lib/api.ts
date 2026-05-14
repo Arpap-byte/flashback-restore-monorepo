@@ -90,6 +90,34 @@ async function getAuthHeader(): Promise<Record<string, string>> {
   return {};
 }
 
+/**
+ * Extrait le token JWT brut depuis Clerk ou localStorage.
+ * Retourne null si aucun token n'est disponible.
+ */
+async function getAuthToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+
+  // 1. Clerk token
+  try {
+    const clerk = (window as any).Clerk;
+    if (clerk?.session) {
+      const token = await clerk.session.getToken();
+      if (token) return token;
+    }
+  } catch {}
+
+  // 2. Fallback: localStorage
+  try {
+    const stored = localStorage.getItem("flashback_auth");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      return parsed.token || null;
+    }
+  } catch {}
+
+  return null;
+}
+
 async function apiFetch<T>(
   endpoint: string,
   options?: RequestInit,
@@ -211,23 +239,55 @@ export async function pollRestoreJob(
   throw new Error("La restauration a pris trop de temps. Veuillez réessayer.");
 }
 
-export function getRestoredImageUrl(urlImage: string): string {
+export async function getRestoredImageUrl(urlImage: string): Promise<string> {
   if (!urlImage) return "";
   if (urlImage.startsWith("http")) return urlImage;
   const base = typeof window !== "undefined"
     ? window.location.origin
     : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
-  return `${base}${urlImage}`;
+  let url = `${base}${urlImage}`;
+  // Ajouter le token JWT en query param pour les URLs /uploads/ (nécessaire car <img> ne peut pas envoyer de header Authorization)
+  if (url.includes("/uploads/")) {
+    const token = await getAuthToken();
+    if (token) {
+      url += `?token=${encodeURIComponent(token)}`;
+    }
+  }
+  return url;
 }
 
-export function getPhotoUrl(chemin: string): string {
+/**
+ * Convertit un chemin serveur en URL publique.
+ *
+ * Côté client : ajoute ?token=... pour les URLs /uploads/ (contourne l'impossibilité
+ * d'envoyer un header Authorization sur les balises <img>).
+ * Côté serveur (SSR) : retourne l'URL sans token (pas d'accès au token client).
+ *
+ * @param chemin - Chemin relatif (ex: "/uploads/abc123.jpg") ou URL absolue
+ * @param token  - Token JWT optionnel pré-calculé (évite un appel async supplémentaire)
+ */
+export function getPhotoUrl(chemin: string, token?: string | null): string {
   if (!chemin) return "";
   if (chemin.startsWith("http")) return chemin;
   const filename = chemin.split("/").pop();
   const base = typeof window !== "undefined"
     ? window.location.origin
     : process.env.NEXT_PUBLIC_SITE_URL || "https://flashback-restore.com";
-  return `${base}/uploads/${filename}`;
+  let url = `${base}/uploads/${filename}`;
+  // Côté client avec token : ajouter le query param (contourne l'absence de header Authorization sur <img>)
+  if (typeof window !== "undefined" && token) {
+    url += `?token=${encodeURIComponent(token)}`;
+  }
+  return url;
+}
+
+/**
+ * Version async de getPhotoUrl qui récupère automatiquement le token.
+ * À utiliser quand on a besoin d'une URL avec token pour fetch/telechargement.
+ */
+export async function getPhotoUrlAsync(chemin: string): Promise<string> {
+  const token = await getAuthToken();
+  return getPhotoUrl(chemin, token);
 }
 
 export async function animatePhoto(

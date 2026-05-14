@@ -24,6 +24,9 @@ from app.models.schemas import AnalyseReponse, ParametresRestauration
 
 logger = logging.getLogger(__name__)
 
+# Modèle dédié à la génération d'images (restauration, colorisation)
+GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview"
+
 # Client Gemini (initialisé paresseusement)
 _client: Optional[genai.Client] = None
 
@@ -287,33 +290,18 @@ async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestau
 # ---------------------------------------------------------------------------
 
 PROMPT_COLORISATION = (
-    "Colorise cette photographie en noir et blanc avec une précision extrême "
-    "et une exactitude historique.\n\n"
-    "INSTRUCTIONS CRITIQUES :\n"
-    "1. PRÉSERVE chaque détail de l'image restaurée — pas de flou, lissage "
-    "ou altération des textures.\n"
-    "2. PEAU : Tons chair réalistes. Évite les peaux orange ou plastiques. "
-    "Inclus des variations subtiles (joues légèrement rosées, ombres froides).\n"
-    "3. TISSUS : Couleurs historiquement plausibles pour l'époque. Les tissus "
-    "foncés restent foncés (marine, charbon, brun). Les tissus clairs "
-    "restent clairs (crème, blanc, beige). PAS de couleurs synthétiques vives.\n"
-    "4. ARRIÈRE-PLAN : Ciel en bleu/gris pâle selon la météo apparente. "
-    "Végétation en verts naturels. Architecture en pierre, brique ou bois.\n"
-    "5. ÉVITE : Bavures de couleur aux frontières, halos autour des sujets, "
-    "sursaturation, teinte uniforme façon sépia.\n"
-    "6. ZONES AMBIGUËS : Tons sobres et conservateurs, pas de couleurs "
-    "vives devinées.\n"
-    "7. RÉSULTAT : Une photo d'époque crédible, pas un rendu artificiel."
+    "Colorize this black and white photograph with historically accurate colors. "
+    "Preserve every detail and texture exactly — no blurring, smoothing, or alteration. "
+    "Use natural skin tones (not orange), realistic fabric colors (navy, charcoal, cream, beige), "
+    "period-appropriate palette. Avoid color bleeding, halos, oversaturation. "
+    "Return ONLY the colorized image. No text."
 )
 
 
 async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
     """
-    Colorise une photo via Gemini (image generation), avec fallback Pillow.
-
-    La clé Gemini pouvant être invalide (leaked), on essaye d'abord l'API.
-    Si elle échoue, on applique un filtre de colorisation automatique avec Pillow
-    (augmentation saturation, ajustement balance des couleurs).
+    Colorise une photo via Gemini Image Model (image→image),
+    avec fallback Pillow amélioré en cas d'échec.
 
     Args:
         chemin_image: Chemin local vers l'image à coloriser.
@@ -325,9 +313,9 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
     Raises:
         Exception: Si ni Gemini ni Pillow ne peut produire une image.
     """
-    logger.info(f"Tentative de colorisation pour : {chemin_image}")
+    logger.info(f"Tentative de colorisation ({GEMINI_IMAGE_MODEL}) pour : {chemin_image}")
 
-    # --- Essai 1 : Gemini ---
+    # --- Essai 1 : Gemini Image Model (image → image) ---
     try:
         import base64
         import httpx
@@ -335,9 +323,9 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
         image_bytes = Path(chemin_image).read_bytes()
         image_b64 = base64.b64encode(image_bytes).decode("ascii")
 
-        async with httpx.AsyncClient(timeout=60.0) as http_client:
+        async with httpx.AsyncClient(timeout=120.0) as http_client:
             response = await http_client.post(
-                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_MODEL}:generateContent",
+                f"https://generativelanguage.googleapis.com/v1beta/models/{GEMINI_IMAGE_MODEL}:generateContent",
                 headers={"x-goog-api-key": GEMINI_API_KEY},
                 json={
                     "contents": [
@@ -354,9 +342,9 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
                         }
                     ],
                     "generationConfig": {
-                        "temperature": 0.4,
+                        "temperature": 0.2,
                         "maxOutputTokens": 8192,
-                        "responseModalities": ["TEXT", "IMAGE"],
+                        "responseModalities": ["IMAGE"],
                     },
                 },
             )
@@ -369,17 +357,30 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
                         if "inlineData" in part:
                             img_data = base64.b64decode(part["inlineData"]["data"])
                             Path(chemin_sortie).write_bytes(img_data)
-                            logger.info(f"Colorisation Gemini réussie : {chemin_sortie}")
+                            taille = len(img_data)
+                            logger.info(
+                                f"Colorisation Gemini réussie : {chemin_sortie} "
+                                f"({taille} octets)"
+                            )
                             return chemin_sortie
 
-            logger.warning(
-                f"Gemini colorisation échouée (status={response.status_code}), "
-                f"fallback Pillow"
-            )
+                # Statut 200 mais pas d'image inline
+                logger.warning(
+                    f"Gemini colorisation : réponse 200 mais aucune image inline trouvée. "
+                    f"Réponse brute (300 premiers) : {response.text[:300]}"
+                )
+            else:
+                logger.warning(
+                    f"Gemini colorisation échouée "
+                    f"(status={response.status_code}, body={response.text[:300]}), "
+                    f"fallback Pillow"
+                )
     except Exception as e:
-        logger.warning(f"Gemini colorisation exception : {e}, fallback Pillow")
+        logger.warning(
+            f"Gemini colorisation exception : {e}, fallback Pillow"
+        )
 
-    # --- Fallback : Pillow colorisation automatique ---
+    # --- Fallback : Pillow colorisation améliorée ---
     _colorisation_pillow(chemin_image, chemin_sortie)
     logger.info(f"Colorisation Pillow appliquée : {chemin_sortie}")
     return chemin_sortie
@@ -387,38 +388,89 @@ async def coloriser_photo(chemin_image: str, chemin_sortie: str) -> str:
 
 def _colorisation_pillow(chemin_source: str, chemin_destination: str) -> None:
     """
-    Applique une colorisation automatique via Pillow.
+    Applique une colorisation automatique via Pillow (fallback).
 
-    Technique :
-    1. Convertir en RGB
-    2. Augmenter fortement la saturation (×2.5) pour raviver les couleurs
-    3. Ajuster la balance des blancs (auto-contraste)
-    4. Appliquer une légère correction de teinte chaude
+    Détecte si l'image est en niveaux de gris :
+    - Si oui : applique une teinte sépia chaude avec variation de tons
+      (les images N&B ne réagissent pas à la saturation).
+    - Si non (déjà en couleur) : boost saturation + contraste + réchauffement.
     """
     from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
     image = Image.open(chemin_source).convert("RGB")
+    pixels = image.load()
+    largeur, hauteur = image.size
 
-    # 1. Auto-contraste (égalisation d'histogramme) pour corriger la balance
-    image = ImageOps.autocontrast(image, cutoff=2)
+    # --- Détection niveaux de gris ---
+    # Échantillonne jusqu'à 5000 pixels pour déterminer si l'image est N&B
+    echantillon_max = 5000
+    pas_x = max(1, largeur // 70)
+    pas_y = max(1, hauteur // 70)
+    nb_pixels, nb_gris = 0, 0
+    seuil_gris = 8  # tolérance pour considérer un pixel comme « gris »
 
-    # 2. Augmentation forte de la saturation
-    ameliorateur = ImageEnhance.Color(image)
-    image = ameliorateur.enhance(2.5)
+    for y in range(0, hauteur, pas_y):
+        for x in range(0, largeur, pas_x):
+            if nb_pixels >= echantillon_max:
+                break
+            r, g, b = pixels[x, y][:3]
+            if abs(r - g) <= seuil_gris and abs(g - b) <= seuil_gris and abs(r - b) <= seuil_gris:
+                nb_gris += 1
+            nb_pixels += 1
+        if nb_pixels >= echantillon_max:
+            break
 
-    # 3. Légère augmentation du contraste
-    ameliorateur = ImageEnhance.Contrast(image)
-    image = ameliorateur.enhance(1.15)
+    ratio_gris = nb_gris / max(nb_pixels, 1)
+    est_nb = ratio_gris > 0.92  # >92% des pixels sont dans une plage de gris
 
-    # 4. Réchauffement léger : booster rouge, réduire bleu
-    r, g, b = image.split()
-    r = r.point(lambda p: min(255, int(p * 1.08)))
-    b = b.point(lambda p: min(255, int(p * 0.92)))
-    image = Image.merge("RGB", (r, g, b))
+    if est_nb:
+        logger.info(
+            f"Image détectée comme N&B (ratio gris={ratio_gris:.2f}), "
+            f"application teinte sépia"
+        )
+        # Conversion en niveaux de gris puis application d'une teinte sépia
+        # via transformation par canal (opérations C-level rapides)
+        gris = image.convert("L")
 
-    # 5. Légère netteté
-    ameliorateur = ImageEnhance.Sharpness(image)
-    image = ameliorateur.enhance(1.2)
+        # Sépia classique : boost rouge, modéré vert, réduit bleu
+        r = gris.point(lambda p: min(255, int(p * 1.08 + 18)))
+        g = gris.point(lambda p: min(255, int(p * 0.95 + 8)))
+        b = gris.point(lambda p: min(255, int(p * 0.72)))
+
+        image = Image.merge("RGB", (r, g, b))
+
+        # Léger boost contraste pour faire ressortir la teinte
+        ameliorateur = ImageEnhance.Contrast(image)
+        image = ameliorateur.enhance(1.15)
+
+        # Légère netteté
+        ameliorateur = ImageEnhance.Sharpness(image)
+        image = ameliorateur.enhance(1.1)
+    else:
+        logger.info(
+            f"Image déjà en couleur (ratio gris={ratio_gris:.2f}), "
+            f"boost saturation + réchauffement"
+        )
+        # 1. Auto-contraste (égalisation d'histogramme)
+        image = ImageOps.autocontrast(image, cutoff=2)
+
+        # 2. Boost saturation
+        ameliorateur = ImageEnhance.Color(image)
+        image = ameliorateur.enhance(2.0)
+
+        # 3. Léger boost contraste
+        ameliorateur = ImageEnhance.Contrast(image)
+        image = ameliorateur.enhance(1.15)
+
+        # 4. Réchauffement : booster rouge, réduire bleu
+        r, g, b = image.split()
+        r = r.point(lambda p: min(255, int(p * 1.08)))
+        b = b.point(lambda p: min(255, int(p * 0.92)))
+        image = Image.merge("RGB", (r, g, b))
+
+        # 5. Légère netteté
+        ameliorateur = ImageEnhance.Sharpness(image)
+        image = ameliorateur.enhance(1.2)
 
     image.save(chemin_destination, quality=95)
 
@@ -426,8 +478,6 @@ def _colorisation_pillow(chemin_source: str, chemin_destination: str) -> None:
 # ---------------------------------------------------------------------------
 # Restauration IA par Gemini Image Model
 # ---------------------------------------------------------------------------
-
-GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview"  # latest banana flash
 
 PROMPT_RESTAURATION_IA = (
     "Restaure cette photo ancienne en haute qualité. "
