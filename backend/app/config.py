@@ -17,10 +17,9 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR.parent / ".env")
 UPLOAD_DIR = BASE_DIR / "uploads"
 DB_PATH = BASE_DIR / "flashback.db"
-DATABASE_URL: str = os.getenv(
-    "DATABASE_URL",
-    "postgresql+asyncpg://flashback:flashback@localhost:5432/flashback",
-)
+DATABASE_URL: str = os.getenv("DATABASE_URL", "")
+if not DATABASE_URL:
+    raise RuntimeError("DATABASE_URL must be set in environment or .env file")
 
 # Création automatique du répertoire d'upload
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -31,15 +30,9 @@ if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY must be set in environment or .env file")
 GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-image-preview")
 
-# --- API D-ID ---
+# --- API D-ID (désactivée — Veo 3.1 exclusif) ---
 DID_API_KEY: str = os.getenv("DID_API_KEY", "")
-if not DID_API_KEY:
-    import warnings
-    warnings.warn("DID_API_KEY not set — animation service will use Veo 3.1 only. D-ID legacy support disabled.", RuntimeWarning)
-DID_BASE_URL: str = os.getenv(
-    "DID_BASE_URL",
-    "https://api.d-id.com",
-)
+DID_BASE_URL: str = os.getenv("DID_BASE_URL", "https://api.d-id.com")
 
 # --- Sécurité ---
 SECRET_KEY: str = os.getenv("SECRET_KEY")

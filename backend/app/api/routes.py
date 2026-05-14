@@ -27,7 +27,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from arq.jobs import Job as ArqJob, JobStatus as ArqJobStatus
 
-from app.config import DID_API_KEY, DID_BASE_URL, GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
+from app.config import GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
 from app.auth import exiger_utilisateur
 from app.db.queries import (
     CREDITS_PAR_PLAN,
@@ -52,7 +52,6 @@ from app.db.queries import (
     stripe_event_deja_traite,
 )
 from app.services.credits import consommer_operation, peut_animer, peut_restaurer
-from app.limiter import limiter
 from app.models.schemas import (
     AnalyseReponse,
     AnimationReponse,
@@ -255,7 +254,6 @@ URL_ANNULATION_STRIPE = f"{SITE_URL}/abonnement/annulation"
 # ---------------------------------------------------------------------------
 
 @router.get("/health", response_model=SanteReponse)
-@limiter.limit("10/minute")
 async def sante(request: Request):
     """
     Vérification de l'état du service.
@@ -281,8 +279,8 @@ async def sante(request: Request):
         except Exception as e:
             logger.warning(f"Test de connectivité Gemini échoué : {e}")
 
-    # --- Test D-ID : vérification simple de la présence de la clé ---
-    did_ok = bool(DID_API_KEY)
+    # D-ID retiré — Veo 3.1 exclusif
+    did_ok = False
 
     # --- Test Base de données : SELECT 1 via SQLAlchemy async ---
     db_ok = False
@@ -816,7 +814,6 @@ async def admin_detail_utilisateur(
 # ---------------------------------------------------------------------------
 
 @router.post("/analyze", response_model=AnalyseReponse)
-@limiter.limit("10/minute")
 async def analyser(
     request: Request,
     fichier: UploadFile = File(...),
@@ -942,7 +939,6 @@ def _appliquer_restauration_pillow(
 
 
 @router.post("/restore")
-@limiter.limit("20/hour")
 async def restaurer(
     request: Request,
     fichier: UploadFile = File(...),
@@ -1051,7 +1047,6 @@ async def restaurer(
 # ---------------------------------------------------------------------------
 
 @router.post("/colorize", response_model=RestaurationReponse)
-@limiter.limit("5/minute")
 async def coloriser_standalone(
     request: Request,
     fichier: UploadFile = File(...),
@@ -1139,7 +1134,6 @@ async def coloriser_standalone(
 # ---------------------------------------------------------------------------
 
 @router.post("/animate")
-@limiter.limit("20/hour")
 async def animer(
     request: Request,
     fichier: UploadFile = File(...),

@@ -16,7 +16,7 @@ from pathlib import Path
 from arq.connections import RedisSettings
 from arq import create_pool
 
-from app.config import DID_BASE_URL, GEMINI_API_KEY, GEMINI_MODEL, PUBLIC_BACKEND_URL, UPLOAD_DIR
+from app.config import GEMINI_API_KEY, GEMINI_MODEL, PUBLIC_BACKEND_URL, UPLOAD_DIR
 from app.db.queries import (
     mettre_a_jour_travail,
     mettre_a_jour_job_externe_id,
@@ -313,27 +313,8 @@ async def _rembourser_si_echec(
 
 
 async def _worker_shutdown(ctx):
-    """Appelé par ARQ à l'arrêt du worker (SIGTERM/SIGINT).
-
-    Force un WAL checkpoint avant de quitter si SQLite.
-    Ne dispose PAS l'engine SQLAlchemy (partagé avec le backend).
-    """
-    from app.config import DATABASE_URL as _DB_URL
-
-    if "sqlite" in _DB_URL:
-        logger.info("[ARQ] Arrêt du worker — WAL checkpoint en cours...")
-        try:
-            import sqlite3
-            from pathlib import Path
-            from app.config import DB_PATH
-            conn = sqlite3.connect(str(DB_PATH))
-            conn.execute("PRAGMA wal_checkpoint(TRUNCATE)")
-            conn.close()
-            logger.info("[ARQ] Worker arrêté proprement — WAL checkpoint OK.")
-        except Exception as e:
-            logger.error(f"[ARQ] Erreur lors du WAL checkpoint worker : {e}")
-    else:
-        logger.info("[ARQ] Worker arrêté proprement (PostgreSQL).")
+    """Appelé par ARQ à l'arrêt du worker (SIGTERM/SIGINT)."""
+    logger.info("[ARQ] Worker arrêté proprement (PostgreSQL).")
 
 
 class WorkerSettings:
