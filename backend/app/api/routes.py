@@ -94,8 +94,8 @@ TARIF_RESTAURATION: dict[str, int] = {
 
 TARIF_COLORISATION: dict[str, int] = {
     "720p": 1,
-    "1080p": 2,
-    "4k": 4,
+    "1080p": 1,
+    "4k": 1,
 }
 
 TARIF_ANIMATION: dict[str, int] = {

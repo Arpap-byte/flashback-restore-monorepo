@@ -27,10 +27,10 @@ class TestTarification:
         assert TARIF_COLORISATION["720p"] == 1
 
     def test_tarif_colorisation_1080p(self):
-        assert TARIF_COLORISATION["1080p"] == 2
+        assert TARIF_COLORISATION["1080p"] == 1
 
     def test_tarif_colorisation_4k(self):
-        assert TARIF_COLORISATION["4k"] == 4
+        assert TARIF_COLORISATION["4k"] == 1
 
     def test_tarif_animation_720p(self):
         assert TARIF_ANIMATION["720p"] == 10
@@ -44,9 +44,9 @@ class TestTarification:
         assert total == 2
 
     def test_tarif_restauration_4k_colorize_total(self):
-        """4K + colorisation = 4 + 4 = 8 crédits"""
+        """4K + colorisation = 4 + 1 = 5 crédits"""
         total = TARIF_RESTAURATION["4k"] + TARIF_COLORISATION["4k"]
-        assert total == 8
+        assert total == 5
 
     def test_resolution_invalide_non_presente(self):
         """Les résolutions non supportées ne sont pas dans le dict."""

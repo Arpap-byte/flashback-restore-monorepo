@@ -32,8 +32,7 @@ import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollResto
 
 function getCreditTotal(resolution: string, colorize: boolean): number {
   const base = resolution === "4k" ? 4 : resolution === "1080p" ? 2 : 1;
-  const colorExtra = resolution === "4k" ? 4 : resolution === "1080p" ? 2 : 1;
-  return base + (colorize ? colorExtra : 0);
+  return base + (colorize ? 1 : 0);
 }
 
 function Label({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>, label: string }) {
@@ -81,7 +80,12 @@ export default function RestorePage() {
     let cancelled = false;
     if (restoreResult?.url_image) {
       getPhotoUrlAsync(restoreResult.url_image).then((url) => {
-        if (!cancelled) setRestoredUrl(url || null);
+        if (!cancelled) {
+          // Si getPhotoUrlAsync échoue, utiliser l'URL brute comme fallback
+          setRestoredUrl(url || `${window.location.origin}${restoreResult.url_image}`);
+        }
+      }).catch(() => {
+        if (!cancelled) setRestoredUrl(`${window.location.origin}${restoreResult.url_image}`);
       });
     } else {
       setRestoredUrl(null);
@@ -485,7 +489,7 @@ export default function RestorePage() {
                             {colorize ? "Colorisation activée" : "Ajouter la colorisation"}
                           </div>
                           <div className="text-xs text-muted">
-                            +{resolution === "4k" ? "4" : resolution === "1080p" ? "2" : "1"} crédit{resolution === "4k" || resolution === "1080p" ? "s" : ""}
+                            +1 crédit
                           </div>
                         </div>
                         <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
