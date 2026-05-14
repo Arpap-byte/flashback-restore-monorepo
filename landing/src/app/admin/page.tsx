@@ -431,6 +431,66 @@ function CreditsDetail({ data }: { data: DashboardData["credits"] }) {
 
 // ── Page principale ─────────────────────────────────────────────────
 
+// ── Section Logs de connexion ──────────────────────────────────────
+
+interface AuditLogEntry {
+  id: string;
+  evenement: string;
+  email: string | null;
+  ip: string | null;
+  reussite: number;
+  detail: string | null;
+  cree_le: string;
+}
+
+function AuditLogsSection({ adminKey }: { adminKey: string }) {
+  const [logs, setLogs] = useState<AuditLogEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/audit-logs?limite=10", { headers: { "X-Admin-Key": adminKey } })
+      .then((r) => r.json())
+      .then((d) => { setLogs(d.logs || []); setLoading(false); })
+      .catch(() => setLoading(false));
+  }, [adminKey]);
+
+  if (loading) return <div className="text-zinc-500 text-sm animate-pulse">Chargement...</div>;
+  if (logs.length === 0) return <div className="text-zinc-500 text-sm">Aucune connexion enregistrée.</div>;
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-zinc-500 border-b border-zinc-800">
+            <th className="text-left py-2 pr-3 font-medium">Événement</th>
+            <th className="text-left py-2 pr-3 font-medium">Email</th>
+            <th className="text-left py-2 pr-3 font-medium">IP</th>
+            <th className="text-left py-2 pr-3 font-medium">Résultat</th>
+            <th className="text-right py-2 font-medium">Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {logs.map((log) => (
+            <tr key={log.id} className="border-b border-zinc-800/50">
+              <td className="py-2 pr-3 text-zinc-300 capitalize">{log.evenement}</td>
+              <td className="py-2 pr-3 text-zinc-300 max-w-[180px] truncate">{log.email || "—"}</td>
+              <td className="py-2 pr-3 text-zinc-500 font-mono text-xs">{log.ip || "—"}</td>
+              <td className="py-2 pr-3">
+                <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${log.reussite ? "bg-emerald-500/20 text-emerald-400" : "bg-red-500/20 text-red-400"}`}>
+                  {log.reussite ? "✅ OK" : "❌ Échec"}
+                </span>
+              </td>
+              <td className="py-2 text-right text-zinc-500 text-xs whitespace-nowrap">{formatDate(log.cree_le)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ── Page principale ─────────────────────────────────────────────────
+
 export default function AdminDashboard() {
   const [adminKey, setAdminKey] = useState("");
   const [authenticated, setAuthenticated] = useState(false);
@@ -577,6 +637,12 @@ export default function AdminDashboard() {
             <StatCard label="Actifs" value={data.credits.credits_actifs} icon={Coins} accent="emerald"
               onClick={() => openModal("credits", "Détail des crédits")} />
           </div>
+        </section>
+
+        {/* Section Connexions */}
+        <section className="mb-6">
+          <h2 className="text-lg font-semibold text-zinc-300 mb-3">🔐 Connexions</h2>
+          <AuditLogsSection adminKey={adminKey} />
         </section>
 
         {/* Modals */}

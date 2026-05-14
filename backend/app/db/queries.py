@@ -454,6 +454,19 @@ async def mettre_a_jour_derniere_connexion(utilisateur_id: str) -> bool:
         return result.rowcount > 0
 
 
+async def mettre_a_jour_email(utilisateur_id: str, nouvel_email: str) -> bool:
+    """Met à jour l'email d'un utilisateur (ex: placeholder → email réel Clerk)."""
+    async with async_session() as session:
+        stmt = (
+            update(Utilisateur)
+            .where(Utilisateur.id == utilisateur_id)
+            .values(email=nouvel_email)
+        )
+        result = await session.execute(stmt)
+        await session.commit()
+        return result.rowcount > 0
+
+
 async def decrementer_essais(utilisateur_id: str) -> int:
     """Décrémente le compteur d'essais. Retourne le nombre restant."""
     async with async_session() as session:
