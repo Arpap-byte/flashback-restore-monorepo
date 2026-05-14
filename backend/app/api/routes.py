@@ -132,11 +132,57 @@ MAGIC_MIME_TYPES = {
     'image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/tiff'
 }
 
+# Signatures de fichiers image (magic numbers) — fallback si python-magic
+# détecte un faux type (ex: application/json pour des images exotiques)
+_SIGNATURES_IMAGE: dict[bytes, str] = {
+    b'\xff\xd8\xff': 'image/jpeg',       # JPEG
+    b'\x89PNG': 'image/png',             # PNG
+    b'GIF8': 'image/gif',                # GIF
+    b'RIFF': 'image/webp',               # WebP (vérification supplémentaire)
+    b'MM\x00*': 'image/tiff',            # TIFF big-endian
+    b'II*\x00': 'image/tiff',            # TIFF little-endian
+}
+
+
+def _valider_signature_image(contenu: bytes) -> Optional[str]:
+    """Vérifie si les premiers octets correspondent à un format image connu.
+
+    Retourne le type MIME si reconnu, None sinon.
+    Fallback quand python-magic se trompe.
+    """
+    if len(contenu) < 8:
+        return None
+    for signature, mime in _SIGNATURES_IMAGE.items():
+        if contenu.startswith(signature):
+            # Vérification WebP : doit avoir 'WEBP' aux octets 8-11
+            if signature == b'RIFF':
+                if len(contenu) >= 12 and contenu[8:12] == b'WEBP':
+                    return mime
+                continue  # RIFF mais pas WebP → ne pas matcher
+            return mime
+    return None
+
 
 def _valider_upload_par_contenu(contenu: bytes) -> bool:
-    """Vérifie le vrai type MIME du fichier via magic bytes (python-magic)."""
+    """Vérifie le vrai type MIME du fichier via magic bytes (python-magic).
+
+    Fallback sur la signature binaire si python-magic se trompe.
+    """
     detected = magic.from_buffer(contenu, mime=True)
-    return detected in MAGIC_MIME_TYPES
+    if detected in MAGIC_MIME_TYPES:
+        return True
+
+    # Fallback : python-magic peut se tromper (ex: application/json
+    # pour une image). On vérifie la signature binaire directement.
+    fallback_mime = _valider_signature_image(contenu)
+    if fallback_mime is not None:
+        logger.warning(
+            f"python-magic a détecté '{detected}' mais la signature binaire "
+            f"indique '{fallback_mime}' — accepté via fallback"
+        )
+        return True
+
+    return False
 
 
 def _valider_upload(fichier: UploadFile, contenu: bytes, nom_par_defaut: str = "photo.jpg") -> str:

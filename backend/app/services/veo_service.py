@@ -89,6 +89,72 @@ def _image_en_base64(chemin: str) -> tuple[str, str]:
     return b64, mime
 
 
+async def _uploader_image_gemini(chemin: str) -> tuple[str, str]:
+    """Upload l'image vers l'API File de Gemini et retourne (file_uri, mime_type).
+
+    Veo 3.1 exige que l'image soit d'abord uploadée via l'API File,
+    puis référencée par son fileUri dans la requête predictLongRunning.
+    """
+    path = Path(chemin)
+    if not path.exists():
+        raise FileNotFoundError(f"Image introuvable : {chemin}")
+
+    suffix = path.suffix.lower()
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+    }
+    mime_type = mime_map.get(suffix, "image/jpeg")
+
+    # Étape 1 : obtenir une URL d'upload signée
+    async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
+        init_resp = await client.post(
+            f"https://generativelanguage.googleapis.com/upload/v1beta/files",
+            params={"key": GEMINI_API_KEY},
+            headers={"X-Goog-Upload-Protocol": "resumable",
+                     "X-Goog-Upload-Command": "start",
+                     "X-Goog-Upload-Header-Content-Type": mime_type,
+                     "X-Goog-Upload-Header-Slug": path.name},
+        )
+        init_resp.raise_for_status()
+        upload_url = init_resp.headers.get("X-Goog-Upload-URL")
+        if not upload_url:
+            raise RuntimeError(
+                f"Gemini Files: pas d'URL d'upload dans la réponse. "
+                f"Status={init_resp.status_code}, body={init_resp.text[:200]}"
+            )
+
+    # Étape 2 : uploader les bytes
+    image_bytes = path.read_bytes()
+    async with httpx.AsyncClient(timeout=120.0, follow_redirects=True) as client:
+        upload_resp = await client.post(
+            upload_url,
+            params={"key": GEMINI_API_KEY},
+            headers={"X-Goog-Upload-Command": "upload, finalize",
+                     "X-Goog-Upload-Offset": "0",
+                     "Content-Type": mime_type},
+            content=image_bytes,
+        )
+        upload_resp.raise_for_status()
+        file_info = upload_resp.json()
+
+    file_name = file_info.get("file", {}).get("name")
+    if not file_name:
+        raise RuntimeError(
+            f"Gemini Files: pas de 'name' dans la réponse. "
+            f"body={upload_resp.text[:200]}"
+        )
+
+    file_uri = f"https://generativelanguage.googleapis.com/v1beta/{file_name}"
+    logger.info(
+        f"Gemini Files upload — {path.name} → {file_name} "
+        f"({len(image_bytes)} octets)"
+    )
+    return file_uri, mime_type
+
+
 async def _soumettre_veo(
     b64_image: str,
     mime_type: str,
