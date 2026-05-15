@@ -31,39 +31,54 @@ VEO_MODEL_FAST = "veo-3.1-fast-generate-preview"       # fallback si overload
 VEO_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 
 # ---------------------------------------------------------------------------
-# Prompts par comportement (en anglais, Veo comprend mieux)
+# Préfixe commun — contraintes de fidélité à la photo originale
+# Appliqué à TOUS les prompts. Cadrage positif (pas de "DO NOT").
+# Effet de récence via SUFFIX_FIDELITE en fin de prompt.
+# ---------------------------------------------------------------------------
+
+PREFIX_FIDELITE = (
+    "Static locked camera, fixed composition, identical background and lighting "
+    "as the original photo. The background, setting, and decor remain completely "
+    "unchanged — exactly as in the input image. No camera movement of any kind: "
+    "no pan, no zoom, no dolly, no tracking. Same framing, no crop. "
+    "Only the person moves"
+)
+
+SUFFIX_FIDELITE = "Background and lighting identical to the input photo, fixed camera"
+
+# ---------------------------------------------------------------------------
+# Prompts par comportement — ÉPURÉS de toute référence à la lumière/décor
 # ---------------------------------------------------------------------------
 
 PROMPTS_PAR_COMPORTEMENT: dict[str, str] = {
     "naturel": (
-        "Subtle natural micro-expressions on a still face, gentle breathing visible "
-        "in the chest and shoulders, soft ambient light, photorealistic portrait, "
-        "smooth cinematic motion, 24fps, shallow depth of field"
+        "Subtle natural micro-expressions on the face, gentle breathing visible "
+        "in the chest and shoulders, the person remains still and calm, "
+        "photorealistic portrait, natural subtle motion"
     ),
     "sourire": (
         "A warm genuine smile slowly spreading across the face, eyes crinkling softly "
-        "with quiet joy, subtle natural head tilt, golden hour cinematic lighting, "
-        "photorealistic portrait, smooth elegant motion, 24fps"
+        "with quiet joy, subtle natural head tilt, "
+        "photorealistic portrait, gentle natural motion"
     ),
     "rire": (
-        "A spontaneous joyful laugh, head tilting back slightly, eyes closing naturally, "
-        "shoulders moving with laughter, warm golden lighting, candid happy moment, "
-        "photorealistic, smooth natural motion, 24fps"
+        "A spontaneous joyful laugh, slight natural head tilt, eyes closing naturally, "
+        "shoulders moving gently with laughter, "
+        "photorealistic, gentle natural motion"
     ),
     "respirer": (
         "Gentle visible breathing, chest rising and falling subtly, calm serene expression, "
-        "soft diffused natural light, photorealistic portrait, meditative smooth motion, "
-        "24fps, shallow depth of field"
+        "photorealistic portrait, meditative gentle motion"
     ),
     "clin_oeil": (
-        "A playful wink, one eye closing while the other stays open, slight mischievous "
-        "smile forming, head tilting playfully, soft cinematic lighting, photorealistic "
-        "portrait, smooth motion, 24fps"
+        "A playful wink, one eye closing while the other stays open, a slight mischievous "
+        "smile forming, subtle head tilt, "
+        "photorealistic portrait, gentle motion"
     ),
     "salut": (
         "A friendly warm greeting, slight nod of the head, welcoming smile appearing, "
-        "natural friendly expression, soft daylight, photorealistic portrait, smooth "
-        "natural motion, 24fps"
+        "natural friendly expression, "
+        "photorealistic portrait, gentle natural motion"
     ),
 }
 
@@ -275,7 +290,8 @@ async def creer_animation_veo(
     Returns:
         Tuple (chemin_video_local, url_video_relative).
     """
-    prompt = PROMPTS_PAR_COMPORTEMENT.get(comportement, PROMPTS_PAR_COMPORTEMENT["naturel"])
+    prompt_base = PROMPTS_PAR_COMPORTEMENT.get(comportement, PROMPTS_PAR_COMPORTEMENT["naturel"])
+    prompt = f"{PREFIX_FIDELITE}. {prompt_base}. {SUFFIX_FIDELITE}."
     b64_image, mime_type = _image_en_base64(chemin_photo)
 
     logger.info(
