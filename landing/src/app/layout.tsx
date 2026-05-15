@@ -56,7 +56,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${inter.variable} ${playfair.variable} h-full antialiased dark`}
+      className={`${inter.variable} ${playfair.variable} h-full antialiased`}
       suppressHydrationWarning
     >
       <body className="min-h-full bg-background text-foreground font-sans transition-colors">

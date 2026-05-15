@@ -16,7 +16,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Charge les variables d'environnement depuis .env
 load_dotenv(BASE_DIR.parent / ".env")
 UPLOAD_DIR = BASE_DIR / "uploads"
-DB_PATH = BASE_DIR / "flashback.db"
 DATABASE_URL: str = os.getenv("DATABASE_URL", "")
 if not DATABASE_URL:
     raise RuntimeError("DATABASE_URL must be set in environment or .env file")
@@ -29,10 +28,6 @@ GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
 if not GEMINI_API_KEY:
     raise RuntimeError("GEMINI_API_KEY must be set in environment or .env file")
 GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-image-preview")
-
-# --- API D-ID (désactivée — Veo 3.1 exclusif) ---
-DID_API_KEY: str = os.getenv("DID_API_KEY", "")
-DID_BASE_URL: str = os.getenv("DID_BASE_URL", "https://api.d-id.com")
 
 # --- Sécurité ---
 SECRET_KEY: str = os.getenv("SECRET_KEY")

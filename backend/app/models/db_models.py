@@ -145,7 +145,7 @@ class EssaiGratuit(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_travail IN ('analyse', 'restauration', 'animation')",
+            "type_travail IN ('analyse', 'restauration', 'animation', 'colorisation')",
             name="ck_essais_type",
         ),
     )
@@ -177,7 +177,7 @@ class ConsommationCredits(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "type_operation IN ('restauration', 'animation')",
+            "type_operation IN ('restauration', 'animation', 'colorisation')",
             name="ck_consommation_type",
         ),
     )

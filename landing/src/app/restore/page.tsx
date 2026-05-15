@@ -1,16 +1,21 @@
 "use client";
 
+import type { Metadata } from 'next';
 import { useState, useEffect, useCallback, useRef } from "react";
+
+export const metadata: Metadata = {
+  title: 'Restaurer une photo — Flashback Restore',
+  description: 'Restaurez vos photos anciennes avec l\'IA. Réparation automatique des défauts, rayures et taches.',
+  openGraph: { images: ['/og-default.jpg'] },
+};
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   Upload,
   Sparkles,
-  ArrowRight,
   AlertTriangle,
-  Shield,
   LogIn,
   X,
   Download,
@@ -110,7 +115,9 @@ export default function RestorePage() {
         try {
           const res = await fetch(url);
           if (!res.ok) {
-            console.error("Impossible de charger la photo pour restauration:", res.status);
+            if (process.env.NODE_ENV === "development") {
+              console.error("Impossible de charger la photo pour restauration:", res.status);
+            }
             return;
           }
           const blob = await res.blob();

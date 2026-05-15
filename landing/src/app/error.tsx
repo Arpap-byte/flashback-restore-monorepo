@@ -12,7 +12,9 @@ export default function Error({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Erreur de la page :", error);
+    if (process.env.NODE_ENV === "development") {
+      console.error("Erreur de la page :", error);
+    }
   }, [error]);
 
   return (

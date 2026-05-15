@@ -1,12 +1,19 @@
 "use client";
 
+import type { Metadata } from 'next';
 import { useState, useEffect, useCallback } from "react";
+
+export const metadata: Metadata = {
+  title: 'Historique — Flashback Restore',
+  description: 'Retrouvez toutes vos photos restaurées et animées. Gérez votre historique de travaux.',
+  openGraph: { images: ['/og-default.jpg'] },
+};
 import { motion } from "framer-motion";
 import Image from "next/image";
 import {
   History, Image as ImageIcon, Sparkles, AlertTriangle,
   ExternalLink, Clock, Trash2, RotateCw, Video, ShieldCheck,
-  Calendar, Download, ChevronDown, Wand2, Film, Upload, Camera,
+  Calendar, Download, ChevronDown, Wand2, Film, Upload,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";

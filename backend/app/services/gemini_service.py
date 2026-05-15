@@ -236,55 +236,6 @@ Règles :
 Sois précis. Une photo très abîmée nécessite des corrections plus fortes."""
 
 
-async def obtenir_parametres_restauration(chemin_image: str) -> ParametresRestauration:
-    """
-    Demande à Gemini les paramètres optimaux de restauration pour une photo.
-
-    Args:
-        chemin_image: Chemin local vers le fichier image.
-
-    Returns:
-        Un objet ParametresRestauration avec les paramètres recommandés.
-
-    Raises:
-        Exception: Si l'API Gemini échoue.
-    """
-    logger.info(f"Obtention des paramètres de restauration pour : {chemin_image}")
-
-    client = _obtenir_client()
-    image_bytes = Path(chemin_image).read_bytes()
-
-    response = await asyncio.to_thread(
-        client.models.generate_content,
-        model=GEMINI_MODEL,
-        contents=[
-            PROMPT_RESTAURATION,
-            types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-        ],
-        config=types.GenerateContentConfig(
-            temperature=0.3,
-            max_output_tokens=2048,
-        ),
-    )
-
-    texte_brut = response.text.strip() if response.text else ""
-    data = _parser_json_gemini(texte_brut)
-
-    params = ParametresRestauration(
-        luminosite=float(data.get("luminosite", 1.0)),
-        contraste=float(data.get("contraste", 1.0)),
-        saturation=float(data.get("saturation", 1.0)),
-        nettete=float(data.get("nettete", 1.0)),
-        debruitage=float(data.get("debruitage", 0.0)),
-        correction_rouge=float(data.get("correction_rouge", 1.0)),
-        correction_vert=float(data.get("correction_vert", 1.0)),
-        correction_bleu=float(data.get("correction_bleu", 1.0)),
-    )
-
-    logger.info(f"Paramètres obtenus : luminosite={params.luminosite}, contraste={params.contraste}")
-    return params
-
-
 # ---------------------------------------------------------------------------
 # Colorisation
 # ---------------------------------------------------------------------------

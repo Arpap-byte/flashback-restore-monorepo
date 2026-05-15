@@ -280,9 +280,6 @@ async def sante(request: Request):
         except Exception as e:
             logger.warning(f"Test de connectivité Gemini échoué : {e}")
 
-    # D-ID retiré — Veo 3.1 exclusif
-    did_ok = False
-
     # --- Test Base de données : SELECT 1 via SQLAlchemy async ---
     db_ok = False
     try:
@@ -309,7 +306,6 @@ async def sante(request: Request):
         statut="OK",
         version="1.0.0",
         gemini_disponible=gemini_ok,
-        did_disponible=did_ok,
         db_disponible=db_ok,
         stripe_disponible=stripe_ok,
         b2_disponible=b2_ok,
@@ -869,75 +865,6 @@ async def analyser(
 # ---------------------------------------------------------------------------
 # Restauration
 # ---------------------------------------------------------------------------
-
-def _appliquer_restauration_pillow(
-    chemin_source: str,
-    chemin_destination: str,
-    params: ParametresRestauration,
-) -> None:
-    """
-    Applique les paramètres de restauration à une image avec Pillow.
-
-    Étapes :
-    1. Ajustement de la luminosité
-    2. Ajustement du contraste
-    3. Ajustement de la saturation
-    4. Ajustement de la netteté (filtre unsharp mask)
-    5. Débruitage (filtre median)
-    6. Correction des canaux de couleur (rouge, vert, bleu)
-    """
-    image = Image.open(chemin_source).convert("RGB")
-    logger.info(
-        f"Restauration de {chemin_source} — "
-        f"taille={image.size}, params={params.model_dump()}"
-    )
-
-    # 1. Luminosité
-    if params.luminosite != 1.0:
-        ameliorateur = ImageEnhance.Brightness(image)
-        image = ameliorateur.enhance(params.luminosite)
-
-    # 2. Contraste
-    if params.contraste != 1.0:
-        ameliorateur = ImageEnhance.Contrast(image)
-        image = ameliorateur.enhance(params.contraste)
-
-    # 3. Saturation
-    if params.saturation != 1.0:
-        ameliorateur = ImageEnhance.Color(image)
-        image = ameliorateur.enhance(params.saturation)
-
-    # 4. Netteté (unsharp mask ou sharpen)
-    if params.nettete > 1.0:
-        ameliorateur = ImageEnhance.Sharpness(image)
-        image = ameliorateur.enhance(params.nettete)
-    elif params.nettete < 1.0:
-        # Flou léger si nettete < 1
-        rayon = int((1.0 - params.nettete) * 2)
-        image = image.filter(ImageFilter.GaussianBlur(radius=max(1, rayon)))
-
-    # 5. Débruitage (filtre médian)
-    if params.debruitage > 0.1:
-        # Taille du kernel : 1, 3 ou 5 selon l'intensité
-        taille = 3 if params.debruitage < 0.5 else 5
-        image = image.filter(ImageFilter.MedianFilter(size=taille))
-
-    # 6. Correction des canaux de couleur
-    if (
-        params.correction_rouge != 1.0
-        or params.correction_vert != 1.0
-        or params.correction_bleu != 1.0
-    ):
-        r, g, b = image.split()
-        r = r.point(lambda p: min(255, int(p * params.correction_rouge)))
-        g = g.point(lambda p: min(255, int(p * params.correction_vert)))
-        b = b.point(lambda p: min(255, int(p * params.correction_bleu)))
-        image = Image.merge("RGB", (r, g, b))
-
-    # Sauvegarde
-    image.save(chemin_destination, quality=95)
-    logger.info(f"Image restaurée sauvegardée : {chemin_destination}")
-
 
 @router.post("/restore")
 async def restaurer(

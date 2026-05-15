@@ -139,9 +139,6 @@ class SanteReponse(BaseModel):
     gemini_disponible: bool = Field(
         default=True, description="Indique si l'API Gemini est accessible"
     )
-    did_disponible: bool = Field(
-        default=True, description="Indique si la clé API D-ID est configurée"
-    )
     db_disponible: bool = Field(
         default=True, description="Indique si la base de données est accessible"
     )

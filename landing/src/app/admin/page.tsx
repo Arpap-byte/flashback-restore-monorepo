@@ -232,7 +232,7 @@ function TravauxList({ adminKey, type, statut }: { adminKey: string; type?: stri
 
   return (
     <div>
-      <div className="text-xs text-zinc-500 mb-3">{travaux.length} travail/travaux {titleParts.length ? `· ${titleParts.join(" · ")}` : ""}</div>
+      <div className="text-xs text-zinc-500 mb-3">{travaux.length} {travaux.length > 1 ? 'travaux' : 'travail'} {titleParts.length ? `· ${titleParts.join(" · ")}` : ""}</div>
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>

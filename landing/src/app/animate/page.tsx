@@ -1,14 +1,21 @@
 "use client";
 
+import type { Metadata } from 'next';
 import { useState, useEffect, useCallback, useRef } from "react";
+
+export const metadata: Metadata = {
+  title: 'Animer une photo — Flashback Restore',
+  description: 'Donnez vie à vos photos avec l\'animation IA. Transformez un portrait en vidéo réaliste.',
+  openGraph: { images: ['/og-default.jpg'] },
+};
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import {
-  Upload, Sparkles, AlertTriangle, X, Download, Play,
-  RefreshCw, Film, Heart, Smile, Eye, Wind, Loader2,
+  Sparkles, AlertTriangle, X, Download, Play,
+  RefreshCw, Film, Heart, Smile, Eye, Wind,
   Hand, Clock, Monitor,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
@@ -62,7 +69,9 @@ export default function AnimatePage() {
           if (!res.ok) {
             // Token expiré ou accès refusé → on ne peut pas charger l'image
             // L'aperçu reste affiché (chargé avant tentative de fetch via setPreview)
-            console.error("Impossible de charger la photo pour animation:", res.status);
+            if (process.env.NODE_ENV === "development") {
+              console.error("Impossible de charger la photo pour animation:", res.status);
+            }
             return;
           }
           const blob = await res.blob();

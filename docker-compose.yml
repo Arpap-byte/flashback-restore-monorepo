@@ -1,6 +1,6 @@
 services:
   traefik:
-    image: traefik:latest
+    image: traefik:v3.6.2
     container_name: traefik
     network_mode: host
     command:
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
 
   n8n:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:2.2.5
     container_name: n8n
     environment:
       - N8N_HOST=${DOMAIN}
@@ -49,6 +49,12 @@ services:
   postgres:
     image: postgres:15
     container_name: postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U n8n -d n8n"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     environment:
       - POSTGRES_USER=n8n
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}

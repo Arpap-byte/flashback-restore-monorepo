@@ -463,26 +463,3 @@ async def creer_animation_veo(
     )
 
     return str(chemin_local), url_relative
-
-
-async def verifier_statut_animation_veo(op_name: str) -> dict:
-    """
-    Vérifie le statut d'une opération Veo en cours.
-    Gardé pour compatibilité avec le pattern de l'ancienne API.
-    En pratique, le worker fait le polling lui-même.
-
-    Returns:
-        {"statut": "en_cours" | "termine" | "erreur", "url_video": ..., "message": ...}
-    """
-    try:
-        data = await _poll_veo(op_name, timeout=10)
-        gvr = data["response"]["generateVideoResponse"]
-        samples = gvr.get("generatedSamples", [])
-        if samples:
-            uri = samples[0].get("video", {}).get("uri", "")
-            return {"statut": "termine", "url_video": uri}
-        return {"statut": "termine", "url_video": None}
-    except RuntimeError as e:
-        return {"statut": "erreur", "message": str(e)}
-    except Exception as e:
-        return {"statut": "en_cours", "message": str(e)}

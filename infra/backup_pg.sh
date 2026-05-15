@@ -25,6 +25,17 @@ if [ ! -s "$DUMP_FILE" ]; then
 fi
 echo "[$(date)] Dump OK: $(du -h "$DUMP_FILE" | cut -f1)"
 
+# Backup n8n
+N8N_DUMP_FILE="/root/backups/n8n_$(date +%Y%m%d_%H%M%S).sql.gz"
+mkdir -p "$(dirname "$N8N_DUMP_FILE")"
+echo "[$(date)] Dumping n8n PostgreSQL..."
+docker exec postgres pg_dump -U n8n -d n8n | gzip > "$N8N_DUMP_FILE"
+if [ -s "$N8N_DUMP_FILE" ]; then
+    echo "[$(date)] n8n Dump OK: $(du -h "$N8N_DUMP_FILE" | cut -f1)"
+else
+    echo "[$(date)] ⚠️ n8n Dump vide ou échoué (non-bloquant)"
+fi
+
 # 2. Upload vers Backblaze B2
 if [ -x "$B2_CLI" ]; then
     echo "[$(date)] Uploading to B2..."
@@ -41,14 +52,14 @@ fi
 echo "[$(date)] Cleaning local backups older than ${RETENTION_DAYS} days..."
 find "$BACKUP_DIR" -name "flashback_*.sql.gz" -mtime +$RETENTION_DAYS -delete
 
-# 4. Nettoyage B2 (vieux fichiers)
+# 4. Nettoyage B2 (vieux fichiers) — syntaxe B2 CLI v4.x
 if [ -x "$B2_CLI" ]; then
     echo "[$(date)] Cleaning B2 backups older than ${RETENTION_DAYS} days..."
     CUTOFF_DATE=$(date -d "$RETENTION_DAYS days ago" +%Y-%m-%d 2>/dev/null || date -v-${RETENTION_DAYS}d +%Y-%m-%d 2>/dev/null || echo "")
     if [ -n "$CUTOFF_DATE" ]; then
-        $B2_CLI file ls "$B2_BUCKET" "$B2_PATH/" --long 2>/dev/null | while read -r _ _ _ _ timestamp _ filepath; do
+        $B2_CLI ls --long "b2://${B2_BUCKET}/${B2_PATH}/" 2>/dev/null | while read -r _ _ _ _ timestamp _ filepath; do
             if [ -n "$filepath" ] && [[ "$timestamp" < "$CUTOFF_DATE" ]]; then
-                $B2_CLI file rm "b2://${B2_BUCKET}/${filepath}" 2>/dev/null || true
+                $B2_CLI rm "b2://${B2_BUCKET}/${filepath}" 2>/dev/null || true
             fi
         done
     fi

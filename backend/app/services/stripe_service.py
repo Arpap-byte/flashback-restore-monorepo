@@ -230,18 +230,18 @@ async def traiter_webhook(
 
     # Mise à jour du timestamp du dernier webhook
     global _dernier_webhook
-    _dernier_webhook = datetime.now(timezone.utc)
+    ancien = _dernier_webhook
+    now = datetime.now(timezone.utc)
+    _dernier_webhook = now
 
     logger.info(f"Webhook reçu : type={type_evenement}, id={evenement['id']}")
 
     # Vérification d'inactivité : warning si plus de 24h depuis le dernier webhook
-    if _dernier_webhook:
-        delta = datetime.now(timezone.utc) - _dernier_webhook
-        if delta.total_seconds() > 86400:
-            logger.warning(
-                "Aucun webhook Stripe reçu depuis plus de 24h (dernier : %s)",
-                _dernier_webhook.isoformat(),
-            )
+    if ancien and (now - ancien).total_seconds() > 86400:
+        logger.warning(
+            "Aucun webhook Stripe reçu depuis plus de 24h (dernier : %s)",
+            ancien.isoformat(),
+        )
 
     return {
         "type": type_evenement,

@@ -1,6 +1,13 @@
 "use client";
 
+import type { Metadata } from 'next';
 import { useState, useEffect, useCallback, useRef } from "react";
+
+export const metadata: Metadata = {
+  title: 'Tableau de bord — Flashback Restore',
+  description: 'Gérez votre compte, vos crédits et suivez vos restaurations de photos.',
+  openGraph: { images: ['/og-default.jpg'] },
+};
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
@@ -20,10 +27,8 @@ import {
   Zap,
   Gift,
   Briefcase,
-  User,
   Calendar,
   ShieldCheck,
-  Trash2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -261,7 +266,9 @@ export default function DashboardPage() {
       if (meData.status === "fulfilled") {
         setUserMe(meData.value);
       } else {
-        console.error("[Dashboard] getUserMe failed:", meData.reason);
+        if (process.env.NODE_ENV === "development") {
+          console.error("[Dashboard] getUserMe failed:", meData.reason);
+        }
         // Fallback : utiliser Clerk ou l'ancien contexte
         const email = clerkUser?.emailAddresses?.[0]?.emailAddress || user?.email || "";
         if (email) {
