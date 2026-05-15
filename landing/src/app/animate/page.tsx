@@ -332,14 +332,6 @@ export default function AnimatePage() {
                         </label>
                       </div>
 
-                      {/* Résumé coût */}
-                      <div className="bg-surface rounded-xl p-3 flex items-center justify-between">
-                        <span className="text-sm text-muted">Coût de l&apos;animation</span>
-                        <span className="text-sm font-semibold text-foreground">
-                          {resolution === "1080p" ? "20" : "10"} crédits
-                        </span>
-                      </div>
-
                       <button
                         onClick={handleAnimate}
                         className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-gradient-to-r from-violet-500 to-violet-600 text-white font-semibold text-base hover:brightness-110 hover:shadow-xl hover:shadow-violet-500/25 transition-all active:scale-[0.97]"

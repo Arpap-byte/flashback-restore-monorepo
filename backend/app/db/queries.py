@@ -77,9 +77,9 @@ def _rows_to_dicts(rows) -> list[dict]:
 # Mapping plan → crédits mensuels
 CREDITS_PAR_PLAN: dict[str, int] = {
     "gratuit": 0,
-    "decouverte": 10,
-    "premium": 100,
-    "annuel": 100,
+    "decouverte": 20,
+    "premium": 200,
+    "annuel": 200,
     "pro": -1,  # -1 = illimité
 }
 
@@ -87,8 +87,8 @@ CREDITS_PAR_PLAN: dict[str, int] = {
 ANIMATIONS_PAR_PLAN: dict[str, int] = {
     "gratuit": 0,
     "decouverte": 2,
-    "premium": 25,
-    "annuel": 25,
+    "premium": 50,
+    "annuel": 50,
     "pro": -1,
 }
 
