@@ -1,13 +1,6 @@
 "use client";
 
-import type { Metadata } from 'next';
 import { useState, useEffect, useCallback } from "react";
-
-export const metadata: Metadata = {
-  title: 'Historique — Flashback Restore',
-  description: 'Retrouvez toutes vos photos restaurées et animées. Gérez votre historique de travaux.',
-  openGraph: { images: ['/og-default.jpg'] },
-};
 import { motion } from "framer-motion";
 import Image from "next/image";
 import {

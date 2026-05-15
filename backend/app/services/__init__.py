@@ -1,1 +1,1 @@
-"""Module services — intégrations Gemini et D-ID."""
+"""Module services — intégrations Gemini et Veo."""

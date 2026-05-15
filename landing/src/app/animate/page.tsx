@@ -1,13 +1,6 @@
 "use client";
 
-import type { Metadata } from 'next';
 import { useState, useEffect, useCallback, useRef } from "react";
-
-export const metadata: Metadata = {
-  title: 'Animer une photo — Flashback Restore',
-  description: 'Donnez vie à vos photos avec l\'animation IA. Transformez un portrait en vidéo réaliste.',
-  openGraph: { images: ['/og-default.jpg'] },
-};
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { motion } from "framer-motion";

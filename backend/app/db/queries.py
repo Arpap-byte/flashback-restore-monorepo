@@ -92,24 +92,6 @@ ANIMATIONS_PAR_PLAN: dict[str, int] = {
     "pro": -1,
 }
 
-# Mapping des modèles de restauration par forfait
-MODELE_RESTAURATION_PAR_PLAN: dict[str, str] = {
-    "gratuit": "imagen-4-fast",
-    "decouverte": "imagen-4-standard",
-    "premium": "imagen-4-standard",
-    "annuel": "imagen-4-standard",
-    "pro": "imagen-4-batch",
-}
-
-# Mapping des modèles d'animation par forfait
-MODELE_ANIMATION_PAR_PLAN: dict[str, str] = {
-    "gratuit": None,
-    "decouverte": "veo-3.1-fast",
-    "premium": "veo-3.1-lite",
-    "annuel": "veo-3.1-lite",
-    "pro": "veo-3.1-standard-batch",
-}
-
 # Cache de plan utilisateur (évite des requêtes répétées)
 _plan_cache: dict[str, tuple[float, str]] = {}
 
@@ -198,7 +180,7 @@ async def obtenir_travail(travail_id: str) -> Optional[dict]:
 
 
 async def obtenir_travail_par_job_externe(job_externe_id: str) -> Optional[dict]:
-    """Récupère un travail par son ID externe (ex: job D-ID)."""
+    """Récupère un travail par son ID externe (ex: job Veo)."""
     async with async_session() as session:
         stmt = select(Travail).where(Travail.job_externe_id == job_externe_id)
         result = await session.execute(stmt)
@@ -1187,31 +1169,6 @@ async def compter_audit_logs(
         count = result.scalar_one()
         return count
 
-
-# ===================================================================
-# Alias (noms alternatifs mentionnés dans le cahier des charges)
-# ===================================================================
-
-# Auth
-trouver_utilisateur_par_email = obtenir_utilisateur_par_email
-obtenir_utilisateur = obtenir_utilisateur_par_id
-maj_derniere_connexion = mettre_a_jour_derniere_connexion
-mettre_a_jour_mot_de_passe = changer_mot_de_passe
-stocker_token_reinitialisation = creer_token_reinitialisation
-valider_token_reinitialisation = verifier_token_reinitialisation
-
-# Travaux
-obtenir_travaux_utilisateur = lister_travaux_par_utilisateur
-
-# Essais
-enregistrer_essai_gratuit = enregistrer_essai
-
-# Abonnements
-maj_statut_abonnement = mettre_a_jour_abonnement
-attribuer_credits_abonnement = mettre_a_jour_attribution_credits
-
-# Audit
-consulter_audit_logs = lister_audit_logs
 
 
 # ===================================================================

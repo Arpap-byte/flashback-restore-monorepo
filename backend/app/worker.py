@@ -1,5 +1,5 @@
 """
-Worker ARQ pour les traitements longs (restauration IA, animation D-ID).
+Worker ARQ pour les traitements longs (restauration IA, animation Veo).
 
 Exécuté indépendamment du serveur HTTP via :
     arq app.worker.WorkerSettings

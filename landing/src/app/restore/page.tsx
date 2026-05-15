@@ -1,13 +1,6 @@
 "use client";
 
-import type { Metadata } from 'next';
 import { useState, useEffect, useCallback, useRef } from "react";
-
-export const metadata: Metadata = {
-  title: 'Restaurer une photo — Flashback Restore',
-  description: 'Restaurez vos photos anciennes avec l\'IA. Réparation automatique des défauts, rayures et taches.',
-  openGraph: { images: ['/og-default.jpg'] },
-};
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";

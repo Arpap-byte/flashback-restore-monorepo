@@ -1,13 +1,6 @@
 "use client";
 
-import type { Metadata } from 'next';
 import { useState, useEffect, useCallback, useRef } from "react";
-
-export const metadata: Metadata = {
-  title: 'Tableau de bord — Flashback Restore',
-  description: 'Gérez votre compte, vos crédits et suivez vos restaurations de photos.',
-  openGraph: { images: ['/og-default.jpg'] },
-};
 import { motion } from "framer-motion";
 import Link from "next/link";
 import Image from "next/image";
