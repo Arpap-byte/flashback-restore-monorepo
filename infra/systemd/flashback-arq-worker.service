@@ -8,6 +8,7 @@ Type=simple
 User=flashback
 WorkingDirectory=/opt/flashback-restore-monorepo/backend
 Environment="ENVIRONMENT=production"
+Environment="CLERK_SECRET_KEY=sk_test_NVaHy5Dm9iS9dCfn6Fxv2MZxR8aTu0LhNeaxKAyC70"
 ExecStart=/opt/flashback-restore-monorepo/backend/.venv/bin/arq app.worker.WorkerSettings
 Restart=always
 RestartSec=5

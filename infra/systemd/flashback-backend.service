@@ -15,6 +15,7 @@ TimeoutStopSec=30
 StartLimitBurst=3
 StartLimitIntervalSec=60
 Environment="ENVIRONMENT=production"
+Environment="CLERK_SECRET_KEY=sk_test_NVaHy5Dm9iS9dCfn6Fxv2MZxR8aTu0LhNeaxKAyC70"
 
 # Isolation
 NoNewPrivileges=yes

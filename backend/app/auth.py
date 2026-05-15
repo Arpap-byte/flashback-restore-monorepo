@@ -143,14 +143,50 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
             return u
 
     # Token Clerk : créer l'utilisateur automatiquement
+    # Mais JAMAIS avec un email placeholder — résoudre via l'API Clerk d'abord
     if est_clerk:
         provider_id = utilisateur_id
-        email_a_utiliser = email or f"clerk_{utilisateur_id}@placeholder.local"
+
+        # Si pas d'email dans le JWT, tenter la résolution via l'API Clerk
+        if not email:
+            from app.clerk_auth import resoudre_email_clerck
+            email_resolu = await resoudre_email_clerck(provider_id)
+            if email_resolu:
+                email = email_resolu
+            else:
+                logger.error(
+                    "REFUS: compte Clerk sans email identifiable — "
+                    "sub=%s, impossible de résoudre via l'API Clerk",
+                    provider_id,
+                )
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        "Impossible d'identifier votre adresse email via Clerk. "
+                        "Veuillez vérifier que votre compte Clerk possède une "
+                        "adresse email primaire vérifiée."
+                    ),
+                )
+
+        # Vérifier que l'email n'est pas un placeholder
+        if email.endswith("@placeholder.local"):
+            logger.error(
+                "REFUS: email placeholder détecté pour Clerk user_id=%s email=%s",
+                provider_id, email,
+            )
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Votre compte ne possède pas d'adresse email vérifiée. "
+                    "Veuillez ajouter une adresse email dans vos paramètres Clerk."
+                ),
+            )
+
         logger.info(
             "Création automatique utilisateur Clerk: email=%s provider_id=%s",
-            email_a_utiliser, provider_id,
+            email, provider_id,
         )
-        nouvel_id = await creer_utilisateur_oauth(email_a_utiliser, "clerk", provider_id)
+        nouvel_id = await creer_utilisateur_oauth(email.lower(), "clerk", provider_id)
         if nouvel_id:
             return await obtenir_utilisateur_par_id(nouvel_id)
 

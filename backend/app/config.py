@@ -40,6 +40,7 @@ if not SECRET_KEY:
     raise RuntimeError("SECRET_KEY must be set in environment or .env file")
 AUTH_SECRET: str = os.getenv("AUTH_SECRET", "")
 # --- Clerk JWT ---
+CLERK_SECRET_KEY: str = os.getenv("CLERK_SECRET_KEY", "")
 CLERK_ISSUER: str = os.getenv("CLERK_ISSUER", "")
 CLERK_JWKS_URL: str = os.getenv("CLERK_JWKS_URL", "")
 CLERK_AUDIENCE: str = os.getenv("CLERK_AUDIENCE", "")
