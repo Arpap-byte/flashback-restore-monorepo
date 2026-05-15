@@ -869,15 +869,18 @@ async def verifier_token_reinitialisation(token: str) -> Optional[dict]:
 
 
 async def marquer_token_utilise(token: str, session=None) -> bool:
-    """Marque un token comme utilisé.
+    """Marque un token comme utilisé (comparaison par hash SHA-256).
 
     Si session est fournie, utilise cette session sans committer
     (permet l'atomicité multi-opérations).
     """
+    import hashlib
+    token_hash = hashlib.sha256(token.encode()).hexdigest()
+
     async def _do(sess):
         stmt = (
             update(ReinitialisationMdp)
-            .where(ReinitialisationMdp.token == token)
+            .where(ReinitialisationMdp.token == token_hash)
             .values(utilise=1)
         )
         result = await sess.execute(stmt)

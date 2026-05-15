@@ -107,7 +107,7 @@ async def register(request: Request, body: RegisterRequest):
         logger.info(f"Tentative d'inscription avec un email déjà utilisé : {body.email}")
         return JSONResponse(
             status_code=202,
-            content={"message": "Si cet email n'est pas déjà utilisé, un email de vérification a été envoyé."},
+            content={"message": "Si cet email est disponible, votre compte a été créé. Vérifiez vos emails."},
         )
 
     # Hacher le mot de passe
@@ -152,6 +152,13 @@ async def login(request: Request, body: LoginRequest):
     utilisateur = await obtenir_utilisateur_par_email(body.email)
     if utilisateur is None:
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
+
+    # Refuser la connexion locale pour les comptes OAuth (Google/Clerk)
+    if not utilisateur.get("password_hash"):
+        await log_auth(request, "login", email=body.email, reussite=False,
+                       detail="Tentative de connexion locale sur un compte OAuth")
+        raise HTTPException(status_code=401,
+                            detail="Ce compte utilise Google. Connectez-vous avec Google.")
 
     # Vérifier le mot de passe
     if not bcrypt.checkpw(
