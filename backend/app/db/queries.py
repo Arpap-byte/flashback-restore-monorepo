@@ -368,16 +368,17 @@ async def creer_utilisateur(email: str, password_hash: str) -> Optional[str]:
     """Crée un nouvel utilisateur. Retourne l'ID ou None si l'email existe déjà."""
     utilisateur_id = _new_uuid()
     maintenant = _utcnow()
+    email_lower = email.lower()
     async with async_session() as session:
         # Vérifier si l'email existe déjà
-        stmt = select(Utilisateur.id).where(Utilisateur.email == email)
+        stmt = select(Utilisateur.id).where(func.lower(Utilisateur.email) == email_lower)
         result = await session.execute(stmt)
         if result.scalar_one_or_none() is not None:
             return None
 
         user = Utilisateur(
             id=utilisateur_id,
-            email=email,
+            email=email_lower,
             password_hash=password_hash,
             essais_restants=3,
             est_abonne=0,
@@ -392,7 +393,7 @@ async def creer_utilisateur(email: str, password_hash: str) -> Optional[str]:
 async def obtenir_utilisateur_par_email(email: str) -> Optional[dict]:
     """Récupère un utilisateur par son email."""
     async with async_session() as session:
-        stmt = select(Utilisateur).where(Utilisateur.email == email)
+        stmt = select(Utilisateur).where(func.lower(Utilisateur.email) == email.lower())
         result = await session.execute(stmt)
         row = result.scalar_one_or_none()
         return _row_to_dict(row)
@@ -420,10 +421,11 @@ async def creer_utilisateur_oauth(
     """Crée un utilisateur lié à un compte OAuth (Google/Facebook/etc)."""
     utilisateur_id = _new_uuid()
     maintenant = _utcnow()
+    email_lower = email.lower()
     async with async_session() as session:
         user = Utilisateur(
             id=utilisateur_id,
-            email=email,
+            email=email_lower,
             password_hash="",
             essais_restants=3,
             credits=0,

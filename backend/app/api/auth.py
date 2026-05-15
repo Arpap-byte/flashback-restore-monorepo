@@ -105,9 +105,9 @@ async def register(request: Request, body: RegisterRequest):
     if existing:
         await log_auth(request, "register", email=body.email, reussite=False, detail="Email déjà utilisé")
         logger.info(f"Tentative d'inscription avec un email déjà utilisé : {body.email}")
-        return JSONResponse(
-            status_code=202,
-            content={"message": "Si cet email est disponible, votre compte a été créé. Vérifiez vos emails."},
+        raise HTTPException(
+            status_code=409,
+            detail="Un compte avec cet email existe déjà.",
         )
 
     # Hacher le mot de passe

@@ -118,10 +118,10 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
         if u:
             await mettre_a_jour_derniere_connexion(u["id"])
             # Mettre à jour l'email si le token Clerk contient un email différent
-            if email and email != u.get("email", ""):
+            if email and email.lower() != (u.get("email", "") or "").lower():
                 from app.db.queries import mettre_a_jour_email
                 try:
-                    await mettre_a_jour_email(u["id"], email)
+                    await mettre_a_jour_email(u["id"], email.lower())
                     logger.info(
                         "Email utilisateur Clerk mis à jour: id=%s ancien=%s → nouvel_email=%s",
                         u["id"], u.get("email"), email,
