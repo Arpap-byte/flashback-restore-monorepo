@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { Metadata } from "next";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
@@ -26,6 +27,11 @@ const COMPORTEMENTS = [
   { id: "clin_oeil", label: "Clin d'œil", icon: Eye, desc: "Un clin d'œil complice et naturel" },
   { id: "salut", label: "Salut", icon: Hand, desc: "Un signe de tête et sourire pour dire bonjour" },
 ];
+
+export const metadata: Metadata = {
+  title: "Animer vos photos — Flashback Restore",
+  description: "Donnez vie à vos souvenirs avec des micro-expressions naturelles.",
+};
 
 export default function AnimatePage() {
   const router = useRouter();

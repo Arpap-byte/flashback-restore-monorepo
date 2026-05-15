@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { motion } from "framer-motion";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import {
@@ -226,6 +227,11 @@ function NotConnected() {
 /* ------------------------------------------------------------------ */
 /*  Page principale                                                    */
 /* ------------------------------------------------------------------ */
+
+export const metadata: Metadata = {
+  title: "Tableau de bord — Flashback Restore",
+  description: "Gérez vos crédits, vos restaurations et votre abonnement.",
+};
 
 export default function DashboardPage() {
   const { user, loading: authLoading } = useAuth();

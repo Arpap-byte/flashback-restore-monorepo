@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
+import type { Metadata } from "next";
 import Image from "next/image";
 import {
   History, Image as ImageIcon, Sparkles, AlertTriangle,
@@ -71,6 +72,11 @@ function formatExpiration(iso: string | null): { text: string; urgent: boolean }
   if (diffDays <= 30) return { text: `${diffDays} jours`, urgent: false };
   return { text: `${Math.floor(diffDays / 30)} mois`, urgent: false };
 }
+
+export const metadata: Metadata = {
+  title: "Historique — Flashback Restore",
+  description: "Retrouvez toutes vos photos restaurées et animées.",
+};
 
 export default function HistoriquePage() {
   const { user, loading: authLoading } = useAuth();

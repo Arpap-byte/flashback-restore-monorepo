@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -41,6 +42,11 @@ function Label({ icon: Icon, label }: { icon: React.ComponentType<{ className?: 
     </div>
   );
 }
+
+export const metadata: Metadata = {
+  title: "Restaurer vos photos — Flashback Restore",
+  description: "Réparez automatiquement les défauts, rayures et taches de vos photos anciennes grâce à l'IA.",
+};
 
 export default function RestorePage() {
   const router = useRouter();

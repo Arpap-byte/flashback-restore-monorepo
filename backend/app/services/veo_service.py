@@ -1,7 +1,7 @@
 """
 Service d'intégration avec Google Veo 3.1 pour l'animation de portraits.
 
-Remplace le service D-ID (historique). Utilise l'API Gemini Veo pour générer
+Utilise l'API Gemini Veo pour générer
 des vidéos à partir d'une photo + prompt décrivant l'émotion.
 
 Modèles :
