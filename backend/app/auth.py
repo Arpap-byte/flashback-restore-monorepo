@@ -117,15 +117,22 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
         u = await obtenir_utilisateur_par_oauth("clerk", utilisateur_id)
         if u:
             await mettre_a_jour_derniere_connexion(u["id"])
-            # Mettre à jour l'email si le token Clerk contient un vrai email
-            if email and u.get("email", "").endswith("@placeholder.local"):
+            # Mettre à jour l'email si le token Clerk contient un email différent
+            if email and email != u.get("email", ""):
                 from app.db.queries import mettre_a_jour_email
-                await mettre_a_jour_email(u["id"], email)
-                logger.info(
-                    "Email utilisateur Clerk mis à jour: id=%s placeholder=%s → nouvel_email=%s",
-                    u["id"], u.get("email"), email,
-                )
-                u["email"] = email
+                try:
+                    await mettre_a_jour_email(u["id"], email)
+                    logger.info(
+                        "Email utilisateur Clerk mis à jour: id=%s ancien=%s → nouvel_email=%s",
+                        u["id"], u.get("email"), email,
+                    )
+                    u["email"] = email
+                except Exception:
+                    # Email déjà pris par un autre compte — logguer sans bloquer
+                    logger.warning(
+                        "Email Clerk non mis à jour (déjà existant): id=%s email=%s → tentative=%s",
+                        u["id"], u.get("email"), email,
+                    )
             return u
 
     # Puis par email
