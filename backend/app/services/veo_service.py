@@ -104,6 +104,81 @@ def _image_en_base64(chemin: str) -> tuple[str, str]:
     return b64, mime
 
 
+def _nettoyer_message_veo(msg: str) -> str:
+    """Nettoie le message d'erreur Veo pour l'utilisateur final.
+
+    - Tronque les suffixes inutiles en anglais (Contact Gemini API support, etc.)
+    - Traduit les messages d'erreur courants en français.
+    - Limite la longueur à 200 caractères max.
+    """
+    suffixes_a_tronquer = [
+        "If the problem persists, please contact Gemini API support",
+        "If the problem persists, contact Gemini API support",
+        "Please try again in a few minutes",
+        "If this error persists",
+        "Please try again later",
+        "Please retry",
+    ]
+    for suffix in suffixes_a_tronquer:
+        idx = msg.lower().find(suffix.lower())
+        if idx != -1:
+            msg = msg[:idx].strip().rstrip(".,; ")
+            break
+
+    # Traductions de messages d'erreur Veo/Gemini courants
+    traductions = {
+        "Video generation failed due to an internal server issue":
+            "Échec de génération (erreur serveur interne)",
+        "The model is currently overloaded":
+            "Le modèle est actuellement surchargé",
+        "The model is overloaded":
+            "Le modèle est surchargé",
+        "Resource has been exhausted":
+            "Quota épuisé",
+    }
+    msg_clean = msg.strip()
+    for en, fr in traductions.items():
+        if msg_clean.lower().startswith(en.lower()):
+            msg_clean = fr + msg_clean[len(en):]
+            break
+
+    # Tronquer à 200 caractères max
+    if len(msg_clean) > 200:
+        msg_clean = msg_clean[:197] + "..."
+
+    return msg_clean
+
+
+def _erreur_recuperable_veo(msg: str) -> bool:
+    """Détermine si une erreur Veo mérite un fallback vers le modèle Fast.
+
+    Erreurs récupérables :
+    - "high demand" / overload
+    - "internal server issue"
+    - "server error"
+    - messages traduits correspondants
+
+    Erreurs NON récupérables (on ne retente pas) :
+    - Filtre de sécurité / contenu filtré → la photo elle-même est rejetée
+    - Erreur 4xx (sauf 429 déjà traité) → bug dans notre requête
+    """
+    msg_lower = msg.lower()
+    motifs_recuperables = [
+        "high demand",
+        "internal server",
+        "server error",
+        "currently overloaded",
+        "currently unavailable",
+        "temporarily unavailable",
+        "erreur serveur",
+        "surchargé",
+    ]
+    for motif in motifs_recuperables:
+        if motif in msg_lower:
+            return True
+    return False
+
+
 async def _uploader_image_gemini(chemin: str) -> tuple[str, str]:
     """Upload l'image vers l'API File de Gemini et retourne (file_uri, mime_type).
 
@@ -231,20 +306,34 @@ async def _poll_veo(
             data = resp.json()
 
             if data.get("done"):
-                # Vérifier erreur
-                err = data.get("error", {})
-                if err:
-                    msg = err.get("message", "Erreur inconnue Veo")
-                    raise RuntimeError(f"Veo : {msg}")
-
-                # Vérifier filtre de sécurité
+                # 1. Vérifier le filtre de sécurité AVANT l'erreur générique.
+                #    "internal server issue" masque souvent un rejet de sécurité.
                 gvr = data.get("response", {}).get("generateVideoResponse", {})
                 filtered = gvr.get("raiMediaFilteredCount", 0)
                 if filtered:
                     reasons = gvr.get("raiMediaFilteredReasons", [])
-                    raise RuntimeError(
-                        f"Veo a filtré la vidéo (sécurité) : {reasons[0] if reasons else 'raison inconnue'}"
+                    logger.error(
+                        f"Veo réponse filtrée (sécurité) — "
+                        f"raiMediaFilteredCount={filtered}, "
+                        f"reasons={reasons}, "
+                        f"body_complet={data}"
                     )
+                    raise RuntimeError(
+                        f"Veo : contenu filtré — {reasons[0] if reasons else 'raison inconnue'}"
+                    )
+
+                # 2. Puis vérifier l'erreur générique
+                err = data.get("error", {})
+                if err:
+                    msg = err.get("message", "Erreur inconnue Veo")
+                    logger.error(
+                        f"Veo réponse erreur — "
+                        f"code={err.get('code')}, "
+                        f"message={msg}, "
+                        f"body_complet={data}"
+                    )
+                    user_msg = _nettoyer_message_veo(msg)
+                    raise RuntimeError(f"Veo : {user_msg}")
 
                 return data
 
@@ -294,10 +383,21 @@ async def creer_animation_veo(
     prompt = f"{PREFIX_FIDELITE}. {prompt_base}. {SUFFIX_FIDELITE}."
     b64_image, mime_type = _image_en_base64(chemin_photo)
 
+    # Journaliser la taille de l'image source (les images > 6 Mo peuvent causer
+    # des erreurs serveur Veo)
+    image_path = Path(chemin_photo)
+    taille_mo = image_path.stat().st_size / (1024 * 1024)
     logger.info(
         f"Veo animation — comportement={comportement}, "
-        f"resolution={resolution}, duree={duree}s"
+        f"resolution={resolution}, duree={duree}s, "
+        f"image={image_path.name} ({taille_mo:.1f} Mo)"
     )
+    if taille_mo > 5:
+        logger.warning(
+            f"Veo image source volumineuse ({taille_mo:.1f} Mo) — "
+            f"peut causer des erreurs serveur. "
+            f"Limite recommandée : 5 Mo pour 720p."
+        )
 
     # Essayer Lite d'abord, fallback Fast si overload
     data = None
@@ -314,15 +414,20 @@ async def creer_animation_veo(
             break  # succès → sortir de la boucle
 
         except httpx.HTTPStatusError as e:
-            if e.response.status_code == 429 and modele == VEO_MODEL_LITE:
-                logger.warning("Veo Lite overload, fallback Fast…")
-                continue
+            if modele == VEO_MODEL_LITE:
+                if e.response.status_code == 429:
+                    logger.warning("Veo Lite overload (429), fallback Fast…")
+                    continue
+                if e.response.status_code >= 500:
+                    logger.warning(
+                        f"Veo Lite erreur serveur ({e.response.status_code}), fallback Fast…"
+                    )
+                    continue
             raise
         except RuntimeError as e:
             msg = str(e)
-            # "high demand" = overload → fallback
-            if "high demand" in msg.lower() and modele == VEO_MODEL_LITE:
-                logger.warning("Veo Lite high demand, fallback Fast…")
+            if modele == VEO_MODEL_LITE and _erreur_recuperable_veo(msg):
+                logger.warning(f"Veo Lite erreur récupérable, fallback Fast : {msg}")
                 continue
             raise
 
