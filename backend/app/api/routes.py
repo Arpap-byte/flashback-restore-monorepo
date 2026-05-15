@@ -1329,7 +1329,7 @@ async def statut_animation_par_travail(
             from pathlib import Path as _Path
             nom_fichier = _Path(chemin_local).name
             token_dl = creer_token_telechargement(utilisateur["id"])
-            url_video = f"/uploads/{nom_fichier}?token_dl={token_dl}"
+            url_video = f"/uploads/{nom_fichier}?token={token_dl}"
         else:
             url_video = travail.get("chemin_resultat")
 

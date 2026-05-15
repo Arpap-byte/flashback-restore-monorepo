@@ -166,7 +166,7 @@ def _vers_url(chemin: str | None, utilisateur_id: str) -> str | None:
     nom_fichier = os.path.basename(chemin)
     url = f"/uploads/{nom_fichier}"
     token_dl = creer_token_telechargement(utilisateur_id)
-    url += f"?token_dl={token_dl}"
+    url += f"?token={token_dl}"
     return url
 
 
