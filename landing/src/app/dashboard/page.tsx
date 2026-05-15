@@ -624,12 +624,12 @@ export default function DashboardPage() {
                       transition={{ delay: i * 0.06 }}
                       className="flex items-center gap-4 p-3 rounded-xl hover:bg-surface/50 transition-colors group/item"
                     >
-                      {/* Miniature */}
-                      {(t.url_resultat || t.url_original) ? (
+                      {/* Miniature — pour les animations, utiliser la photo source (url_original), pas la vidéo .mp4 (url_resultat) */}
+                      {((t.type === "animation" ? t.url_original : (t.url_resultat || t.url_original))) ? (
                         <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-lg overflow-hidden bg-surface-alt flex-shrink-0 border border-card-border relative">
                           <Image
                             src={getPhotoUrl(
-                              t.url_resultat || t.url_original!
+                              t.type === "animation" ? t.url_original! : (t.url_resultat || t.url_original!)
                             )}
                             alt={TYPE_LABELS[t.type] || t.type}
                             fill

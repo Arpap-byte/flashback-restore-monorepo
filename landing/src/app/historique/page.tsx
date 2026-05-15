@@ -414,7 +414,7 @@ export default function HistoriquePage() {
                   ? (t.url_original || null)
                   : activeTab === "retouchees"
                     ? (t.url_resultat || t.url_original || null)
-                    : (t.url_animation || t.url_original || null);
+                    : (t.url_original || null);  // Animations : utiliser la photo source, pas le .mp4
                 const hasResult = t.url_resultat && t.statut === "termine";
                 const hasAnimation = t.url_animation && t.statut === "termine";
                 const isDeleting = deleting === t.id;

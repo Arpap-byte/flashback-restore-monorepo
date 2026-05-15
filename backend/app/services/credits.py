@@ -14,7 +14,6 @@ import logging
 
 from app.db.queries import (
     consommer_credit,
-    enregistrer_animation,
     obtenir_credits_restants,
     peut_animer as _db_peut_animer,
     rembourser_credit,
@@ -98,18 +97,14 @@ async def consommer_operation(utilisateur_id: str, type_operation: str, travail_
     if not resultat["succes"]:
         raise RuntimeError(resultat.get("raison", "Crédits insuffisants"))
 
-    # Pour les animations, incrémenter le compteur mensuel
-    if type_operation == "animation":
-        await enregistrer_animation(utilisateur_id)
-        logger.info(
-            f"Animation enregistrée pour utilisateur={utilisateur_id}, "
-            f"travail={travail_id}"
-        )
-    else:
-        logger.info(
-            f"Crédit consommé pour {type_operation}, "
-            f"utilisateur={utilisateur_id}, travail={travail_id}"
-        )
+    # NOTE: l'enregistrement du compteur mensuel d'animations n'est PAS fait ici.
+    # Il est appelé une seule fois dans la route /api/animate (avant la boucle
+    # de consommation des crédits) pour éviter d'incrémenter N fois.
+    # Pour les opérations non-animation, on log simplement.
+    logger.info(
+        f"Crédit consommé pour {type_operation}, "
+        f"utilisateur={utilisateur_id}, travail={travail_id}"
+    )
 
 
 async def rembourser_operation(utilisateur_id: str, travail_id: str) -> dict:

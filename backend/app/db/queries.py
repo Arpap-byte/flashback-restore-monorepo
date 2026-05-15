@@ -724,7 +724,9 @@ async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
                     "message": "Essai gratuit remboursé",
                 }
 
-            # 2. Vérifier si c'était un crédit payant
+            # 2. Vérifier si c'était un/des crédit(s) payant(s)
+            # NOTE: un travail peut consommer plusieurs crédits (ex: animation = 10 crédits).
+            # On récupère TOUTES les lignes de consommation pour ce travail.
             stmt_credit = select(ConsommationCredits).where(
                 and_(
                     ConsommationCredits.utilisateur_id == utilisateur_id,
@@ -732,17 +734,19 @@ async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
                 )
             )
             result_credit = await session.execute(stmt_credit)
-            conso = result_credit.scalar_one_or_none()
+            consos = result_credit.scalars().all()
 
-            if conso:
-                credits_utilises = conso.credits_utilises
-                await session.delete(conso)
+            if consos:
+                total_credits = sum(c.credits_utilises for c in consos)
+                for c in consos:
+                    await session.delete(c)
                 await session.execute(
                     update(Utilisateur)
                     .where(Utilisateur.id == utilisateur_id)
-                    .values(credits=Utilisateur.credits + credits_utilises)
+                    .values(credits=Utilisateur.credits + total_credits)
                 )
                 # Annuler l'incrémentation du compteur d'animations
+                # (une seule animation, indépendamment du nombre de crédits)
                 await session.execute(
                     update(Utilisateur)
                     .where(
@@ -756,7 +760,7 @@ async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
                 return {
                     "succes": True,
                     "type": "credit",
-                    "message": f"{credits_utilises} crédit(s) remboursé(s)",
+                    "message": f"{total_credits} crédit(s) remboursé(s)",
                 }
 
             # Aucune consommation trouvée

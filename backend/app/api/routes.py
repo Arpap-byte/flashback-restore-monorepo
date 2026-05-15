@@ -36,6 +36,7 @@ from app.db.queries import (
     creer_abonnement,
     creer_travail,
     enregistrer_achat_credits,
+    enregistrer_animation,
     lister_audit_logs,
     marquer_stripe_event_traite,
     mettre_a_jour_abonnement,
@@ -1207,6 +1208,9 @@ async def animer(
             message_erreur=f"Service de traitement indisponible ({e})",
         )
         raise HTTPException(status_code=503, detail="Service de traitement indisponible. Aucun crédit débité.")
+
+    # Enregistrer l'animation (une seule fois, pas par crédit)
+    await enregistrer_animation(utilisateur["id"])
 
     # Consommation des crédits (seulement après enqueue réussie)
     for i in range(nb_credits_anim):
