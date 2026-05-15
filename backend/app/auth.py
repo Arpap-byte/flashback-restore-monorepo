@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # Configuration JWT
 ALGORITHME = "HS256"
 DUREE_TOKEN = timedelta(hours=24)
+DUREE_TOKEN_TELECHARGEMENT = timedelta(minutes=30)  # Pour URLs d'images/vidéos (balises <img>/<video>)
 
 # Schéma de sécurité Bearer
 securite = HTTPBearer(auto_error=False)
@@ -39,6 +40,19 @@ def creer_token(utilisateur_id: str, email: str) -> str:
     payload = {
         "sub": utilisateur_id,
         "email": email,
+        "iat": maintenant,
+        "exp": expiration,
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHME)
+
+
+def creer_token_telechargement(utilisateur_id: str) -> str:
+    """Crée un token JWT pour le téléchargement d'images/vidéos."""
+    maintenant = datetime.now(timezone.utc)
+    expiration = maintenant + DUREE_TOKEN_TELECHARGEMENT
+    payload = {
+        "sub": utilisateur_id,
+        "scope": "download",
         "iat": maintenant,
         "exp": expiration,
     }

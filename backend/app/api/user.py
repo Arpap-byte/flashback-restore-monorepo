@@ -157,14 +157,16 @@ async def lire_preferences(utilisateur: dict = Depends(exiger_utilisateur)):
 # ---------------------------------------------------------------------------
 
 
-def _vers_url(chemin: str | None, token: str | None = None) -> str | None:
-    """Convertit un chemin absolu en URL publique relative avec token d'accès."""
+def _vers_url(chemin: str | None, utilisateur_id: str) -> str | None:
+    """Convertit un chemin absolu en URL publique relative avec token de téléchargement."""
     if not chemin:
         return None
+    from app.auth import creer_token_telechargement
+
     nom_fichier = os.path.basename(chemin)
     url = f"/uploads/{nom_fichier}"
-    if token:
-        url += f"?token={token}"
+    token_dl = creer_token_telechargement(utilisateur_id)
+    url += f"?token_dl={token_dl}"
     return url
 
 
@@ -182,12 +184,10 @@ async def history(
     - Tailles de fichiers
     - Date d'expiration calculée selon la rétention configurée
     """
-    # Extraire le token JWT pour l'injecter dans les URLs des miniatures
-    token_jwt = None
-    if request:
-        auth = request.headers.get("Authorization", "")
-        if auth.startswith("Bearer "):
-            token_jwt = auth[7:]
+    # Générer un token de téléchargement dédié pour les URLs
+    from app.auth import creer_token_telechargement
+
+    token_dl = creer_token_telechargement(utilisateur["id"])
 
     travaux = await lister_travaux_par_utilisateur(utilisateur["id"], limite)
     retention = await obtenir_retention(utilisateur["id"])
@@ -208,9 +208,9 @@ async def history(
             "id": t["id"],
             "type": t["type"],
             "statut": t["statut"],
-            "url_original": _vers_url(t.get("chemin_photo"), token_jwt),
-            "url_resultat": _vers_url(t.get("chemin_resultat"), token_jwt),
-            "url_animation": _vers_url(t.get("chemin_animation"), token_jwt),
+            "url_original": _vers_url(t.get("chemin_photo"), utilisateur["id"]),
+            "url_resultat": _vers_url(t.get("chemin_resultat"), utilisateur["id"]),
+            "url_animation": _vers_url(t.get("chemin_animation"), utilisateur["id"]),
             "taille_original": t.get("taille_original"),
             "taille_resultat": t.get("taille_resultat"),
             "message_erreur": t.get("message_erreur"),

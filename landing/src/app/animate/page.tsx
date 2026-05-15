@@ -258,7 +258,7 @@ export default function AnimatePage() {
               <div className="grid lg:grid-cols-5 gap-8">
                 <div className="lg:col-span-2">
                   <div className="relative rounded-2xl overflow-hidden border border-card-border bg-card shadow-xl aspect-[3/4]">
-                    <Image src={preview} alt="Aperçu" fill className="object-contain" sizes="(max-width: 1024px) 100vw, 40vw" />
+                    <Image src={preview} alt="Aperçu" fill unoptimized className="object-contain" sizes="(max-width: 1024px) 100vw, 40vw" />
                     {!animating && !status && (
                       <button onClick={handleClear} className="absolute top-3 right-3 w-8 h-8 rounded-full bg-black/50 backdrop-blur text-white flex items-center justify-center hover:bg-black/70">
                         <X className="w-4 h-4" />

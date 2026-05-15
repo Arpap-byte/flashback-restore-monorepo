@@ -434,6 +434,7 @@ export default function HistoriquePage() {
                           src={getPhotoUrl(photoUrl, authToken)}
                           alt={TYPE_LABELS[t.type] || t.type}
                           fill
+                          unoptimized
                           className="object-cover group-hover:scale-105 transition-transform duration-500"
                           sizes="(max-width: 640px) 50vw, 33vw"
                         />

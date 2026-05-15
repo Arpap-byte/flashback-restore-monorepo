@@ -28,7 +28,7 @@ from arq.connections import RedisSettings
 from arq.jobs import Job as ArqJob, JobStatus as ArqJobStatus
 
 from app.config import GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
-from app.auth import exiger_utilisateur
+from app.auth import creer_token_telechargement, exiger_utilisateur
 from app.db.queries import (
     CREDITS_PAR_PLAN,
     compter_audit_logs,
@@ -1328,7 +1328,8 @@ async def statut_animation_par_travail(
             # Transformer chemin absolu en URL relative /uploads/...
             from pathlib import Path as _Path
             nom_fichier = _Path(chemin_local).name
-            url_video = f"/uploads/{nom_fichier}"
+            token_dl = creer_token_telechargement(utilisateur["id"])
+            url_video = f"/uploads/{nom_fichier}?token_dl={token_dl}"
         else:
             url_video = travail.get("chemin_resultat")
 
