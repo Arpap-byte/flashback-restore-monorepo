@@ -1165,7 +1165,7 @@ async def statut_animation(
     pour rétrocompatibilité.
 
     Interroge **la base de données locale** (le worker ARQ Veo met à jour
-    le statut côté serveur). Aucun appel à l'API D-ID n'est effectué.
+    le statut côté serveur). Aucun appel externe n'est effectué.
 
     Args:
         job_id: L'identifiant du job ARQ (retourné par POST /api/animate).
@@ -1253,7 +1253,7 @@ async def statut_animation_par_travail(
 
     url_video = None
     if statut_frontend == StatutAnimation.TERMINE:
-        # Priorité : fichier local → URL D-ID → chemin_resultat
+        # Priorité : fichier local → URL Veo → chemin_resultat
         chemin_local = travail.get("chemin_animation")
         if chemin_local:
             # Transformer chemin absolu en URL relative /uploads/...

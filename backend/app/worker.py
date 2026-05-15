@@ -326,6 +326,6 @@ class WorkerSettings:
     functions = [restauration_job, animation_job]
     redis_settings = RedisSettings(host='localhost', port=6379)
     max_jobs = 10  # Limite de jobs concurrents par worker
-    job_timeout = 600  # Timeout max par job (10 minutes, Veo peut être lent)
+    job_timeout = 900  # Timeout max par job (15 minutes, Veo peut être lent)
     keep_result = 3600  # Garde les résultats 1h dans Redis
     on_shutdown = _worker_shutdown  # WAL checkpoint à l'arrêt
