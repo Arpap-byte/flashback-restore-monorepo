@@ -443,14 +443,16 @@ PROMPT_RESTAURATION_IA = (
 )
 
 
-async def restaurer_photo_ia(chemin_image: str, chemin_sortie: str) -> str:
+async def restaurer_photo_ia(chemin_image: str, chemin_sortie: str, resolution: str = "720p") -> str:
     """
     Restaure une photo via Gemini Image Model (image→image),
     avec fallback Pillow avancé en cas d'échec.
+    Redimensionne l'image finale à la résolution demandée.
 
     Args:
         chemin_image: Chemin local vers l'image à restaurer.
         chemin_sortie: Chemin local où sauvegarder l'image restaurée.
+        resolution: Résolution de sortie souhaitée ("720p", "1080p", "4k").
 
     Returns:
         Le chemin de l'image restaurée.
@@ -458,6 +460,8 @@ async def restaurer_photo_ia(chemin_image: str, chemin_sortie: str) -> str:
     logger.info(f"Restauration IA ({GEMINI_IMAGE_MODEL}) pour : {chemin_image}")
 
     # --- Essai 1 : Gemini Image Model ---
+    restauration_reussie = False
+
     try:
         import base64
         import httpx
@@ -503,21 +507,26 @@ async def restaurer_photo_ia(chemin_image: str, chemin_sortie: str) -> str:
                                 f"Restauration IA réussie : {chemin_sortie} "
                                 f"({taille} octets)"
                             )
-                            return chemin_sortie
+                            restauration_reussie = True
 
-            logger.warning(
-                f"Gemini restauration IA échouée "
-                f"(status={response.status_code}, body={response.text[:300]}), "
-                f"fallback Pillow"
-            )
+            if not restauration_reussie:
+                logger.warning(
+                    f"Gemini restauration IA échouée "
+                    f"(status={response.status_code}, body={response.text[:300]}), "
+                    f"fallback Pillow"
+                )
     except Exception as e:
         logger.warning(
             f"Gemini restauration IA exception : {e}, fallback Pillow"
         )
 
     # --- Fallback : Pillow avancé ---
-    _restauration_pillow_avancee(chemin_image, chemin_sortie)
-    logger.info(f"Restauration Pillow avancée : {chemin_sortie}")
+    if not restauration_reussie:
+        _restauration_pillow_avancee(chemin_image, chemin_sortie)
+        logger.info(f"Restauration Pillow avancée : {chemin_sortie}")
+
+    # --- Redimensionnement à la résolution demandée ---
+    _redimensionner_image(chemin_sortie, resolution)
     return chemin_sortie
 
 
@@ -556,3 +565,42 @@ def _restauration_pillow_avancee(chemin_source: str, chemin_destination: str) ->
     )
 
     image.save(chemin_destination, quality=95)
+
+
+def _redimensionner_image(chemin_image: str, resolution: str) -> None:
+    """
+    Redimensionne l'image finale à la résolution demandée.
+
+    Mappe les résolutions utilisateur vers des dimensions de sortie
+    (720p → 1280×720, 1080p → 1920×1080, 4K → 3840×2160).
+    Utilise le filtre LANCZOS pour un redimensionnement de haute qualité.
+
+    Args:
+        chemin_image: Chemin vers l'image à redimensionner (modifiée sur place).
+        resolution: Résolution souhaitée ("720p", "1080p", "4k").
+    """
+    from PIL import Image
+
+    RESOLUTIONS = {
+        "720p": (1280, 720),
+        "1080p": (1920, 1080),
+        "4k": (3840, 2160),
+    }
+
+    if resolution not in RESOLUTIONS:
+        logger.warning(
+            f"Résolution inconnue : '{resolution}', "
+            f"utilisation de 720p par défaut"
+        )
+        resolution = "720p"
+
+    largeur, hauteur = RESOLUTIONS[resolution]
+    image = Image.open(chemin_image).convert("RGB")
+    image = image.resize((largeur, hauteur), Image.LANCZOS)
+    image.save(chemin_image, "JPEG", quality=95)
+
+    taille_finale = Path(chemin_image).stat().st_size
+    logger.info(
+        f"Image redimensionnée à {resolution} "
+        f"({largeur}x{hauteur}, {taille_finale} octets) : {chemin_image}"
+    )

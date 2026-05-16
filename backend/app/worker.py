@@ -73,7 +73,7 @@ async def restauration_job(
         # Étape 2 : Restauration IA
         nom_restaure = f"{nom_base}_restaure.jpg"
         chemin_restaure = UPLOAD_DIR / nom_restaure
-        await restaurer_photo_ia(chemin_original, str(chemin_restaure))
+        await restaurer_photo_ia(chemin_original, str(chemin_restaure), resolution)
 
         url_image = f"/uploads/{nom_restaure}"
         chemin_final = chemin_restaure
