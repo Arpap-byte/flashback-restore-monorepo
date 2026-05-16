@@ -1,26 +1,36 @@
 import { MetadataRoute } from "next";
+import { getAllSlugs } from "@/lib/blog-posts";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = "https://flashback-restore.com";
 
-  const routes = [
-    "",
-    "/restore",
-    "/animate",
-    "/dashboard",
-    "/historique",
-    "/abonnement/succes",
-    "/about",
-    "/privacy",
-    "/terms",
-    "/cookies",
-    "/business",
-  ].map((route) => ({
-    url: `${baseUrl}${route}`,
-    lastModified: new Date(),
-    changeFrequency: route === "" ? ("weekly" as const) : ("monthly" as const),
-    priority: route === "" ? 1 : 0.8,
+  const staticRoutes = [
+    { route: "", changeFrequency: "weekly" as const, priority: 1 },
+    { route: "/restore", changeFrequency: "weekly" as const, priority: 0.9 },
+    { route: "/animate", changeFrequency: "monthly" as const, priority: 0.8 },
+    { route: "/dashboard", changeFrequency: "monthly" as const, priority: 0.8 },
+    { route: "/historique", changeFrequency: "monthly" as const, priority: 0.8 },
+    { route: "/abonnement/succes", changeFrequency: "monthly" as const, priority: 0.5 },
+    { route: "/about", changeFrequency: "monthly" as const, priority: 0.7 },
+    { route: "/privacy", changeFrequency: "yearly" as const, priority: 0.3 },
+    { route: "/terms", changeFrequency: "yearly" as const, priority: 0.3 },
+    { route: "/cookies", changeFrequency: "yearly" as const, priority: 0.3 },
+    { route: "/business", changeFrequency: "monthly" as const, priority: 0.6 },
+    { route: "/blog", changeFrequency: "weekly" as const, priority: 0.8 },
+  ];
+
+  const blogRoutes = getAllSlugs().map((slug) => ({
+    route: `/blog/${slug}`,
+    changeFrequency: "monthly" as const,
+    priority: 0.7,
   }));
 
-  return routes;
+  const allRoutes = [...staticRoutes, ...blogRoutes];
+
+  return allRoutes.map(({ route, changeFrequency, priority }) => ({
+    url: `${baseUrl}${route}`,
+    lastModified: new Date(),
+    changeFrequency,
+    priority,
+  }));
 }

@@ -137,3 +137,62 @@ body {
   background: rgba(245, 158, 11, 0.3);
   color: var(--foreground);
 }
+
+/* Blog article prose styles */
+.prose-custom h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--foreground);
+  margin-top: 3rem;
+  margin-bottom: 1rem;
+  font-family: var(--font-playfair), Georgia, serif;
+}
+.prose-custom h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--foreground);
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+.prose-custom p {
+  color: var(--muted);
+  line-height: 1.8;
+  margin-bottom: 1rem;
+}
+.prose-custom ul,
+.prose-custom ol {
+  color: var(--muted);
+  margin-bottom: 1.5rem;
+}
+.prose-custom li {
+  line-height: 1.8;
+  margin-bottom: 0.5rem;
+}
+.prose-custom strong {
+  color: var(--foreground);
+}
+.prose-custom table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.prose-custom th {
+  text-align: left;
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  color: var(--foreground);
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--card-border);
+}
+.prose-custom td {
+  padding: 0.75rem 1rem;
+  color: var(--muted);
+  border-top: 1px solid var(--card-border);
+}
+.prose-custom a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.prose-custom a:hover {
+  color: var(--foreground);
+}

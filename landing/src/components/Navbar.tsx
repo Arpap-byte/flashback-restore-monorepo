@@ -14,6 +14,7 @@ const navLinks = [
   { label: "Restaurer", href: "/restore" },
   { label: "Animer", href: "/animate" },
   { label: "Tarifs", href: "/#pricing" },
+  { label: "Blog", href: "/blog" },
 ];
 
 export default function Navbar() {
