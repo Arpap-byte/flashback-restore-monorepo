@@ -260,11 +260,16 @@ async def servir_upload_protege(
 
 @app.on_event("startup")
 async def demarrage():
-    """Initialise la base de données au démarrage."""
+    """Initialise la base de données et le planificateur au démarrage."""
     logger.info("Démarrage de Flashback Restore API...")
     await async_initialiser_base()
     logger.info(f"Répertoire d'upload : {UPLOAD_DIR}")
     logger.info("Base de données initialisée.")
+
+    # Démarrage du planificateur backend (nettoyage + backup)
+    from app.scheduler import demarrer_scheduler
+    demarrer_scheduler()
+
     logger.info("API prête à recevoir des requêtes.")
 
 
@@ -273,6 +278,10 @@ async def arret():
     """Nettoyage à l'arrêt."""
     logger.info("Arrêt de Flashback Restore API.")
     from app.db.session import close_db
+
+    # Arrêt du planificateur
+    from app.scheduler import arreter_scheduler
+    arreter_scheduler()
 
     await close_db()
     logger.info("Moteur DB fermé proprement.")

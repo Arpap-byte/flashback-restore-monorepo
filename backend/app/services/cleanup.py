@@ -89,3 +89,73 @@ async def _nettoyer_async() -> dict:
 async def nettoyer_uploads() -> dict:
     """Nettoie les travaux expirés (appelé par le endpoint admin /api/admin/cleanup)."""
     return await _nettoyer_async()
+
+
+# ── Rapport Google Drive ──
+
+GOOGLE_DRIVE_FOLDER = "Flashback Restore — Rapports"
+
+
+async def exporter_rapport_cleanup(resultat: dict) -> str | None:
+    """
+    Génère le rapport de nettoyage et l'envoie sur Google Drive.
+
+    Returns:
+        L'ID du fichier Drive si uploadé, None sinon.
+    """
+    import json
+    from datetime import datetime, timezone
+    from pathlib import Path
+
+    maintenant = datetime.now(timezone.utc)
+    date_str = maintenant.strftime("%Y%m%d")
+
+    rapport = {
+        "type": "nettoyage_quotidien",
+        "service": "Flashback Restore",
+        "date": maintenant.isoformat(),
+        "travaux_supprimes": resultat["travaux_supprimes"],
+        "fichiers_supprimes": resultat["fichiers_supprimes"],
+        "espace_libere_octets": resultat["espace_libere_octets"],
+        "erreurs": resultat["erreurs"],
+    }
+
+    rapport_json = json.dumps(rapport, indent=2, ensure_ascii=False)
+
+    # Sauvegarde locale
+    rapport_dir = Path("/root/backups/flashback/rapports")
+    rapport_dir.mkdir(parents=True, exist_ok=True)
+    rapport_path = rapport_dir / f"rapport_cleanup_{date_str}.json"
+    rapport_path.write_text(rapport_json, encoding="utf-8")
+
+    # Upload Google Drive (si OAuth configuré)
+    drive_id = await _upload_rapport_drive(rapport_json, f"cleanup_flashback_{date_str}.json")
+
+    if drive_id:
+        logger.info("📤 Rapport cleanup uploadé sur Drive: %s", drive_id)
+    else:
+        logger.info("📤 Rapport cleanup sauvegardé localement (Drive non configuré)")
+
+    return drive_id
+
+
+async def _upload_rapport_drive(content: str, filename: str) -> str | None:
+    """
+    Upload un fichier JSON sur Google Drive.
+
+    Args:
+        content: Contenu JSON (string)
+        filename: Nom du fichier sur Drive
+
+    Returns:
+        File ID Drive, ou None si OAuth non configuré
+    """
+    from pathlib import Path
+
+    google_token = Path.home() / ".hermes" / "google_token.json"
+    if not google_token.exists():
+        return None
+
+    # TODO: Utiliser l'API Drive via google_api.py quand OAuth sera configuré
+    logger.debug("Drive upload prêt pour %s (%s octets)", filename, len(content))
+    return None

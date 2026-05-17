@@ -55,3 +55,6 @@ asyncpg>=0.29,<1.0
 
 # Migrations de base de données
 alembic>=1.13,<2.0
+
+# Planificateur de tâches backend
+apscheduler>=3.10,<4.0
