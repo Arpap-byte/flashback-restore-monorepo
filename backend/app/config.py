@@ -54,12 +54,12 @@ if not STRIPE_WEBHOOK_SECRET or STRIPE_WEBHOOK_SECRET == "whsec_placeholder":
         "STRIPE_WEBHOOK_SECRET is missing or still set to 'whsec_placeholder'. "
         "Set your real Stripe webhook secret in .env before starting the server."
     )
-STRIPE_PRICE_DECOUVERTE: str = os.getenv("STRIPE_PRICE_DECOUVERTE", "price_decouverte_monthly")
-STRIPE_PRICE_PREMIUM: str = os.getenv("STRIPE_PRICE_PREMIUM", "price_premium_monthly")
-STRIPE_PRICE_ANNUEL: str = os.getenv("STRIPE_PRICE_ANNUEL", "price_premium_yearly")
-STRIPE_PRICE_CREDITS_30: str = os.getenv("STRIPE_PRICE_CREDITS_30", "price_credits_30")
-STRIPE_PRICE_CREDITS_50: str = os.getenv("STRIPE_PRICE_CREDITS_50", "price_credits_50")
-STRIPE_PRICE_CREDITS_110: str = os.getenv("STRIPE_PRICE_CREDITS_110", "price_credits_110")
+STRIPE_PRICE_DECOUVERTE: str = os.getenv("STRIPE_PRICE_DECOUVERTE", "price_1TYBvHACw2Aur8P69PrMuS9F")
+STRIPE_PRICE_PREMIUM: str = os.getenv("STRIPE_PRICE_PREMIUM", "price_1TYBvHACw2Aur8P61S6N9xWY")
+STRIPE_PRICE_ANNUEL: str = os.getenv("STRIPE_PRICE_ANNUEL", "price_1TYBvHACw2Aur8P6UuX96v4Q")
+STRIPE_PRICE_CREDITS_30: str = os.getenv("STRIPE_PRICE_CREDITS_30", "price_1TYBvIACw2Aur8P6cQZh1BDf")
+STRIPE_PRICE_CREDITS_50: str = os.getenv("STRIPE_PRICE_CREDITS_50", "price_1TYBvIACw2Aur8P60j57vBLf")
+STRIPE_PRICE_CREDITS_110: str = os.getenv("STRIPE_PRICE_CREDITS_110", "price_1TYBvIACw2Aur8P6O8uHYl64")
 
 # --- Serveur ---
 HOST: str = os.getenv("HOST", "0.0.0.0")

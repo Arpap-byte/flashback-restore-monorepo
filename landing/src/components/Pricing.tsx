@@ -32,7 +32,7 @@ const plans = [
   {
     name: "Découverte",
     icon: Sparkles,
-    price: "4,99€",
+    price: "2,49€",
     period: "/mois",
     description: "Idéal pour débuter avec la restauration HD.",
     credits: "20 crédits/mois",
@@ -56,7 +56,7 @@ const plans = [
   {
     name: "Premium",
     icon: Zap,
-    price: "29€",
+    price: "14,50€",
     period: "/mois",
     description: "Pour les passionnés de souvenirs.",
     credits: "200 crédits/mois",
@@ -81,7 +81,7 @@ const plans = [
   {
     name: "Annuel",
     icon: Crown,
-    price: "232€",
+    price: "116€",
     period: "/an",
     description: "200 crédits/mois — 4 mois offerts !",
     credits: "200 crédits/mois",
@@ -92,7 +92,7 @@ const plans = [
       "Sans filigrane",
       "Galerie cloud",
       "Support prioritaire",
-      "Économisez 116€/an",
+      "Économisez 58€/an",
       "Respect de la confidentialité",
     ],
     cta: "S'abonner",
