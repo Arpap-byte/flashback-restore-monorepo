@@ -614,13 +614,5 @@ def _redimensionner_image(chemin_image: str, resolution: str) -> None:
             )
 
     # LANCZOS pour 720p, 1080p, et fallback 4K
-    largeur, hauteur = RESOLUTIONS[resolution]
-    image = Image.open(chemin_image).convert("RGB")
-    image = image.resize((largeur, hauteur), Image.LANCZOS)
-    image.save(chemin_image, "JPEG", quality=95)
-
-    taille_finale = Path(chemin_image).stat().st_size
-    logger.info(
-        f"Image redimensionnée à {resolution} "
-        f"({largeur}x{hauteur}, {taille_finale} octets) : {chemin_image}"
-    )
+    from app.services.resize_utils import resize_fit
+    resize_fit(chemin_image, resolution)

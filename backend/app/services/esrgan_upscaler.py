@@ -102,6 +102,7 @@ def redimensionner_intelligent(
     """
     Redimensionne une image à la résolution cible en utilisant
     l'IA (FSRCNN) pour la 4K et LANCZOS pour les résolutions inférieures.
+    Préserve le ratio d'aspect — pas de déformation.
 
     Modifie l'image sur place, ou à chemin_sortie si fourni.
 
@@ -111,6 +112,7 @@ def redimensionner_intelligent(
         chemin_sortie: Chemin de sortie (si différent de la source)
     """
     from PIL import Image
+    from app.services.resize_utils import resize_fit, resize_fit_png_temp
 
     if resolution not in TARGETS:
         logger.warning("Résolution inconnue '%s', fallback 720p", resolution)
@@ -129,60 +131,65 @@ def redimensionner_intelligent(
     facteur_max = max(facteur_w, facteur_h)
 
     if facteur_max <= 1.0:
-        # Downscale ou même taille → LANCZOS suffit
-        img_resized = img.resize((largeur_cible, hauteur_cible), Image.LANCZOS)
-        img_resized.save(sortie, "JPEG", quality=95)
-        logger.info(
-            "LANCZOS %dx%d → %dx%d (pas d'upscale nécessaire)",
-            src_w, src_h, largeur_cible, hauteur_cible,
-        )
+        # Downscale ou même taille → resize_fit (préserve le ratio)
+        resize_fit(chemin_image, resolution, chemin_sortie)
         return
 
     if resolution in ("720p", "1080p"):
-        # Upscale ≤2x → LANCZOS suffit
-        img_resized = img.resize((largeur_cible, hauteur_cible), Image.LANCZOS)
-        img_resized.save(sortie, "JPEG", quality=95)
-        logger.info(
-            "LANCZOS %dx%d → %dx%d (≤1080p)",
-            src_w, src_h, largeur_cible, hauteur_cible,
-        )
+        # Upscale ≤2x → resize_fit (préserve le ratio)
+        resize_fit(chemin_image, resolution, chemin_sortie)
         return
 
     # ── 4K : Super-résolution IA ──
-    # Stratégie : on prépare l'image pour un upscale intelligent
-    # 1. Sauvegarder en PNG temporaire (qualité max pour le réseau)
-    # 2. Appliquer FSRCNN
-    # 3. Ajuster aux dimensions exactes avec LANCZOS
+    # 1. Resize proportionnel (préserve ratio) → PNG temporaire
+    # 2. FSRCNN 4x
+    # 3. Ajuster dans le canvas 4K avec letterboxing
 
     import cv2
     import tempfile
     import os
 
-    # Sauvegarder l'image source en PNG pour éviter la double compression
-    with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as tmp_src:
-        img.save(tmp_src.name, "PNG")
-        tmp_src_path = tmp_src.name
+    tmp_src_path = resize_fit_png_temp(chemin_image, "4k")
 
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp_out:
         tmp_out_path = tmp_out.name
 
     try:
-        # Appliquer FSRCNN 4x
+        # Appliquer FSRCNN 4x (préserve le ratio, upscale pixel-perfect)
         success = _upscale_ia(tmp_src_path, tmp_out_path, facteur=4)
 
         if success:
-            # Ajuster aux dimensions exactes 4K
+            # Ajuster dans le canvas 4K avec letterboxing (ratio préservé)
             img_up = Image.open(tmp_out_path).convert("RGB")
-            img_final = img_up.resize((largeur_cible, hauteur_cible), Image.LANCZOS)
-            img_final.save(sortie, "JPEG", quality=95)
+            up_w, up_h = img_up.size
+
+            # Calculer les dimensions dans le canvas 4K
+            ratio_cible = largeur_cible / hauteur_cible
+            ratio_up = up_w / up_h
+
+            if ratio_up > ratio_cible:
+                new_w = largeur_cible
+                new_h = int(largeur_cible / ratio_up)
+            else:
+                new_h = hauteur_cible
+                new_w = int(hauteur_cible * ratio_up)
+
+            img_fit = img_up.resize((new_w, new_h), Image.LANCZOS)
+
+            # Canvas 4K + centrage
+            canvas = Image.new("RGB", (largeur_cible, hauteur_cible), (0, 0, 0))
+            ox = (largeur_cible - new_w) // 2
+            oy = (hauteur_cible - new_h) // 2
+            canvas.paste(img_fit, (ox, oy))
+            canvas.save(sortie, "JPEG", quality=95)
+
             logger.info(
-                "4K IA %dx%d → FSRCNN → %dx%d",
-                src_w, src_h, largeur_cible, hauteur_cible,
+                "4K IA %dx%d → FSRCNN → %dx%d (ratio préservé, canvas %dx%d)",
+                src_w, src_h, new_w, new_h, largeur_cible, hauteur_cible,
             )
         else:
-            # Fallback LANCZOS
-            img_resized = img.resize((largeur_cible, hauteur_cible), Image.LANCZOS)
-            img_resized.save(sortie, "JPEG", quality=95)
+            # Fallback resize_fit (préserve le ratio)
+            resize_fit(chemin_image, "4k", chemin_sortie)
             logger.warning("FSRCNN indisponible, fallback LANCZOS pour 4K")
     finally:
         for p in (tmp_src_path, tmp_out_path):
