@@ -571,9 +571,11 @@ def _redimensionner_image(chemin_image: str, resolution: str) -> None:
     """
     Redimensionne l'image finale à la résolution demandée.
 
+    Pour la 4K, utilise la super-résolution IA (FSRCNN) qui synthétise
+    de vrais détails au lieu d'interpoler (LANCZOS).
+
     Mappe les résolutions utilisateur vers des dimensions de sortie
     (720p → 1280×720, 1080p → 1920×1080, 4K → 3840×2160).
-    Utilise le filtre LANCZOS pour un redimensionnement de haute qualité.
 
     Args:
         chemin_image: Chemin vers l'image à redimensionner (modifiée sur place).
@@ -594,6 +596,24 @@ def _redimensionner_image(chemin_image: str, resolution: str) -> None:
         )
         resolution = "720p"
 
+    # Pour la 4K, utiliser la super-résolution IA
+    if resolution == "4k":
+        try:
+            from app.services.esrgan_upscaler import redimensionner_intelligent
+            redimensionner_intelligent(chemin_image, "4k")
+            taille_finale = Path(chemin_image).stat().st_size
+            logger.info(
+                f"Image redimensionnée en 4K IA "
+                f"(3840x2160, {taille_finale} octets) : {chemin_image}"
+            )
+            return
+        except Exception as e:
+            logger.warning(
+                f"Super-résolution IA indisponible pour 4K : {e}. "
+                f"Fallback LANCZOS."
+            )
+
+    # LANCZOS pour 720p, 1080p, et fallback 4K
     largeur, hauteur = RESOLUTIONS[resolution]
     image = Image.open(chemin_image).convert("RGB")
     image = image.resize((largeur, hauteur), Image.LANCZOS)

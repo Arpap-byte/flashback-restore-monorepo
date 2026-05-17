@@ -63,3 +63,6 @@ apscheduler>=3.10,<4.0
 google-api-python-client>=2.0,<3.0
 google-auth-oauthlib>=1.0,<2.0
 google-auth-httplib2>=0.1,<1.0
+
+# Super-résolution IA (FSRCNN via OpenCV DNN)
+opencv-contrib-python-headless>=4.0,<5.0
