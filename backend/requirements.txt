@@ -58,3 +58,8 @@ alembic>=1.13,<2.0
 
 # Planificateur de tâches backend
 apscheduler>=3.10,<4.0
+
+# Google Drive API (rapports automatiques)
+google-api-python-client>=2.0,<3.0
+google-auth-oauthlib>=1.0,<2.0
+google-auth-httplib2>=0.1,<1.0

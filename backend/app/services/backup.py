@@ -224,37 +224,5 @@ async def _upload_json_to_drive(content: str, filename: str, folder: str) -> str
     Returns:
         File ID Drive, ou None si non configuré
     """
-    import tempfile
-
-    # Vérifier si l'OAuth Google est configuré
-    google_token = Path.home() / ".hermes" / "google_token.json"
-    if not google_token.exists():
-        logger.info("Google OAuth non configuré — skip upload Drive")
-        return None
-
-    gapi_script = (
-        Path.home() / ".hermes" / "skills" / "productivity" / "google-workspace" / "scripts" / "google_api.py"
-    )
-    if not gapi_script.exists():
-        logger.warning("Script google_api.py introuvable")
-        return None
-
-    # Écrire le contenu dans un fichier temporaire
-    with tempfile.NamedTemporaryFile(
-        mode="w", suffix=".json", delete=False, encoding="utf-8"
-    ) as tmp:
-        tmp.write(content)
-        tmp_path = tmp.name
-
-    try:
-        # TODO: Utiliser l'API Drive pour uploader le fichier
-        # Pour l'instant, on sauvegarde localement et on log
-        logger.info(
-            "Rapport prêt pour Drive : %s (%s octets) → dossier '%s'",
-            filename, len(content), folder,
-        )
-        return None  # Sera implémenté après setup OAuth
-
-    finally:
-        if os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+    from app.services.drive_utils import upload_json_to_drive
+    return upload_json_to_drive(content, filename)

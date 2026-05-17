@@ -150,12 +150,5 @@ async def _upload_rapport_drive(content: str, filename: str) -> str | None:
     Returns:
         File ID Drive, ou None si OAuth non configuré
     """
-    from pathlib import Path
-
-    google_token = Path.home() / ".hermes" / "google_token.json"
-    if not google_token.exists():
-        return None
-
-    # TODO: Utiliser l'API Drive via google_api.py quand OAuth sera configuré
-    logger.debug("Drive upload prêt pour %s (%s octets)", filename, len(content))
-    return None
+    from app.services.drive_utils import upload_json_to_drive
+    return upload_json_to_drive(content, filename)
