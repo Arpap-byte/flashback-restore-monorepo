@@ -66,3 +66,6 @@ google-auth-httplib2>=0.1,<1.0
 
 # Super-résolution IA (FSRCNN via OpenCV DNN)
 opencv-contrib-python-headless>=4.0,<5.0
+
+# Compatibilité event loop (APScheduler dans contexte async)
+nest_asyncio>=1.6,<2.0
