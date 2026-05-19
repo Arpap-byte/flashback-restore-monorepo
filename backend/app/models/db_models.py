@@ -60,6 +60,9 @@ class Utilisateur(Base):
     animations_utilisees = Column(Integer, nullable=True, default=0)
     mois_animation_courant = Column(String, nullable=True)
 
+    # Crédits perpétuels (packs achetés, n'expirent jamais)
+    credits_perpetuels = Column(Integer, nullable=False, default=0)
+
     # Rétention & Dashboard admin (migration 12/05/2026)
     retention_jours = Column(Integer, nullable=False, default=30)
     derniere_activite = Column(DateTime(timezone=True), nullable=True)
@@ -281,3 +284,18 @@ class ImageImportee(Base):
             name="ck_lib_mime",
         ),
     )
+
+
+class CreditPack(Base):
+    """Pack de crédits standalone (one-shot, pas d'abonnement)."""
+
+    __tablename__ = "credit_packs"
+
+    id = Column(String, primary_key=True, default=_new_uuid)
+    stripe_price_id = Column(String, nullable=False, unique=True)
+    stripe_product_id = Column(String, nullable=False)
+    nom = Column(String, nullable=False)
+    credits = Column(Integer, nullable=False)
+    prix_centimes = Column(Integer, nullable=False)
+    actif = Column(Boolean, nullable=False, default=True)
+    cree_le = Column(DateTime(timezone=True), nullable=False, default=_utcnow)

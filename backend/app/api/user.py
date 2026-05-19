@@ -102,6 +102,7 @@ async def me(utilisateur: dict = Depends(exiger_utilisateur)):
         "essais_restants": essais["essais_restants"],
         "est_abonne": essais["est_abonne"],
         "credits": detail.get("credits", 0),
+        "credits_perpetuels": detail.get("credits_perpetuels", 0),
         "plan": plan,
         "animations_utilisees": detail.get("animations_utilisees", 0),
         "animations_limite": animations_limite,

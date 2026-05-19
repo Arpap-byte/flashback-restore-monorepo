@@ -35,7 +35,8 @@ async def peut_restaurer(utilisateur_id: str) -> tuple[bool, str]:
         tuple[bool, str]: (autorisé, raison du refus si non autorisé).
     """
     credits_info = await obtenir_credits_restants(utilisateur_id)
-    if credits_info["essais_restants"] > 0 or credits_info["credits"] > 0:
+    total = credits_info.get("credits", 0) + credits_info.get("credits_perpetuels", 0)
+    if credits_info["essais_restants"] > 0 or total > 0:
         return (True, "")
     return (False, "Crédits insuffisants. Achetez des crédits pour continuer.")
 

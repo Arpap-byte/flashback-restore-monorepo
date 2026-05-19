@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState, useEffect } from "react";
 import { motion, useInView } from "framer-motion";
 import { Check, Sparkles, Zap, Crown, Gift, Briefcase, Shield, Info } from "lucide-react";
 import Link from "next/link";
@@ -286,6 +286,82 @@ function PricingCard({
   );
 }
 
+function CreditPacksSection() {
+  const [packs, setPacks] = useState<any[] | null>(null);
+  const [estAbonne, setEstAbonne] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/credit-packs", { credentials: "include" })
+      .then(r => r.json())
+      .then(d => { setPacks(d.packs); setEstAbonne(d.est_abonne); })
+      .catch(() => setPacks([]));
+  }, []);
+
+  const handleBuy = async (code: string) => {
+    const token = localStorage.getItem("__clerk_db_jwt") || "";
+    const res = await fetch("/api/stripe/create-pack-checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+      credentials: "include",
+      body: JSON.stringify({ pack: code }),
+    });
+    if (!res.ok) {
+      if (res.status === 401) { window.location.href = "/sign-in"; return; }
+      return;
+    }
+    const data = await res.json();
+    window.location.href = data.checkout_url;
+  };
+
+  if (!packs || packs.length === 0) return null;
+
+  return (
+    <div className="mt-20 max-w-5xl mx-auto">
+      <h3 className="text-2xl font-bold text-center text-foreground mb-2 font-[family-name:var(--font-playfair)]">
+        Packs de crédits supplémentaires
+      </h3>
+      <p className="text-center text-muted text-sm mb-2">
+        Achat ponctuel — crédits sans expiration.
+      </p>
+      {estAbonne && (
+        <p className="text-center text-emerald-500 text-sm mb-8 font-medium">
+          ✓ En tant qu&apos;abonné, vous bénéficiez de -20% sur tous les packs.
+        </p>
+      )}
+      <div className="grid md:grid-cols-3 gap-6">
+        {packs.map((p: any) => (
+          <div key={p.code} className="relative bg-card border border-card-border rounded-2xl p-6 flex flex-col hover:border-accent/30 transition-colors">
+            <div className="text-lg font-semibold text-foreground">Pack {p.code}</div>
+            <div className="text-3xl font-bold text-foreground mt-2">
+              {p.prix_eur.toFixed(2).replace(".", ",")} €
+              {p.remise_abonne && (
+                <span className="ml-2 text-sm text-muted line-through font-normal">
+                  {p.prix_normal_eur.toFixed(2).replace(".", ",")} €
+                </span>
+              )}
+            </div>
+            <div className="mt-1 inline-block px-3 py-1 rounded-full text-xs font-semibold bg-accent/15 text-accent self-start">
+              {p.credits} crédits
+            </div>
+            <p className="text-muted text-sm mt-4 flex-1">
+              {p.credits === 30 && "Pour quelques restaurations occasionnelles."}
+              {p.credits === 100 && "Le meilleur rapport qualité/prix."}
+              {p.credits === 300 && "Idéal pour un projet de numérisation complet."}
+            </p>
+            <p className="text-xs text-emerald-500 mt-2">✓ Crédits sans expiration</p>
+            <button
+              onClick={() => handleBuy(p.code)}
+              className="mt-4 w-full py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.97]"
+            >
+              Acheter ce pack
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Pricing() {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, margin: "-80px" });
@@ -341,6 +417,9 @@ export default function Pricing() {
         >
           Tous les prix sont en euros TTC. Paiement sécurisé par Stripe. Abonnement sans engagement, résiliez à tout moment.
         </motion.p>
+
+        {/* ── Packs de crédits supplémentaires ── */}
+        <CreditPacksSection />
       </div>
     </section>
   );

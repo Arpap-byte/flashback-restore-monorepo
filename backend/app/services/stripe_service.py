@@ -443,3 +443,66 @@ async def obtenir_factures(
     except stripe.error.StripeError as e:
         logger.exception(f"Erreur récupération factures : {e}")
         return []
+
+
+# ---------------------------------------------------------------------------
+# Packs de crédits S / M / L
+# ---------------------------------------------------------------------------
+
+PACKS_CREDITS: dict[str, dict] = {
+    "S": {"credits": 30, "prix_eur": 4.99, "prix_abonne_eur": 3.99},
+    "M": {"credits": 100, "prix_eur": 9.99, "prix_abonne_eur": 7.99},
+    "L": {"credits": 300, "prix_eur": 19.99, "prix_abonne_eur": 15.99},
+}
+
+
+async def creer_session_paiement_pack(
+    pack: str,
+    email: str,
+    est_abonne: bool,
+    url_succes: str,
+    url_annulation: str,
+) -> dict:
+    """Crée une session Stripe Checkout pour un pack de crédits perpétuels."""
+    if pack not in PACKS_CREDITS:
+        raise ValueError(f"Pack inconnu : {pack}. Options : S, M, L")
+    
+    cfg = PACKS_CREDITS[pack]
+    prix = cfg["prix_abonne_eur"] if est_abonne else cfg["prix_eur"]
+    prix_centimes = int(round(prix * 100))
+    
+    try:
+        session = stripe.checkout.Session.create(
+            payment_method_types=["card"],
+            mode="payment",
+            customer_email=email,
+            line_items=[{
+                "price_data": {
+                    "currency": "eur",
+                    "product_data": {
+                        "name": f"Pack {pack} — {cfg['credits']} credits Flashback Restore",
+                        "description": f"Credits sans expiration. {'Tarif abonne (-20%)' if est_abonne else 'Achat ponctuel'}.",
+                    },
+                    "unit_amount": prix_centimes,
+                },
+                "quantity": 1,
+            }],
+            success_url=url_succes + "?session_id={CHECKOUT_SESSION_ID}",
+            cancel_url=url_annulation,
+            locale="fr",
+            metadata={
+                "type": "credit_pack",
+                "pack": pack,
+                "credits": str(cfg["credits"]),
+                "email": email,
+                "est_abonne": "1" if est_abonne else "0",
+                "perpetuel": "1",
+            },
+        )
+        
+        logger.info(f"Session pack {pack} creee pour {email} — {cfg['credits']} credits, {prix}EUR")
+        return {"checkout_url": session.url, "session_id": session.id}
+    
+    except stripe.error.StripeError as e:
+        logger.exception(f"Erreur creation session pack : {e}")
+        raise

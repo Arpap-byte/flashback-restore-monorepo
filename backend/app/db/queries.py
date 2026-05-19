@@ -789,16 +789,16 @@ async def enregistrer_achat_credits(
 
 
 async def obtenir_credits_restants(utilisateur_id: str) -> dict:
-    """Retourne les crédits et essais d'un utilisateur."""
+    """Retourne les crédits, crédits perpétuels et essais d'un utilisateur."""
     async with async_session() as session:
         stmt = select(
-            Utilisateur.credits, Utilisateur.essais_restants
+            Utilisateur.credits, Utilisateur.credits_perpetuels, Utilisateur.essais_restants
         ).where(Utilisateur.id == utilisateur_id)
         result = await session.execute(stmt)
         row = result.one_or_none()
         if row:
-            return {"credits": row.credits, "essais_restants": row.essais_restants}
-        return {"credits": 0, "essais_restants": 0}
+            return {"credits": row.credits, "credits_perpetuels": row.credits_perpetuels, "essais_restants": row.essais_restants}
+        return {"credits": 0, "credits_perpetuels": 0, "essais_restants": 0}
 
 
 # ===================================================================

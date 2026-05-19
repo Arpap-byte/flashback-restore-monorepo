@@ -78,7 +78,9 @@ from app.services.gemini_service import (
     restaurer_photo_ia,
 )
 from app.services.stripe_service import (
+    PACKS_CREDITS,
     cancel_subscription_for_user,
+    creer_session_paiement_pack,
     creer_session_paiement,
     creer_session_paiement_credits,
     obtenir_abonnement_stripe,
@@ -1513,7 +1515,40 @@ async def webhook_stripe(request: Request):
         # Paiement réussi : vérifier si c'est un achat de crédits ou un abonnement
         metadata = donnees.get("metadata", {})
 
-        if metadata.get("type") == "credits":
+        if metadata.get("type") == "credit_pack":
+            # --- Pack de crédits perpétuels ---
+            try:
+                email = metadata.get("email")
+                nb_credits = int(metadata.get("credits", 0))
+                session_id = donnees.get("id")
+                pack = metadata.get("pack", "?")
+                montant = (donnees.get("amount_total") or 0) / 100.0
+
+                utilisateur = await obtenir_utilisateur_par_email(email) if email else None
+                if utilisateur:
+                    from app.db.session import async_session
+                    from sqlalchemy import text as sa_text
+                    async with async_session() as session:
+                        async with session.begin():
+                            # Créditer en perpétuels (n'expirent pas)
+                            await session.execute(
+                                sa_text(
+                                    "UPDATE utilisateurs SET credits_perpetuels = credits_perpetuels + :m WHERE id = :id"
+                                ),
+                                {"m": nb_credits, "id": utilisateur["id"]},
+                            )
+                            await enregistrer_achat_credits(
+                                utilisateur["id"], session_id, nb_credits, montant, session=session
+                            )
+                    logger.info(
+                        f"Pack {pack} crédité (perpétuel) : email={email}, credits={nb_credits}, montant={montant}€"
+                    )
+                else:
+                    logger.warning(f"Utilisateur introuvable pour créditation pack : email={email}")
+            except Exception as e:
+                logger.exception(f"Erreur créditation pack webhook : {e}")
+
+        elif metadata.get("type") == "credits":
             # --- Achat de crédits (paiement unique) ---
             try:
                 email = metadata.get("email")
@@ -1895,3 +1930,53 @@ async def supprimer_bibliotheque(
         await supprimer_image_importee(image_id, utilisateur["id"], session=session)
         await session.commit()
     return {"deleted": True}
+
+
+# ===========================================================================
+# Packs de crédits S / M / L
+# ===========================================================================
+
+
+@router.get("/credit-packs", response_model=dict)
+async def lister_packs_credits(
+    utilisateur: dict | None = Depends(exiger_utilisateur),
+):
+    """Catalogue des packs avec prix abonné ou normal selon le statut."""
+    est_abonne = bool(utilisateur and utilisateur.get("est_abonne"))
+    packs = []
+    for code, cfg in PACKS_CREDITS.items():
+        packs.append({
+            "code": code,
+            "credits": cfg["credits"],
+            "prix_eur": cfg["prix_abonne_eur"] if est_abonne else cfg["prix_eur"],
+            "prix_normal_eur": cfg["prix_eur"],
+            "remise_abonne": est_abonne,
+            "perpetuel": True,
+        })
+    return {"packs": packs, "est_abonne": est_abonne}
+
+
+@router.post("/stripe/create-pack-checkout", response_model=dict)
+async def creer_checkout_pack(
+    request: Request,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """Crée une session Stripe pour un pack de crédits."""
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Corps JSON requis.")
+    
+    pack = body.get("pack", "").upper()
+    if pack not in PACKS_CREDITS:
+        raise HTTPException(status_code=400, detail=f"Pack inconnu : {pack}. Options : S, M, L")
+    
+    est_abonne = bool(utilisateur.get("est_abonne"))
+    resultat = await creer_session_paiement_pack(
+        pack=pack,
+        email=utilisateur["email"],
+        est_abonne=est_abonne,
+        url_succes=f"{SITE_URL}/dashboard?paiement=success",
+        url_annulation=f"{SITE_URL}/#pricing?paiement=cancel",
+    )
+    return resultat

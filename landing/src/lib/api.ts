@@ -540,3 +540,26 @@ export async function getSubscription(): Promise<SubscriptionInfo> {
 export async function openStripePortal(): Promise<{ url: string }> {
   return apiFetch<{ url: string }>("/api/stripe/portal", { method: "POST" });
 }
+
+// ── Sprint 5 — Packs crédits standalone ──────────────
+
+export interface CreditPack {
+  code: string;
+  credits: number;
+  prix_eur: number;
+  prix_normal_eur: number;
+  remise_abonne: boolean;
+  perpetuel: boolean;
+}
+
+export async function getCreditPacks(): Promise<{ packs: CreditPack[]; est_abonne: boolean }> {
+  return apiFetch<{ packs: CreditPack[]; est_abonne: boolean }>("/api/credit-packs");
+}
+
+export async function checkoutCreditPack(packCode: string): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>("/api/stripe/create-pack-checkout", {
+    method: "POST",
+    body: JSON.stringify({ pack: packCode }),
+    headers: { "Content-Type": "application/json" },
+  });
+}
