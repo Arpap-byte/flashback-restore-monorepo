@@ -237,8 +237,9 @@ async def servir_upload_protege(
     if utilisateur is None:
         raise HTTPException(status_code=401, detail="Authentification requise.")
 
-    # Vérifier ownership
+    # Vérifier ownership (dans travaux ET images_importees)
     async with async_session() as session:
+        # 1. Vérifier dans la table travaux (restaurations, colorisations, animations)
         row = (await session.execute(
             _sa_text("""
                 SELECT utilisateur_id FROM travaux
@@ -248,6 +249,20 @@ async def servir_upload_protege(
             """),
             {"c": str(chemin)}
         )).fetchone()
+
+        # 2. Fallback : vérifier dans la table images_importees (bibliothèque)
+        if row is None:
+            # chemin_fichier est stocké en relatif (ex: library/user_id/file.jpg)
+            chemin_rel = str(chemin.relative_to(upload_root)) if str(chemin).startswith(str(upload_root)) else None
+            if chemin_rel:
+                row = (await session.execute(
+                    _sa_text("""
+                        SELECT utilisateur_id FROM images_importees
+                        WHERE chemin_fichier = :c
+                        LIMIT 1
+                    """),
+                    {"c": chemin_rel}
+                )).fetchone()
 
     if row is None:
         # Fichier orphelin — admin only
