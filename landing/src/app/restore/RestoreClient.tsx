@@ -342,7 +342,19 @@ export default function RestorePage() {
     setLoadingGallery(true);
     try {
       const data = await listLibrary(50, 0);
-      setLibraryImages(data.items || []);
+      // Résoudre les URLs avec token pour l'affichage
+      const items = data.items || [];
+      const resolved = await Promise.all(
+        items.map(async (img: LibraryImage) => {
+          try {
+            const tokenUrl = await getPhotoUrlAsync(img.url);
+            return { ...img, url: tokenUrl };
+          } catch {
+            return img;
+          }
+        })
+      );
+      setLibraryImages(resolved);
     } catch {
       setLibraryImages([]);
     } finally {

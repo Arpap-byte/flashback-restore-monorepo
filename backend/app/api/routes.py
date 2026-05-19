@@ -1914,7 +1914,7 @@ async def upload_bibliotheque(
             session=session,
         )
         await session.commit()
-    return {"id": img["id"], "url": f"/uploads/{rel}"}
+    return {"id": img["id"], "url": f"/uploads/{rel}?token={creer_token_telechargement(utilisateur['id'])}"}
 
 
 @router.get("/library", response_model=dict)
@@ -1931,7 +1931,7 @@ async def lister_bibliotheque(
             utilisateur["id"], limite=limite, offset=offset, session=session
         )
     for it in items:
-        it["url"] = f"/uploads/{it['chemin_fichier']}"
+        it["url"] = f"/uploads/{it['chemin_fichier']}?token={creer_token_telechargement(utilisateur['id'])}"
     return {"items": items, "limite": limite, "offset": offset}
 
 
