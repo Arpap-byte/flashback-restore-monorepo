@@ -13,6 +13,7 @@ const navLinks = [
   { label: "Accueil", href: "/" },
   { label: "Restaurer", href: "/restore" },
   { label: "Animer", href: "/animate" },
+  { label: "Bibliothèque", href: "/bibliotheque" },
   { label: "Tarifs", href: "/#pricing" },
   { label: "Blog", href: "/blog" },
 ];

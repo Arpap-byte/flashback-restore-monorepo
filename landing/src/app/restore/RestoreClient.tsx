@@ -21,13 +21,14 @@ import {
   Palette,
   Loader2,
   Check,
+  Images,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
-import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob, getUserMe } from "@/lib/api";
+import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob, getUserMe, listLibrary, restoreFromLibrary, LibraryImage } from "@/lib/api";
 import { useRgpdConsent } from "@/components/RgpdConsent";
 import OutOfCreditsModal from "@/components/OutOfCreditsModal";
 
@@ -69,6 +70,12 @@ export default function RestorePage() {
   const [restoreProgress, setRestoreProgress] = useState<string>("");
   const [restoredUrl, setRestoredUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Sprint 2 — Galerie d'images importées
+  const [showGallery, setShowGallery] = useState(false);
+  const [libraryImages, setLibraryImages] = useState<LibraryImage[]>([]);
+  const [loadingGallery, setLoadingGallery] = useState(false);
+  const [selectedLibraryId, setSelectedLibraryId] = useState<string | null>(null);
 
   // P2.3 — Modale crédits épuisés
   const [showOutOfCredits, setShowOutOfCredits] = useState(false);
@@ -287,7 +294,7 @@ export default function RestorePage() {
       }
       const blob = await res.blob();
       const f = new File([blob], "restored.jpg", { type: "image/jpeg" });
-      const result = await colorizePhoto(f);
+      const result = await colorizePhoto(f, resolution);
       setRestoreResult(result);
     } catch (err) {
       setError(
@@ -326,6 +333,66 @@ export default function RestorePage() {
       setTimeout(() => setError(null), 6000);
     } finally {
       setColorizing(false);
+    }
+  };
+
+  // Sprint 2 — Ouvrir la galerie et charger les images
+  const openGallery = async () => {
+    setShowGallery(true);
+    setLoadingGallery(true);
+    try {
+      const data = await listLibrary(50, 0);
+      setLibraryImages(data.items || []);
+    } catch {
+      setLibraryImages([]);
+    } finally {
+      setLoadingGallery(false);
+    }
+  };
+
+  // Sprint 2 — Sélectionner une image depuis la galerie
+  const selectFromLibrary = async (img: LibraryImage) => {
+    setSelectedLibraryId(img.id);
+    const url = await getPhotoUrlAsync(img.url);
+    setPreview(url);
+    setFile(null); // pas de File, on utilise l'ID
+    setShowGallery(false);
+  };
+
+  // Sprint 2 — Restaurer depuis la galerie
+  const handleRestoreFromLibrary = async () => {
+    if (!selectedLibraryId) return;
+    const consent = await checkRgpdConsent();
+    if (!consent) return;
+
+    try {
+      const me = await getUserMe();
+      if (me.credits === 0 && me.essais_restants === 0) {
+        setShowOutOfCredits(true);
+        return;
+      }
+    } catch {}
+
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+    setRestoring(true);
+    setError(null);
+    setRestoreProgress("Envoi de la photo...");
+    try {
+      const { jobId } = await restoreFromLibrary(selectedLibraryId, colorize, resolution);
+      setRestoreProgress("Restauration IA en cours...");
+      const finalResult = await pollRestoreJob(jobId, (progress) => {
+        setRestoreProgress(progress);
+      }, 120000, controller.signal);
+      setRestoreResult(finalResult);
+      setRestoreProgress("");
+    } catch (err) {
+      if (err instanceof Error && err.message === "Polling annulé.") return;
+      setError(err instanceof Error ? err.message : "Erreur lors de la restauration.");
+      setTimeout(() => setError(null), 6000);
+    } finally {
+      setRestoring(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -458,6 +525,15 @@ export default function RestorePage() {
               <p className="text-muted/60 text-xs">
                 JPG, PNG, WebP — Max 20 Mo
               </p>
+              <div className="mt-4 pt-4 border-t border-card-border">
+                <button
+                  onClick={(e) => { e.stopPropagation(); openGallery(); }}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface border border-card-border text-sm text-muted hover:text-foreground hover:border-accent/30 transition-all"
+                >
+                  <Images className="w-4 h-4" />
+                  Depuis ma galerie
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -555,7 +631,7 @@ export default function RestorePage() {
                       Annuler
                     </button>
                     <button
-                      onClick={handleRestore}
+                      onClick={selectedLibraryId ? handleRestoreFromLibrary : handleRestore}
                       className="px-6 py-2.5 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all flex items-center gap-2"
                     >
                       <Sparkles className="w-4 h-4" />
@@ -583,39 +659,54 @@ export default function RestorePage() {
               ) : restoreResult ? (
                 /* Result displayed */
                 <div className="space-y-6">
-                  {/* Toggle buttons */}
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => { setShowAfter(false); setCompareMode(false); }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        !showAfter && !compareMode
-                          ? "bg-accent text-white dark:text-gray-950"
-                          : "bg-surface text-muted hover:text-foreground border border-card-border"
-                      }`}
+                  {/* Comparaison view-mode toggle (segmented control — pas un CTA) */}
+                  <div className="flex flex-col items-center gap-2">
+                    <span className="text-xs uppercase tracking-wider text-muted/70">
+                      Mode d&apos;aperçu
+                    </span>
+                    <div
+                      role="tablist"
+                      aria-label="Mode d'affichage de la comparaison"
+                      className="inline-flex p-1 rounded-full bg-surface border border-card-border"
                     >
-                      Avant
-                    </button>
-                    <button
-                      onClick={() => { setShowAfter(true); setCompareMode(false); }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                        showAfter && !compareMode
-                          ? "bg-accent text-white dark:text-gray-950"
-                          : "bg-surface text-muted hover:text-foreground border border-card-border"
-                      }`}
-                    >
-                      ✨ Après
-                    </button>
-                    <button
-                      onClick={() => { setShowAfter(true); setCompareMode(true); }}
-                      className={`px-4 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-1.5 ${
-                        compareMode
-                          ? "bg-accent text-white dark:text-gray-950"
-                          : "bg-surface text-muted hover:text-foreground border border-card-border"
-                      }`}
-                    >
-                      <ArrowLeftRight className="w-4 h-4" />
-                      Comparer
-                    </button>
+                      <button
+                        role="tab"
+                        aria-selected={!showAfter && !compareMode}
+                        onClick={() => { setShowAfter(false); setCompareMode(false); }}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          !showAfter && !compareMode
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted hover:text-foreground"
+                        }`}
+                      >
+                        Original
+                      </button>
+                      <button
+                        role="tab"
+                        aria-selected={showAfter && !compareMode}
+                        onClick={() => { setShowAfter(true); setCompareMode(false); }}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all ${
+                          showAfter && !compareMode
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted hover:text-foreground"
+                        }`}
+                      >
+                        Restauré
+                      </button>
+                      <button
+                        role="tab"
+                        aria-selected={compareMode}
+                        onClick={() => { setShowAfter(true); setCompareMode(true); }}
+                        className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all flex items-center gap-1.5 ${
+                          compareMode
+                            ? "bg-card text-foreground shadow-sm"
+                            : "text-muted hover:text-foreground"
+                        }`}
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5" />
+                        Côte à côte
+                      </button>
+                    </div>
                   </div>
 
                   {/* Comparison view */}
@@ -687,13 +778,15 @@ export default function RestorePage() {
                     )}
                   </div>
 
-                  {/* Labels */}
-                  <div className="flex items-center justify-center gap-8 text-sm font-medium">
-                    <span className="px-3 py-1 rounded-full bg-surface text-muted border border-card-border">
-                      Avant
+                  {/* Sprint 3 — Labels Avant/Après discrets (non cliquables) */}
+                  <div className="flex items-center justify-center gap-6 text-xs font-medium mt-2">
+                    <span className="inline-flex items-center gap-1.5 text-muted/60">
+                      <span className="w-1.5 h-1.5 rounded-full bg-muted/30" />
+                      Original
                     </span>
-                    <span className="px-3 py-1 rounded-full bg-accent/15 text-accent">
-                      ✨ Après
+                    <span className="inline-flex items-center gap-1.5 text-accent/70">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent/50" />
+                      Restauré ✨
                     </span>
                   </div>
 
@@ -782,6 +875,58 @@ export default function RestorePage() {
       {/* P2.3 — Modale crédits épuisés */}
       {showOutOfCredits && (
         <OutOfCreditsModal onClose={() => setShowOutOfCredits(false)} />
+      )}
+
+      {/* Sprint 2 — Modale galerie d'images importées */}
+      {showGallery && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setShowGallery(false)}>
+          <div className="bg-card border border-card-border rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-4 border-b border-card-border">
+              <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                <Images className="w-5 h-5 text-accent" /> Ma galerie
+              </h3>
+              <button onClick={() => setShowGallery(false)} className="p-1 rounded-lg hover:bg-surface text-muted hover:text-foreground transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-4">
+              {loadingGallery ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="w-8 h-8 rounded-full border-3 border-accent/30 border-t-accent animate-spin" />
+                </div>
+              ) : libraryImages.length === 0 ? (
+                <div className="text-center py-12 text-muted">
+                  <Images className="w-12 h-12 mx-auto mb-3 opacity-30" />
+                  <p>Aucune image importée.</p>
+                  <p className="text-xs mt-1">Importez des images depuis la page d'accueil.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                  {libraryImages.map((img) => (
+                    <button
+                      key={img.id}
+                      onClick={() => selectFromLibrary(img)}
+                      className={`relative aspect-square rounded-xl overflow-hidden border-2 transition-all ${
+                        selectedLibraryId === img.id
+                          ? "border-accent ring-2 ring-accent/30"
+                          : "border-card-border hover:border-accent/40"
+                      }`}
+                    >
+                      <Image
+                        src={img.url}
+                        alt={img.nom_origine || "Image importée"}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                        onError={(e) => { (e.target as HTMLImageElement).src = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'><rect width='24' height='24' fill='%23111'/><text x='12' y='16' text-anchor='middle' font-size='10'>Img</text></svg>"; }}
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modale consentement RGPD (obligatoire dans le rendu) */}

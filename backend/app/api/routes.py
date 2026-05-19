@@ -34,10 +34,12 @@ from app.db.queries import (
     compter_audit_logs,
     crediter_utilisateur,
     creer_abonnement,
+    creer_image_importee,
     creer_travail,
     enregistrer_achat_credits,
     enregistrer_animation,
     lister_audit_logs,
+    lister_images_importees,
     marquer_stripe_event_traite,
     mettre_a_jour_abonnement,
     mettre_a_jour_activite,
@@ -47,10 +49,12 @@ from app.db.queries import (
     mettre_a_jour_plan_utilisateur,
     mettre_a_jour_travail,
     obtenir_abonnement,
+    obtenir_image_importee,
     obtenir_travail,
     obtenir_travail_par_job_externe,
     obtenir_utilisateur_par_email,
     stripe_event_deja_traite,
+    supprimer_image_importee,
 )
 from app.services.credits import consommer_operation, peut_animer, peut_restaurer
 from app.models.schemas import (
@@ -870,7 +874,8 @@ async def analyser(
 @router.post("/restore")
 async def restaurer(
     request: Request,
-    fichier: UploadFile = File(...),
+    fichier: UploadFile | None = File(None),
+    image_importee_id: str | None = Form(None),
     coloriser: bool = Form(False),
     resolution: str = Form("720p"),
     utilisateur: dict = Depends(exiger_utilisateur),
@@ -890,13 +895,17 @@ async def restaurer(
     **Authentification requise** : un crédit (ou 2 si colorisation) est consommé.
 
     Args:
-        fichier: Le fichier image à restaurer (JPEG, PNG, WebP, TIFF).
-        coloriser: Si True, applique une colorisation après restauration
-                   (consomme 1 crédit supplémentaire).
-
-    Returns:
-        job_id pour suivre la progression + message de confirmation.
+        fichier: Le fichier image à restaurer (si pas de image_importee_id).
+        image_importee_id: ID d'une image de la galerie (alternative au fichier).
+        coloriser: Si True, applique une colorisation après restauration.
     """
+    from app.db.session import async_session
+
+    if not fichier and not image_importee_id:
+        raise HTTPException(status_code=400, detail="Fournir un fichier ou un image_importee_id.")
+    if fichier and image_importee_id:
+        raise HTTPException(status_code=400, detail="Fournir UN seul : fichier OU image_importee_id.")
+
     # Valider la résolution
     if resolution not in TARIF_RESTAURATION:
         raise HTTPException(status_code=400, detail=f"Résolution invalide : {resolution}. Options : 720p, 1080p, 4k")
@@ -911,9 +920,26 @@ async def restaurer(
         if not peut:
             raise HTTPException(status_code=402, detail=raison)
 
-    # Validation et sauvegarde
-    contenu = await fichier.read()
-    nom_original = _valider_upload(fichier, contenu)
+    # Récupérer le contenu : soit du fichier uploadé, soit de la galerie
+    if image_importee_id:
+        async with async_session() as session:
+            img = await obtenir_image_importee(
+                image_importee_id, utilisateur["id"], session=session
+            )
+        if not img:
+            raise HTTPException(status_code=404, detail="Image de la bibliothèque introuvable.")
+        chemin_source = UPLOAD_DIR / img["chemin_fichier"]
+        if not chemin_source.exists():
+            raise HTTPException(status_code=404, detail="Fichier source introuvable.")
+        contenu = chemin_source.read_bytes()
+        mime = img["mime_type"]
+        nom_original = Path(img["chemin_fichier"]).name
+    else:
+        contenu = await fichier.read()
+        nom_original = _valider_upload(fichier, contenu)
+        mime = fichier.content_type
+
+    # Sauvegarder le fichier dans UPLOAD_DIR
     chemin_original = UPLOAD_DIR / nom_original
     chemin_original.write_bytes(contenu)
 
@@ -1780,3 +1806,92 @@ async def stripe_portal(utilisateur: dict = Depends(exiger_utilisateur)):
             status_code=500,
             detail="Impossible de créer le portail client. Réessayez ou contactez le support.",
         )
+
+
+# ===========================================================================
+# Galerie "Images importées" (bibliothèque utilisateur)
+# ===========================================================================
+
+LIBRARY_DIR = UPLOAD_DIR / "library"
+LIBRARY_DIR.mkdir(parents=True, exist_ok=True)
+
+
+@router.post("/library/upload", response_model=dict)
+async def upload_bibliotheque(
+    fichier: UploadFile = File(...),
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """Importe une image dans la galerie personnelle (sans IA, 0 crédit)."""
+    from app.db.session import async_session
+
+    contenu = await fichier.read()
+    if len(contenu) > TAILLE_MAX_UPLOAD:
+        raise HTTPException(status_code=413, detail="Fichier trop volumineux (max 20 Mo).")
+    if fichier.content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise HTTPException(status_code=400, detail="Format non supporté (JPEG, PNG, WebP).")
+
+    user_dir = LIBRARY_DIR / utilisateur["id"]
+    user_dir.mkdir(parents=True, exist_ok=True)
+    ext = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}[fichier.content_type]
+    nom = f"{uuid.uuid4().hex}.{ext}"
+    chemin = user_dir / nom
+    chemin.write_bytes(contenu)
+
+    try:
+        with Image.open(chemin) as im:
+            largeur, hauteur = im.size
+    except Exception:
+        largeur, hauteur = None, None
+
+    rel = f"library/{utilisateur['id']}/{nom}"
+    async with async_session() as session:
+        img = await creer_image_importee(
+            utilisateur_id=utilisateur["id"],
+            chemin_fichier=rel,
+            nom_origine=fichier.filename or "image",
+            mime_type=fichier.content_type,
+            taille_octets=len(contenu),
+            largeur=largeur,
+            hauteur=hauteur,
+            session=session,
+        )
+        await session.commit()
+    return {"id": img["id"], "url": f"/uploads/{rel}"}
+
+
+@router.get("/library", response_model=dict)
+async def lister_bibliotheque(
+    limite: int = 50,
+    offset: int = 0,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """Liste les images de la galerie personnelle (paginée)."""
+    from app.db.session import async_session
+
+    async with async_session() as session:
+        items = await lister_images_importees(
+            utilisateur["id"], limite=limite, offset=offset, session=session
+        )
+    for it in items:
+        it["url"] = f"/uploads/{it['chemin_fichier']}"
+    return {"items": items, "limite": limite, "offset": offset}
+
+
+@router.delete("/library/{image_id}", response_model=dict)
+async def supprimer_bibliotheque(
+    image_id: str,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """Supprime une image de la galerie personnelle."""
+    from app.db.session import async_session
+
+    async with async_session() as session:
+        img = await obtenir_image_importee(image_id, utilisateur["id"], session=session)
+        if not img:
+            raise HTTPException(status_code=404, detail="Image introuvable.")
+        chemin_abs = UPLOAD_DIR / img["chemin_fichier"]
+        if chemin_abs.exists():
+            chemin_abs.unlink()
+        await supprimer_image_importee(image_id, utilisateur["id"], session=session)
+        await session.commit()
+    return {"deleted": True}

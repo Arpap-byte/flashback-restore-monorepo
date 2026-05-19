@@ -203,9 +203,12 @@ export async function restorePhoto(file: File, colorize?: boolean, resolution?: 
   return { jobId: raw.job_id, travailId: raw.travail_id, message: raw.message };
 }
 
-export async function colorizePhoto(file: File): Promise<RestoreResult> {
+export async function colorizePhoto(file: File, resolution?: string): Promise<RestoreResult> {
   const formData = new FormData();
   formData.append("fichier", file);
+  if (resolution) {
+    formData.append("resolution", resolution);
+  }
   return apiFetch<RestoreResult>("/api/colorize", {
     method: "POST",
     body: formData,
@@ -458,6 +461,47 @@ export async function deleteAllHistory(): Promise<{ message: string; travaux_sup
 
 export async function healthCheck(): Promise<{ status: string }> {
   return apiFetch<{ status: string }>("/api/health");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Galerie "Images importées"
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface LibraryImage {
+  id: string;
+  url: string;
+  nom_origine: string;
+  mime_type: string;
+  taille_octets: number;
+  largeur: number | null;
+  hauteur: number | null;
+  cree_le: string;
+}
+
+export async function uploadToLibrary(file: File): Promise<LibraryImage> {
+  const fd = new FormData();
+  fd.append("fichier", file);
+  return apiFetch<LibraryImage>("/api/library/upload", { method: "POST", body: fd }, 30000);
+}
+
+export async function listLibrary(limit = 50, offset = 0): Promise<{ items: LibraryImage[] }> {
+  return apiFetch<{ items: LibraryImage[] }>(`/api/library?limite=${limit}&offset=${offset}`);
+}
+
+export async function deleteLibraryImage(id: string): Promise<{ deleted: boolean }> {
+  return apiFetch<{ deleted: boolean }>(`/api/library/${id}`, { method: "DELETE" });
+}
+
+export async function restoreFromLibrary(
+  imageId: string, colorize: boolean, resolution: string
+): Promise<{ jobId: string; travailId: string }> {
+  const fd = new FormData();
+  fd.append("image_importee_id", imageId);
+  fd.append("colorize", String(colorize));
+  fd.append("resolution", resolution);
+  // apiFetch ne gère pas les réponses non-JSON, mais /restore renvoie du JSON
+  const raw = await apiFetch<any>("/api/restore", { method: "POST", body: fd }, 120000);
+  return { jobId: raw.job_id, travailId: raw.travail_id };
 }
 
 // ── P3.1/P3.3 — Infos abonnement + portail client ──────────

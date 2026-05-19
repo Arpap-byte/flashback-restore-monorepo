@@ -256,3 +256,28 @@ class Consentement(Base):
             name="ck_consentements_type",
         ),
     )
+
+
+class ImageImportee(Base):
+    """Galerie personnelle d'images importées par l'utilisateur (sans traitement IA)."""
+
+    __tablename__ = "images_importees"
+
+    id = Column(String, primary_key=True, default=_new_uuid)
+    utilisateur_id = Column(String, ForeignKey("utilisateurs.id"), nullable=False, index=True)
+    chemin_fichier = Column(String, nullable=False)
+    nom_origine = Column(String, nullable=True)
+    mime_type = Column(String, nullable=False)
+    taille_octets = Column(Integer, nullable=False)
+    largeur = Column(Integer, nullable=True)
+    hauteur = Column(Integer, nullable=True)
+    cree_le = Column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
+    derniere_utilisation = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_lib_user_date", "utilisateur_id", text("cree_le DESC")),
+        CheckConstraint(
+            "mime_type IN ('image/jpeg', 'image/png', 'image/webp')",
+            name="ck_lib_mime",
+        ),
+    )

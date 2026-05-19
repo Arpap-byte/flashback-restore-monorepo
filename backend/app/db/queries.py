@@ -21,6 +21,7 @@ from app.models.db_models import (
     AuditLog,
     ConsommationCredits,
     EssaiGratuit,
+    ImageImportee,
     ReinitialisationMdp,
     StripeEvent,
     Travail,
@@ -1338,4 +1339,97 @@ async def lister_utilisateurs_abonnes() -> list[dict]:
             )
         )
         result = await session.execute(stmt)
-        return _rows_to_dicts(result.scalars().all())
+        return [
+            {"id": u.id, "email": u.email, "plan": u.plan, "credits": u.credits}
+            for u in result.scalars().all()
+        ]
+
+
+# ---------------------------------------------------------------------------
+# Galerie "Images importées" (bibliothèque personnelle)
+# ---------------------------------------------------------------------------
+
+
+async def creer_image_importee(
+    utilisateur_id: str,
+    chemin_fichier: str,
+    nom_origine: str,
+    mime_type: str,
+    taille_octets: int,
+    largeur: int | None = None,
+    hauteur: int | None = None,
+    *,
+    session,
+) -> dict:
+    """Crée une entrée dans la galerie personnelle de l'utilisateur."""
+    img = ImageImportee(
+        utilisateur_id=utilisateur_id,
+        chemin_fichier=chemin_fichier,
+        nom_origine=nom_origine,
+        mime_type=mime_type,
+        taille_octets=taille_octets,
+        largeur=largeur,
+        hauteur=hauteur,
+    )
+    session.add(img)
+    await session.flush()
+    return {"id": img.id, "chemin_fichier": img.chemin_fichier, "cree_le": img.cree_le}
+
+
+async def lister_images_importees(
+    utilisateur_id: str, limite: int = 50, offset: int = 0, *, session
+) -> list[dict]:
+    """Liste les images de la galerie personnelle (paginée)."""
+    res = await session.execute(
+        select(ImageImportee)
+        .where(ImageImportee.utilisateur_id == utilisateur_id)
+        .order_by(ImageImportee.cree_le.desc())
+        .limit(limite)
+        .offset(offset)
+    )
+    return [
+        {
+            "id": i.id,
+            "chemin_fichier": i.chemin_fichier,
+            "nom_origine": i.nom_origine,
+            "mime_type": i.mime_type,
+            "taille_octets": i.taille_octets,
+            "largeur": i.largeur,
+            "hauteur": i.hauteur,
+            "cree_le": i.cree_le.isoformat(),
+        }
+        for i in res.scalars().all()
+    ]
+
+
+async def obtenir_image_importee(
+    image_id: str, utilisateur_id: str, *, session
+) -> dict | None:
+    """Récupère une image de la galerie (vérifie la propriété)."""
+    res = await session.execute(
+        select(ImageImportee).where(
+            ImageImportee.id == image_id,
+            ImageImportee.utilisateur_id == utilisateur_id,
+        )
+    )
+    img = res.scalars().first()
+    if not img:
+        return None
+    return {"id": img.id, "chemin_fichier": img.chemin_fichier, "mime_type": img.mime_type}
+
+
+async def supprimer_image_importee(
+    image_id: str, utilisateur_id: str, *, session
+) -> bool:
+    """Supprime une image de la galerie (vérifie la propriété)."""
+    res = await session.execute(
+        select(ImageImportee).where(
+            ImageImportee.id == image_id,
+            ImageImportee.utilisateur_id == utilisateur_id,
+        )
+    )
+    img = res.scalars().first()
+    if not img:
+        return False
+    await session.delete(img)
+    return True
