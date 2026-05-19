@@ -525,10 +525,17 @@ export default function RestorePage() {
               <p className="text-muted/60 text-xs">
                 JPG, PNG, WebP — Max 20 Mo
               </p>
-              <div className="mt-4 pt-4 border-t border-card-border">
+              <div className="mt-4 pt-4 border-t border-card-border flex items-center justify-center gap-3 flex-wrap">
+                <button
+                  onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-accent text-accent-foreground text-sm font-medium hover:bg-accent/90 transition-all shadow-sm"
+                >
+                  <Upload className="w-4 h-4" />
+                  Depuis mon appareil
+                </button>
                 <button
                   onClick={(e) => { e.stopPropagation(); openGallery(); }}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-surface border border-card-border text-sm text-muted hover:text-foreground hover:border-accent/30 transition-all"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-full bg-surface border border-card-border text-sm text-foreground hover:border-accent/30 transition-all"
                 >
                   <Images className="w-4 h-4" />
                   Depuis ma galerie
