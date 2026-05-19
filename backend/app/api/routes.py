@@ -28,7 +28,7 @@ from arq.connections import RedisSettings
 from arq.jobs import Job as ArqJob, JobStatus as ArqJobStatus
 
 from app.config import GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
-from app.auth import creer_token_telechargement, exiger_utilisateur
+from app.auth import creer_token_telechargement, exiger_utilisateur, obtenir_utilisateur_courant
 from app.db.queries import (
     CREDITS_PAR_PLAN,
     compter_audit_logs,
@@ -1940,7 +1940,7 @@ async def supprimer_bibliotheque(
 
 @router.get("/credit-packs", response_model=dict)
 async def lister_packs_credits(
-    utilisateur: dict | None = Depends(exiger_utilisateur),
+    utilisateur: dict | None = Depends(obtenir_utilisateur_courant),
 ):
     """Catalogue des packs avec prix abonné ou normal selon le statut."""
     est_abonne = bool(utilisateur and utilisateur.get("est_abonne"))

@@ -8,10 +8,17 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { getCreditPacks, checkoutCreditPack, CreditPack } from "@/lib/api";
 
-const PACK_LABELS: Record<string, { name: string; icon: React.ComponentType<{ className?: string }>; gradient: string }> = {
-  S: { name: "Mini", icon: Zap, gradient: "from-emerald-500 to-teal-600" },
-  M: { name: "Standard", icon: Sparkles, gradient: "from-blue-500 to-indigo-600" },
-  L: { name: "Maxi", icon: Crown, gradient: "from-purple-500 to-pink-600" },
+const PACK_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  S: Zap,
+  M: Sparkles,
+  L: Crown,
+  XL: Crown,
+};
+const PACK_GRADIENTS: Record<string, string> = {
+  S: "from-emerald-500 to-teal-600",
+  M: "from-blue-500 to-indigo-600",
+  L: "from-purple-500 to-pink-600",
+  XL: "from-amber-500 to-orange-600",
 };
 
 export default function CreditsPage() {
@@ -101,8 +108,8 @@ export default function CreditsPage() {
           ) : (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {packs.map((pack, i) => {
-                const meta = PACK_LABELS[pack.code] || { name: pack.code, icon: Zap, gradient: "from-accent to-accent/70" };
-                const Icon = meta.icon;
+                const Icon = PACK_ICONS[pack.code] || Zap;
+                const gradient = PACK_GRADIENTS[pack.code] || "from-accent to-accent/70";
                 const prix = pack.prix_eur;
                 const isRemise = pack.remise_abonne && prix < pack.prix_normal_eur;
                 const prixParCredit = pack.credits > 0 ? (prix / pack.credits).toFixed(2) : "0";
@@ -126,11 +133,11 @@ export default function CreditsPage() {
                     )}
 
                     {/* Icon */}
-                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${meta.gradient} flex items-center justify-center mb-4`}>
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center mb-4`}>
                       <Icon className="w-6 h-6 text-white" />
                     </div>
 
-                    <h3 className="text-lg font-semibold text-foreground mb-1">{meta.name}</h3>
+                    <h3 className="text-lg font-semibold text-foreground mb-1">{pack.nom}</h3>
                     <p className="text-muted text-sm mb-4">{pack.credits} crédits</p>
 
                     {/* Price */}
