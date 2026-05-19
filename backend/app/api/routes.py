@@ -79,6 +79,7 @@ from app.services.gemini_service import (
 )
 from app.services.stripe_service import (
     PACKS_CREDITS,
+    PACK_LABELS,
     cancel_subscription_for_user,
     creer_session_paiement_pack,
     creer_session_paiement,
@@ -1947,6 +1948,7 @@ async def lister_packs_credits(
     for code, cfg in PACKS_CREDITS.items():
         packs.append({
             "code": code,
+            "nom": PACK_LABELS.get(code, code),
             "credits": cfg["credits"],
             "prix_eur": cfg["prix_abonne_eur"] if est_abonne else cfg["prix_eur"],
             "prix_normal_eur": cfg["prix_eur"],

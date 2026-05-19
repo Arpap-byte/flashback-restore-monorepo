@@ -450,9 +450,17 @@ async def obtenir_factures(
 # ---------------------------------------------------------------------------
 
 PACKS_CREDITS: dict[str, dict] = {
-    "S": {"credits": 30, "prix_eur": 4.99, "prix_abonne_eur": 3.99},
-    "M": {"credits": 100, "prix_eur": 9.99, "prix_abonne_eur": 7.99},
-    "L": {"credits": 300, "prix_eur": 19.99, "prix_abonne_eur": 15.99},
+    "S":  {"credits": 5,   "prix_eur": 2.99,  "prix_abonne_eur": 2.24},
+    "M":  {"credits": 15,  "prix_eur": 6.99,  "prix_abonne_eur": 5.24},
+    "L":  {"credits": 40,  "prix_eur": 14.99, "prix_abonne_eur": 11.24},
+    "XL": {"credits": 100, "prix_eur": 29.99, "prix_abonne_eur": 22.49},
+}
+
+PACK_LABELS: dict[str, str] = {
+    "S": "Mini",
+    "M": "Standard",
+    "L": "Maxi",
+    "XL": "Méga",
 }
 
 
@@ -465,7 +473,7 @@ async def creer_session_paiement_pack(
 ) -> dict:
     """Crée une session Stripe Checkout pour un pack de crédits perpétuels."""
     if pack not in PACKS_CREDITS:
-        raise ValueError(f"Pack inconnu : {pack}. Options : S, M, L")
+        raise ValueError(f"Pack inconnu : {pack}. Options : S, M, L, XL")
     
     cfg = PACKS_CREDITS[pack]
     prix = cfg["prix_abonne_eur"] if est_abonne else cfg["prix_eur"]

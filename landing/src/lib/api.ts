@@ -545,6 +545,7 @@ export async function openStripePortal(): Promise<{ url: string }> {
 
 export interface CreditPack {
   code: string;
+  nom: string;
   credits: number;
   prix_eur: number;
   prix_normal_eur: number;
