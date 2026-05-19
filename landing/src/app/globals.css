@@ -132,25 +132,7 @@ body {
   background: linear-gradient(135deg, #92400e 0%, #b45309 30%, #d97706 60%, #f59e0b 100%);
 }
 
-/* Fix Clerk social button icons (Tailwind v4 + Clerk v7 compat) */
-.cl-socialButtonsBlockButton {
-  gap: 0.5rem !important;
-  display: inline-flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-width: 96px !important;
-}
-.cl-socialButtonsBlockButton svg,
-.cl-socialButtonsBlockButton img {
-  width: 20px !important;
-  height: 20px !important;
-  display: inline-block !important;
-  flex-shrink: 0;
-}
-.cl-socialButtonsBlockButton__icon {
-  width: 20px !important;
-  height: 20px !important;
-}
+/* Selection colors */
 ::selection {
   background: rgba(245, 158, 11, 0.3);
   color: var(--foreground);
