@@ -225,3 +225,34 @@ class StripeEvent(Base):
     __table_args__ = (
         Index("idx_stripe_event_id", "event_id"),
     )
+
+
+class Consentement(Base):
+    """Trace immuable des consentements légaux (CGV, rétractation, RGPD).
+
+    Append-only : une révocation crée une nouvelle ligne avec retire_le,
+    on ne modifie jamais une ligne existante (preuve légale).
+    """
+
+    __tablename__ = "consentements"
+
+    id = Column(String, primary_key=True, default=_new_uuid)
+    utilisateur_id = Column(String, ForeignKey("utilisateurs.id"), nullable=True, index=True)
+    email = Column(String, nullable=True, index=True)
+    type_consentement = Column(String, nullable=False, index=True)
+    accepte = Column(Boolean, nullable=False, default=True)
+    version_texte = Column(String, nullable=False)
+    ip = Column(String, nullable=True)
+    user_agent = Column(Text, nullable=True)
+    contexte = Column(Text, nullable=True)
+    accorde_le = Column(DateTime(timezone=True), nullable=False, default=_utcnow, index=True)
+    retire_le = Column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        Index("idx_consentements_user_type", "utilisateur_id", "type_consentement"),
+        CheckConstraint(
+            "type_consentement IN ('cgv_checkout', 'renonciation_retractation', "
+            "'rgpd_biometrique', 'rgpd_ia')",
+            name="ck_consentements_type",
+        ),
+    )

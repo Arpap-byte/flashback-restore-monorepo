@@ -81,3 +81,6 @@ SMTP_USER: str = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM: str = os.getenv("SMTP_FROM", "")
 SITE_URL: str = os.getenv("SITE_URL", "https://flashback-restore.com")
+
+# Feature flag — consentements légaux obligatoires (P1.3 + P1.5)
+ENFORCE_CONSENT: bool = os.getenv("ENFORCE_CONSENT", "false").lower() == "true"

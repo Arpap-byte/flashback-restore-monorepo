@@ -1356,6 +1356,23 @@ async def creer_checkout(requete: CheckoutRequete):
         L'URL de la session Checkout Stripe.
     """
     try:
+        # Vérification consentements légaux (P1.3 — feature flag)
+        from app.config import ENFORCE_CONSENT
+        if ENFORCE_CONSENT:
+            from app.db.session import async_session as _session
+            from app.services.consent_service import consentements_checkout_recents
+
+            async with _session() as sess:
+                if not await consentements_checkout_recents(
+                    sess,
+                    email=requete.email_utilisateur,
+                ):
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Consentements CGV et renonciation au droit de rétractation requis. "
+                               "Veuillez accepter les conditions avant de procéder au paiement.",
+                    )
+
         resultat = await creer_session_paiement(
             plan=requete.plan,
             email_utilisateur=requete.email_utilisateur,

@@ -343,6 +343,56 @@ export async function cancelSubscription(): Promise<CancelResult> {
   });
 }
 
+// ── Consentements légaux (P1.3 + P1.5) ──
+
+export interface ConsentCheckoutRequest {
+  plan: string;
+  email: string;
+  cgv_version?: string;
+  retractation_version?: string;
+}
+
+export async function recordCheckoutConsent(
+  data: ConsentCheckoutRequest
+): Promise<{ ok: boolean; consent_id: string }> {
+  return apiFetch<{ ok: boolean; consent_id: string }>("/api/consents/checkout", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function recordBiometricConsent(): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/consents/biometric", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+}
+
+export interface ConsentState {
+  consentements: Record<string, boolean>;
+  historique: Array<{
+    id: string;
+    type: string;
+    accepte: boolean;
+    version: string;
+    accorde_le: string;
+    retire_le: string | null;
+    ip_masquee: string | null;
+  }>;
+}
+
+export async function getMyConsents(): Promise<ConsentState> {
+  return apiFetch<ConsentState>("/api/consents/me");
+}
+
+export async function revokeBiometricConsent(): Promise<{ ok: boolean }> {
+  return apiFetch<{ ok: boolean }>("/api/consents/biometric", {
+    method: "DELETE",
+  });
+}
+
 export interface UserMe {
   id: string;
   email: string;

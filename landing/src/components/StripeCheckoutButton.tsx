@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { createCheckout } from "@/lib/api";
+import { createCheckout, recordCheckoutConsent } from "@/lib/api";
 import { Loader2, Mail, AlertTriangle, X, LogIn, FileText, Shield } from "lucide-react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
@@ -67,7 +67,7 @@ export default function StripeCheckoutButton({
     setShowEmailInput(true);
   };
 
-  const handleLegalConsentConfirm = () => {
+  const handleLegalConsentConfirm = async () => {
     setLegalError(null);
     if (!cguAccepted) {
       setLegalError("Vous devez accepter les Conditions Générales de Vente.");
@@ -77,8 +77,28 @@ export default function StripeCheckoutButton({
       setLegalError("Vous devez reconnaître la renonciation au droit de rétractation.");
       return;
     }
-    setShowLegalConsent(false);
-    goToCheckout(clerkEmail!);
+    if (!clerkEmail) {
+      setLegalError("Email introuvable. Veuillez vous reconnecter.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // Étape 1 : Enregistrer les consentements côté serveur (preuve légale)
+      await recordCheckoutConsent({
+        plan,
+        email: clerkEmail,
+        cgv_version: "v1.2-2026-05-19",
+        retractation_version: "v1.0-2026-05-19",
+      });
+      // Étape 2 : Rediriger vers Stripe
+      setShowLegalConsent(false);
+      await goToCheckout(clerkEmail);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erreur lors de l'enregistrement du consentement.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const validateEmail = (value: string): boolean => {
