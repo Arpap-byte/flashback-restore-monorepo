@@ -1674,15 +1674,37 @@ async def webhook_stripe(request: Request):
             logger.exception(f"Erreur traitement invoice.paid : {e}")
 
     elif type_evenement == "customer.subscription.deleted":
-        # Abonnement résilié
+        # Abonnement résilié → rétrograder l'utilisateur
         try:
+            stripe_sub_id = donnees.get("id")
             await mettre_a_jour_abonnement(
-                stripe_subscription_id=donnees.get("id"),
+                stripe_subscription_id=stripe_sub_id,
                 statut="resilie",
             )
-            logger.info(f"Abonnement résilié : {donnees.get('id')}")
+            # Rétrograder l'utilisateur : plan → gratuit, est_abonne → 0
+            abo = await obtenir_abonnement(stripe_subscription_id=stripe_sub_id)
+            if abo and abo.get("email_utilisateur"):
+                utilisateur = await obtenir_utilisateur_par_email(abo["email_utilisateur"])
+                if utilisateur:
+                    await mettre_a_jour_plan_utilisateur(utilisateur["id"], "gratuit")
+                    # Corriger est_abonne (mettre_a_jour_plan_utilisateur le met à 1)
+                    from app.db.session import async_session
+                    from sqlalchemy import update as sa_update
+                    from app.models.db_models import Utilisateur
+                    async with async_session() as session:
+                        await session.execute(
+                            sa_update(Utilisateur)
+                            .where(Utilisateur.id == utilisateur["id"])
+                            .values(est_abonne=0)
+                        )
+                        await session.commit()
+                    logger.info(
+                        f"Utilisateur rétrogradé (abonnement résilié) : "
+                        f"email={abo['email_utilisateur']}, stripe_sub={stripe_sub_id}"
+                    )
+            logger.info(f"Abonnement résilié : {stripe_sub_id}")
         except Exception as e:
-            logger.exception(f"Erreur mise à jour abonnement : {e}")
+            logger.exception(f"Erreur résiliation abonnement : {e}")
 
     elif type_evenement == "customer.subscription.updated":
         # Abonnement modifié
