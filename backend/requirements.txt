@@ -69,3 +69,6 @@ opencv-contrib-python-headless>=4.0,<5.0
 
 # Compatibilité event loop (APScheduler dans contexte async)
 nest_asyncio>=1.6,<2.0
+
+# Monitoring
+psutil>=5.9,<8.0
