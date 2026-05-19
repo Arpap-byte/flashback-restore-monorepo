@@ -1095,26 +1095,21 @@ async def animer(
     contenu = await fichier.read()
     nom_fichier = _valider_upload(fichier, contenu, nom_par_defaut="portrait.jpg")
     chemin = UPLOAD_DIR / nom_fichier
-    chemin.write_bytes(contenu)
 
     # Suivi dashboard admin
     await mettre_a_jour_activite(utilisateur["id"])
 
-    # Création du travail
-    travail_id = await creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
-    await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
-
-    # Vérification des crédits et de la limite d'animations par forfait (sans consommer)
+    # Vérification des crédits AVANT toute écriture disque (Bug #7)
     nb_credits_anim = TARIF_ANIMATION.get(resolution, 10)
     for i in range(nb_credits_anim):
         peut, raison = await peut_animer(utilisateur["id"])
         if not peut:
-            await mettre_a_jour_travail(
-                travail_id,
-                statut="erreur",
-                message_erreur=raison,
-            )
             raise HTTPException(status_code=403, detail=raison)
+
+    # Création du travail ET sauvegarde fichier disque (seulement si crédits OK)
+    travail_id = await creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
+    await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
+    chemin.write_bytes(contenu)
 
     # Délégation au worker ARQ (non-bloquant) AVANT consommation
     # Atomicité : si l'enqueue échoue, aucun crédit n'est perdu.

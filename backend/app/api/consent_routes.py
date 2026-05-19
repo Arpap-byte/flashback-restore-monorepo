@@ -67,7 +67,12 @@ async def consentement_checkout(request: Request):
     # Essayer d'obtenir l'utilisateur authentifié (optionnel)
     utilisateur_id = None
     try:
-        utilisateur = await exiger_utilisateur.__wrapped__(request) if False else None
+        from app.auth import decoder_token, _trouver_ou_creer_utilisateur
+        auth_header = request.headers.get("Authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            payload = decoder_token(auth_header[7:])
+            utilisateur = await _trouver_ou_creer_utilisateur(payload)
+            utilisateur_id = utilisateur.get("id") if utilisateur else None
     except Exception:
         pass
 

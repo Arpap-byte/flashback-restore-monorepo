@@ -9,6 +9,37 @@ const nextConfig: NextConfig = {
         destination: '/restore',
         permanent: true,
       },
+      // Redirections canoniques françaises (Bug #5)
+      {
+        source: '/cgu',
+        destination: '/conditions-utilisation',
+        permanent: true,
+      },
+      {
+        source: '/confidentialite',
+        destination: '/privacy',
+        permanent: true,
+      },
+      {
+        source: '/tarifs',
+        destination: '/#pricing',
+        permanent: true,
+      },
+      {
+        source: '/pricing',
+        destination: '/#pricing',
+        permanent: true,
+      },
+      {
+        source: '/legal',
+        destination: '/mentions-legales',
+        permanent: true,
+      },
+      {
+        source: '/contact',
+        destination: '/#footer',
+        permanent: true,
+      },
     ];
   },
   async headers() {

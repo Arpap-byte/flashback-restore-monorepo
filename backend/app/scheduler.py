@@ -209,10 +209,10 @@ def demarrer_scheduler():
         replace_existing=True,
     )
 
-    # ── Job 2 : Backup PostgreSQL (3h UTC) ──
+    # ── Job 2 : Backup PostgreSQL (3h05 UTC — décalé pour éviter conflit cleanup) ──
     scheduler.add_job(
         run_backup_job,
-        trigger=CronTrigger(hour=3, minute=0),
+        trigger=CronTrigger(hour=3, minute=5),
         id="backup_quotidien",
         name="Backup PostgreSQL + B2",
         replace_existing=True,
