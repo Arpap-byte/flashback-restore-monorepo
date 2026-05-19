@@ -41,7 +41,7 @@ def evaluate_alerts(snapshot: dict) -> list[dict]:
     """
     alerts = []
     services = snapshot.get("services", {})
-    ssl_info = snapshot.get("ssl", {})
+    ssl_info = snapshot.get("ssl") or {}
     db = snapshot.get("db", {})
     system = snapshot.get("system", {})
     arq = snapshot.get("arq", {})
