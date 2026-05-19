@@ -784,6 +784,9 @@ export default function RestorePage() {
         <OutOfCreditsModal onClose={() => setShowOutOfCredits(false)} />
       )}
 
+      {/* Modale consentement RGPD (obligatoire dans le rendu) */}
+      {RgpdModal}
+
       <Footer />
     </div>
   );
