@@ -25,6 +25,7 @@ from app.api.auth import router as auth_router
 from app.api.consent_routes import router as consent_router
 from app.api.contact_routes import router as contact_router
 from app.api.user import router as user_router
+from app.api.webhooks import router as webhooks_router
 from app.auth import decoder_token, _trouver_ou_creer_utilisateur
 from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT, SENTRY_DSN
 from app.db.session import init_db as async_initialiser_base
@@ -171,6 +172,7 @@ app.include_router(auth_router)
 app.include_router(consent_router)
 app.include_router(contact_router)
 app.include_router(user_router)
+app.include_router(webhooks_router)
 
 # ---------------------------------------------------------------------------
 # Fichiers uploads — protégé par authentification + ownership

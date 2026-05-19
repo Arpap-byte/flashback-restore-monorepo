@@ -76,3 +76,60 @@ async def log_auth(
     logger.info(f"[AUDIT] {statut} {evenement} | email={email_masque or '?'} | ip={ip} | {detail or ''}")
 
     return audit_id
+
+
+async def log_webhook(
+    request,
+    evenement: str,
+    clerk_id: Optional[str] = None,
+    email: Optional[str] = None,
+    reussite: bool = True,
+) -> str:
+    """
+    Enregistre un événement d'audit pour les webhooks Clerk.
+
+    Args:
+        request: Requête FastAPI.
+        evenement: Type d'événement (user.created, user.updated, user.deleted).
+        clerk_id: ID Clerk de l'utilisateur concerné.
+        email: Email de l'utilisateur.
+        reussite: True = succès.
+
+    Returns:
+        ID de l'entrée d'audit.
+    """
+    detail = f"clerk_id={clerk_id}" if clerk_id else None
+    return await log_auth(
+        request,
+        f"webhook_{evenement}",
+        email=email,
+        reussite=reussite,
+        detail=detail,
+    )
+
+
+async def log_security_event(
+    evenement: str,
+    detail: Optional[str] = None,
+) -> str:
+    """
+    Enregistre un événement de sécurité sans requête HTTP (ex: tâche de fond).
+
+    Args:
+        evenement: Type d'événement (webhook_signature_invalide, etc.).
+        detail: Détail additionnel.
+
+    Returns:
+        ID de l'entrée d'audit.
+    """
+    # Pas de request → IP et UA fixes
+    audit_id = await _db_audit(
+        evenement=f"securite_{evenement}",
+        ip="127.0.0.1",
+        user_agent="hermes/internal",
+        reussite=False,
+        detail=detail,
+    )
+
+    logger.warning(f"[SECURITE] {evenement} | {detail or ''}")
+    return audit_id

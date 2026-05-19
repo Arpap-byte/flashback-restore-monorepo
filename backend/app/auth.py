@@ -186,9 +186,10 @@ async def _trouver_ou_creer_utilisateur(payload: dict) -> Optional[dict]:
             "Création automatique utilisateur Clerk: email=%s provider_id=%s",
             email, provider_id,
         )
-        nouvel_id = await creer_utilisateur_oauth(email.lower(), "clerk", provider_id)
-        if nouvel_id:
-            return await obtenir_utilisateur_par_id(nouvel_id)
+        from app.services.clerk_account import ensure_compte
+        result = await ensure_compte(provider_id, email.lower())
+        if result:
+            return await obtenir_utilisateur_par_id(result["id"])
 
     # Token NextAuth ou autre : ne pas créer automatiquement
     if email:
