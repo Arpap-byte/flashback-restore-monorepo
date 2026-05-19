@@ -70,7 +70,7 @@ export default function RestorePage() {
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // RGPD consentement
-  const { showConsent, requireConsent, RgpdModal } = useRgpdConsent();
+  const { showConsent, requireConsent: checkRgpdConsent, RgpdModal } = useRgpdConsent();
 
   // Nettoyer l'AbortController au démontage du composant (F5)
   useEffect(() => {
@@ -203,6 +203,11 @@ export default function RestorePage() {
 
   const handleRestore = async () => {
     if (!file) return;
+
+    // Vérifier le consentement RGPD
+    const consent = await checkRgpdConsent();
+    if (!consent) return;
+
     // F5: Créer un AbortController pour pouvoir annuler le polling
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -283,6 +288,11 @@ export default function RestorePage() {
   // Colorisation standalone (depuis l'historique, sans re-restauration)
   const handleColorizeDirect = async () => {
     if (!file) return;
+
+    // Vérifier le consentement RGPD
+    const consent = await checkRgpdConsent();
+    if (!consent) return;
+
     setColorizing(true);
     setError(null);
     setRestoreProgress("Colorisation en cours...");

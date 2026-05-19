@@ -50,6 +50,9 @@ export default function AnimatePage() {
   const pollStartTime = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // RGPD consentement
+  const { showConsent, requireConsent: checkRgpdConsent, RgpdModal } = useRgpdConsent();
+
   useEffect(() => {
     const stored = sessionStorage.getItem("flashback_photo");
     if (stored) {
@@ -156,9 +159,9 @@ export default function AnimatePage() {
   const handleAnimate = async () => {
     if (!file) return;
 
-    // TODO P1.5: Consentement RGPD biométrique — à implémenter
-    // const consent = await requireConsent();
-    // if (!consent) return;
+    // Vérifier le consentement RGPD
+    const consent = await checkRgpdConsent();
+    if (!consent) return;
 
     setAnimating(true);
     setStatus({ status: "en_attente" });
