@@ -1316,6 +1316,13 @@ async def statut_job_arq(
         if arq_status == ArqJobStatus.complete:
             try:
                 resultat = await arq_job.result(timeout=0.5)
+                # Injecter un token de téléchargement (30 min TTL) dans url_image
+                # pour que le frontend puisse afficher l'image sans expiration Clerk (60s TTL)
+                if resultat and isinstance(resultat, dict) and resultat.get("url_image"):
+                    url_brute = resultat["url_image"]
+                    if url_brute.startswith("/uploads/") and "?token=" not in url_brute:
+                        token_dl = creer_token_telechargement(utilisateur["id"])
+                        resultat["url_image"] = f"{url_brute}?token={token_dl}"
                 response_data["resultat"] = resultat
             except Exception:
                 response_data["resultat"] = None

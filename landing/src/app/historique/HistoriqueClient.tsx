@@ -498,13 +498,17 @@ export default function HistoriquePage() {
                         {/* Importées : boutons Restaurer + Animer */}
                         {activeTab === "importees" && (
                           <>
-                            <a
-                              href={`/restore?photo=${encodeURIComponent(getPhotoUrl(t.url_original!, authToken))}`}
+                            <button
+                              onClick={async () => {
+                                const url = await getPhotoUrlAsync(t.url_original!);
+                                sessionStorage.setItem("flashback_photo", url);
+                                window.location.href = "/restore";
+                              }}
                               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-accent/10 text-accent text-xs hover:bg-accent/20 transition-colors"
                             >
                               <Sparkles className="w-3 h-3" />
                               Restaurer
-                            </a>
+                            </button>
                             <button
                               onClick={async () => {
                                 const url = await getPhotoUrlAsync(t.url_original!);
