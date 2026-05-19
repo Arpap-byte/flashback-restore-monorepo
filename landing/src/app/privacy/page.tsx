@@ -92,7 +92,7 @@ const sections = [
       "Droit de retirer votre consentement à tout moment, sans affecter la licéité du traitement antérieur.",
     ],
     extra:
-      "Pour exercer ces droits, contactez-nous à support@flashback-restore.com. Nous répondrons dans un délai de 30 jours conformément au RGPD.",
+      "Pour exercer ces droits, contactez-nous à apexcyber.eu@gmail.com. Nous répondrons dans un délai de 30 jours conformément au RGPD.",
   },
   {
     icon: Mail,
@@ -100,7 +100,7 @@ const sections = [
     content:
       "Pour toute question concernant cette Politique de Confidentialité ou pour exercer vos droits, contactez-nous à :",
     contact: {
-      email: "support@flashback-restore.com",
+      email: "apexcyber.eu@gmail.com",
       label: "Nous contacter par email",
     },
   },
@@ -235,11 +235,11 @@ export default function PrivacyPage() {
               Notre équipe est là pour vous répondre.
             </p>
             <a
-              href="mailto:support@flashback-restore.com"
+              href="mailto:apexcyber.eu@gmail.com"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-lg hover:shadow-accent/25"
             >
               <Mail className="w-4 h-4" />
-              support@flashback-restore.com
+              apexcyber.eu@gmail.com
             </a>
           </motion.div>
         </div>

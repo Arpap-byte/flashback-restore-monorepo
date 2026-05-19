@@ -15,7 +15,7 @@ const footerLinks = {
     { label: "À propos", href: "/about" },
     { label: "Restaurer", href: "/upload" },
     { label: "Animer", href: "/animate" },
-    { label: "Nous contacter", href: "mailto:support@flashback-restore.com" },
+    { label: "Nous contacter", href: "mailto:apexcyber.eu@gmail.com" },
   ],
   Légal: [
     { label: "Confidentialité", href: "/privacy" },

@@ -98,7 +98,7 @@ const sections = [
     content:
       "Pour toute question concernant notre utilisation des cookies, vous pouvez nous contacter à :",
     contact: {
-      email: "support@flashback-restore.com",
+      email: "apexcyber.eu@gmail.com",
       label: "Nous contacter",
     },
   },
@@ -293,11 +293,11 @@ export default function CookiesPage() {
               Nous sommes transparents sur notre utilisation des données.
             </p>
             <a
-              href="mailto:support@flashback-restore.com"
+              href="mailto:apexcyber.eu@gmail.com"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-lg hover:shadow-accent/25"
             >
               <Cookie className="w-4 h-4" />
-              support@flashback-restore.com
+              apexcyber.eu@gmail.com
             </a>
           </motion.div>
         </div>

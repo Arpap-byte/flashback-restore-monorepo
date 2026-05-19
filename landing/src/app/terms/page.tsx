@@ -122,7 +122,7 @@ const sections = [
     content:
       "Pour toute question concernant ces Conditions Générales d'Utilisation, vous pouvez nous contacter à :",
     contact: {
-      email: "support@flashback-restore.com",
+      email: "apexcyber.eu@gmail.com",
       label: "Contacter le support",
     },
   },
@@ -265,7 +265,7 @@ export default function TermsPage() {
               Contactez-nous, nous vous répondrons rapidement.
             </p>
             <a
-              href="mailto:support@flashback-restore.com"
+              href="mailto:apexcyber.eu@gmail.com"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold hover:brightness-110 transition-all hover:shadow-lg hover:shadow-accent/25"
             >
               <FileText className="w-4 h-4" />

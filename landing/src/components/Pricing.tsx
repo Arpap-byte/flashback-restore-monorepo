@@ -126,7 +126,7 @@ const plans = [
     border: "border-blue-500/20",
     buttonStyle:
       "border-2 border-blue-500/30 text-foreground hover:bg-blue-500/10 hover:border-blue-400 transition-all font-semibold",
-    href: "mailto:contact@flashback-restore.fr",
+    href: "mailto:apexcyber.eu@gmail.com",
   },
 ];
 
@@ -156,7 +156,7 @@ function PricingCard({
     if (plan.name === "Pro") {
       return (
         <a
-          href={plan.href || "mailto:contact@flashback-restore.fr"}
+          href={plan.href || "mailto:apexcyber.eu@gmail.com"}
           className={`w-full py-3.5 rounded-full text-sm transition-all active:scale-[0.97] inline-flex items-center justify-center gap-2 ${plan.buttonStyle}`}
         >
           {plan.cta}
