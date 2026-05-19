@@ -23,6 +23,7 @@ from app.api.routes import router
 # Routes auth — register/login local + Clerk (Google OAuth)
 from app.api.auth import router as auth_router
 from app.api.consent_routes import router as consent_router
+from app.api.contact_routes import router as contact_router
 from app.api.user import router as user_router
 from app.auth import decoder_token, _trouver_ou_creer_utilisateur
 from app.config import DEBUG, UPLOAD_DIR, ALLOWED_ORIGINS, ENVIRONMENT, SENTRY_DSN
@@ -168,6 +169,7 @@ async def ajouter_cache_control_uploads(request: Request, call_next):
 app.include_router(router)
 app.include_router(auth_router)
 app.include_router(consent_router)
+app.include_router(contact_router)
 app.include_router(user_router)
 
 # ---------------------------------------------------------------------------

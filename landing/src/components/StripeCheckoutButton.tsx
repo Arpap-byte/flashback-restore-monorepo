@@ -2,9 +2,10 @@
 
 import { useState, useEffect } from "react";
 import { createCheckout, recordCheckoutConsent } from "@/lib/api";
-import { Loader2, Mail, AlertTriangle, X, LogIn, FileText, Shield } from "lucide-react";
+import { Loader2, Mail, AlertTriangle, X, LogIn, FileText, Shield, WifiOff } from "lucide-react";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import Link from "next/link";
+import ContactFallback from "@/components/ContactFallback";
 
 interface StripeCheckoutButtonProps {
   plan: string;
@@ -31,6 +32,9 @@ export default function StripeCheckoutButton({
   const [waiverAccepted, setWaiverAccepted] = useState(false);
   const [legalError, setLegalError] = useState<string | null>(null);
 
+  // P2.4 — Fallback formulaire contact si Stripe est HS
+  const [showContactFallback, setShowContactFallback] = useState(false);
+
   const { user, isSignedIn } = useUser();
   const clerkEmail = user?.emailAddresses?.[0]?.emailAddress;
 
@@ -49,9 +53,21 @@ export default function StripeCheckoutButton({
         setError("URL de checkout non reçue. Veuillez réessayer.");
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Une erreur est survenue."
-      );
+      // P2.4 — Si l'erreur vient de Stripe/backend (pas une erreur réseau locale),
+      // afficher le formulaire de contact plutôt qu'un message d'erreur
+      const msg = err instanceof Error ? err.message : "Une erreur est survenue.";
+      if (
+        msg.includes("500") ||
+        msg.includes("502") ||
+        msg.includes("503") ||
+        msg.includes("URL de checkout non reçue") ||
+        msg.includes("fetch failed") ||
+        msg.includes("NetworkError")
+      ) {
+        setShowContactFallback(true);
+        return;
+      }
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -136,7 +152,18 @@ export default function StripeCheckoutButton({
 
   return (
     <div className="w-full">
-      {!showEmailInput && !showLegalConsent ? (
+      {/* P2.4 — Fallback formulaire de contact si Stripe HS */}
+      {showContactFallback ? (
+        <ContactFallback
+          plan={plan}
+          onClose={() => {
+            setShowContactFallback(false);
+            setError(null);
+          }}
+        />
+      ) : (
+        <>
+          {!showEmailInput && !showLegalConsent ? (
         <button
           onClick={handleInitialClick}
           disabled={loading}
@@ -298,6 +325,8 @@ export default function StripeCheckoutButton({
             <p className="text-red-400 text-xs text-center">{error}</p>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );

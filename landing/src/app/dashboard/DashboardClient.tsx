@@ -440,6 +440,40 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* ============================================================ */}
+          {/*  BANNIÈRE CRÉDITS ÉPUISÉS (P2.3)                             */}
+          {/* ============================================================ */}
+          {userMe?.plan === "gratuit" &&
+            userMe?.essais_restants === 0 &&
+            userMe?.credits === 0 && (
+              <motion.div
+                variants={itemVariants}
+                className="mb-6 p-5 rounded-2xl bg-red-500/5 border border-red-500/20 flex flex-col sm:flex-row items-start sm:items-center gap-4"
+              >
+                <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center flex-shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-foreground mb-0.5">
+                    Plus de crédits disponibles
+                  </p>
+                  <p className="text-xs text-muted">
+                    Vous avez utilisé tous vos essais gratuits. Passez à un
+                    abonnement pour continuer à restaurer vos photos.
+                  </p>
+                </div>
+                <button
+                  onClick={() => {
+                    window.location.href = "/#pricing";
+                  }}
+                  className="flex-shrink-0 inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-accent text-white text-sm font-semibold hover:brightness-110 transition-all active:scale-[0.97] shadow-md shadow-accent/20"
+                >
+                  Voir les offres
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </motion.div>
+            )}
+
+          {/* ============================================================ */}
           {/*  CARTES DE STATS                                              */}
           {/* ============================================================ */}
           <motion.div

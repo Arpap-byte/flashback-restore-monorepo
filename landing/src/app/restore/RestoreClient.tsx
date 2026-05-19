@@ -27,8 +27,9 @@ import Footer from "@/components/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
-import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob } from "@/lib/api";
+import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob, getUserMe } from "@/lib/api";
 import { useRgpdConsent } from "@/components/RgpdConsent";
+import OutOfCreditsModal from "@/components/OutOfCreditsModal";
 
 function getCreditTotal(resolution: string, colorize: boolean): number {
   const base = resolution === "4k" ? 4 : resolution === "1080p" ? 2 : 1;
@@ -68,6 +69,9 @@ export default function RestorePage() {
   const [restoreProgress, setRestoreProgress] = useState<string>("");
   const [restoredUrl, setRestoredUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // P2.3 — Modale crédits épuisés
+  const [showOutOfCredits, setShowOutOfCredits] = useState(false);
 
   // RGPD consentement
   const { showConsent, requireConsent: checkRgpdConsent, RgpdModal } = useRgpdConsent();
@@ -207,6 +211,18 @@ export default function RestorePage() {
     // Vérifier le consentement RGPD
     const consent = await checkRgpdConsent();
     if (!consent) return;
+
+    // P2.3 — Vérifier les crédits avant de lancer
+    try {
+      const me = await getUserMe();
+      if (me.credits === 0 && me.essais_restants === 0) {
+        setShowOutOfCredits(true);
+        return;
+      }
+    } catch {
+      // Si l'API est down, on laisse passer (le backend bloquera
+      // avec un message d'erreur clair si pas de crédits)
+    }
 
     // F5: Créer un AbortController pour pouvoir annuler le polling
     const controller = new AbortController();
@@ -762,6 +778,12 @@ export default function RestorePage() {
           )}
         </div>
       </main>
+
+      {/* P2.3 — Modale crédits épuisés */}
+      {showOutOfCredits && (
+        <OutOfCreditsModal onClose={() => setShowOutOfCredits(false)} />
+      )}
+
       <Footer />
     </div>
   );
