@@ -459,3 +459,40 @@ export async function deleteAllHistory(): Promise<{ message: string; travaux_sup
 export async function healthCheck(): Promise<{ status: string }> {
   return apiFetch<{ status: string }>("/api/health");
 }
+
+// ── P3.1/P3.3 — Infos abonnement + portail client ──────────
+
+export interface SubscriptionInfo {
+  plan: string;
+  credits: number;
+  essais_restants: number;
+  date_renouvellement: string | null;
+  est_abonne: boolean;
+  stripe: {
+    statut: string;
+    abonnement_id?: string;
+    debut_periode?: string;
+    fin_periode?: string;
+    annulation_auto?: boolean;
+  } | null;
+  factures: Array<{
+    id: string;
+    number: string | null;
+    montant: number;
+    devise: string;
+    statut: string;
+    date: string;
+    url_pdf: string | null;
+    url_portail: string | null;
+    periode_debut: string | null;
+    periode_fin: string | null;
+  }>;
+}
+
+export async function getSubscription(): Promise<SubscriptionInfo> {
+  return apiFetch<SubscriptionInfo>("/api/user/subscription");
+}
+
+export async function openStripePortal(): Promise<{ url: string }> {
+  return apiFetch<{ url: string }>("/api/stripe/portal", { method: "POST" });
+}

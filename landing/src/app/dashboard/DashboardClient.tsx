@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import SubscriptionTab from "@/components/SubscriptionTab";
 import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import {
@@ -251,8 +252,11 @@ export default function DashboardPage() {
   // Résiliation
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [cancelResult, setCancelResult] = useState<CancelResult | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
+  const [cancelResult, setCancelResult] = useState<CancelResult | null>(null);
+
+  // P3.1 — Onglets dashboard
+  const [activeTab, setActiveTab] = useState<"dashboard" | "subscription">("dashboard");
 
   /* ---------- Récupération des données ---------- */
 
@@ -440,8 +444,40 @@ export default function DashboardPage() {
           </motion.div>
 
           {/* ============================================================ */}
-          {/*  BANNIÈRE CRÉDITS ÉPUISÉS (P2.3)                             */}
+          {/*  ONGLETS (P3.1)                                               */}
           {/* ============================================================ */}
+          <div className="flex justify-center mt-6 mb-2">
+            <div className="inline-flex rounded-full bg-card border border-card-border p-1">
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  activeTab === "dashboard"
+                    ? "bg-accent text-white shadow-md"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                Tableau de bord
+              </button>
+              <button
+                onClick={() => setActiveTab("subscription")}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
+                  activeTab === "subscription"
+                    ? "bg-accent text-white shadow-md"
+                    : "text-muted hover:text-foreground"
+                }`}
+              >
+                Mon abonnement
+              </button>
+            </div>
+          </div>
+
+          {activeTab === "subscription" ? (
+            <SubscriptionTab />
+          ) : (
+            <>
+              {/* ============================================================ */}
+              {/*  BANNIÈRE CRÉDITS ÉPUISÉS (P2.3)                             */}
+              {/* ============================================================ */}
           {userMe?.plan === "gratuit" &&
             userMe?.essais_restants === 0 &&
             userMe?.credits === 0 && (
@@ -878,6 +914,8 @@ export default function DashboardPage() {
                 <RefreshCw className="w-4 h-4" />
               </button>
             </motion.div>
+          )}
+            </>
           )}
         </div>
       </main>

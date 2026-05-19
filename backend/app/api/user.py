@@ -295,3 +295,58 @@ async def supprimer_tout_historique(
         "travaux_supprimes": nb_supprimes,
         "fichiers_supprimes": fichiers_supprimes,
     }
+
+
+# ── GET /api/user/subscription ────────────────────────
+
+@router.get("/subscription")
+async def infos_abonnement(utilisateur: dict = Depends(exiger_utilisateur)):
+    """
+    Retourne les informations détaillées de l'abonnement Stripe (P3.1/P3.3).
+
+    Inclut : plan, crédits, date de renouvellement, statut Stripe,
+    factures récentes.
+    """
+    from app.db.queries import obtenir_utilisateur_par_id
+    from app.services.stripe_service import obtenir_abonnement_stripe, obtenir_factures
+
+    uid = utilisateur.get("id")
+    if not uid:
+        raise HTTPException(status_code=401, detail="Utilisateur non identifié.")
+
+    user_row = await obtenir_utilisateur_par_id(uid)
+    if not user_row:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    stripe_customer_id = user_row.get("stripe_customer_id")
+    stripe_subscription_id = user_row.get("stripe_subscription_id")
+
+    # Base
+    result = {
+        "plan": user_row.get("plan", "gratuit"),
+        "credits": user_row.get("credits", 0),
+        "essais_restants": user_row.get("essais_restants", 0),
+        "date_renouvellement": user_row.get("date_renouvellement"),
+        "est_abonne": user_row.get("plan", "gratuit") != "gratuit",
+        "stripe": None,
+        "factures": [],
+    }
+
+    # Infos Stripe (si abonné)
+    if stripe_customer_id and stripe_subscription_id:
+        try:
+            abo = await obtenir_abonnement_stripe(stripe_customer_id)
+            result["stripe"] = {
+                "statut": abo.get("statut"),
+                "abonnement_id": abo.get("abonnement_id"),
+                "debut_periode": abo.get("debut_periode"),
+                "fin_periode": abo.get("fin_periode"),
+                "annulation_auto": abo.get("annulation_auto", False),
+            }
+            # Factures
+            result["factures"] = await obtenir_factures(stripe_customer_id, limit=5)
+        except Exception as e:
+            logger.warning(f"Stripe indisponible pour /subscription user={uid}: {e}")
+            result["stripe"] = {"statut": "indisponible"}
+
+    return result

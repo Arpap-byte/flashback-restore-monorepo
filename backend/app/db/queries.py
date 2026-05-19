@@ -1320,3 +1320,22 @@ async def marquer_stripe_event_traite(event_id: str, type_evenement: str, sessio
         result = await _do(session)
         await session.commit()
         return result
+
+
+async def lister_utilisateurs_abonnes() -> list[dict]:
+    """
+    Retourne tous les utilisateurs avec un abonnement actif (plan != gratuit).
+
+    Utilisé pour les relances d'expiration (P3.4).
+    """
+    async with async_session() as session:
+        stmt = (
+            select(Utilisateur)
+            .where(
+                Utilisateur.plan != "gratuit",
+                Utilisateur.stripe_customer_id.isnot(None),
+                Utilisateur.stripe_subscription_id.isnot(None),
+            )
+        )
+        result = await session.execute(stmt)
+        return _rows_to_dicts(result.scalars().all())

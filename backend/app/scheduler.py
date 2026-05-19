@@ -110,6 +110,87 @@ async def run_alert_check() -> dict:
         raise
 
 
+# ── Relance expiration abonnement (P3.4) ─────────────────
+
+async def run_subscription_reminders():
+    """
+    Vérifie les abonnements expirant dans 3 jours et envoie un email
+    de relance pour éviter les interruptions de service.
+    """
+    try:
+        from app.services.stripe_service import obtenir_abonnement_stripe
+        from app.db.queries import lister_utilisateurs_abonnes
+        import smtplib
+        from email.mime.text import MIMEText
+
+        from app.config import SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+
+        abonnes = await lister_utilisateurs_abonnes()
+        if not abonnes:
+            logger.info("📬 [Relances] Aucun abonné à vérifier")
+            return {"relances_envoyees": 0}
+
+        relances = 0
+        for user in abonnes:
+            stripe_customer_id = user.get("stripe_customer_id")
+            if not stripe_customer_id:
+                continue
+
+            try:
+                abo = await obtenir_abonnement_stripe(stripe_customer_id)
+                fin_periode = abo.get("fin_periode")
+                if not fin_periode:
+                    continue
+
+                # Vérifier si la fin de période est dans 3 jours (±12h)
+                from datetime import datetime, timezone, timedelta
+                maintenant = datetime.now(timezone.utc)
+                fin = datetime.fromtimestamp(fin_periode, tz=timezone.utc)
+                diff_jours = (fin - maintenant).total_seconds() / 86400
+
+                if 2.5 <= diff_jours <= 3.5:  # fenêtre de ~24h autour de J-3
+                    email = user.get("email")
+                    if not email:
+                        continue
+
+                    msg = MIMEText(
+                        f"""Bonjour,
+
+Votre abonnement Flashback Restore arrive à échéance le {fin.strftime('%d/%m/%Y')}.
+
+Pour éviter toute interruption de service, rendez-vous dans votre espace :
+https://flashback-restore.com/dashboard
+
+Vos crédits et photos seront préservés.
+
+L'équipe Flashback Restore""",
+                        "plain",
+                        "utf-8",
+                    )
+                    msg["Subject"] = "[Flashback Restore] Votre abonnement expire bientôt"
+                    msg["From"] = SMTP_FROM
+                    msg["To"] = email
+
+                    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as s:
+                        s.starttls()
+                        s.login(SMTP_USER, SMTP_PASSWORD)
+                        s.send_message(msg)
+
+                    relances += 1
+                    logger.info(f"📬 [Relances] Email envoyé à {email} (expire le {fin.strftime('%d/%m/%Y')})")
+
+            except Exception as e:
+                logger.warning(f"⚠️ [Relances] Erreur pour user={user.get('id')}: {e}")
+                continue
+
+        logger.info(f"📬 [Relances] {relances} email(s) de relance envoyé(s)")
+        return {"relances_envoyees": relances}
+
+    except Exception:
+        logger.exception("❌ [Scheduler] Erreur lors des relances d'expiration")
+        return {"relances_envoyees": 0}
+
+
 # ── Démarrage / Arrêt ────────────────────────────────────
 
 def demarrer_scheduler():
@@ -164,10 +245,19 @@ def demarrer_scheduler():
         replace_existing=True,
     )
 
+    # ── Job 6 : Relances expiration abonnement (10h UTC = 12h Paris) ──
+    scheduler.add_job(
+        run_subscription_reminders,
+        trigger=CronTrigger(hour=10, minute=0),
+        id="subscription_reminders",
+        name="Relances expiration abonnement (J-3)",
+        replace_existing=True,
+    )
+
     scheduler.start()
     logger.info(
-        "📅 Scheduler démarré — 5 jobs : cleanup (3h), backup (3h), "
-        "monitoring (5h+16h), alertes (15min)"
+        "📅 Scheduler démarré — 6 jobs : cleanup (3h), backup (3h), "
+        "monitoring (5h+16h), alertes (15min), relances abo (10h)"
     )
 
 

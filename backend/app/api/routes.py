@@ -1739,3 +1739,42 @@ async def resilier_abonnement(
             status_code=500,
             detail="Erreur lors de la résiliation. Contactez le support : apexcyber.eu@gmail.com",
         )
+
+
+# ── POST /api/stripe/portal ───────────────────────────
+
+@router.post("/stripe/portal")
+async def stripe_portal(utilisateur: dict = Depends(exiger_utilisateur)):
+    """
+    Crée une session de portail client Stripe (Customer Portal).
+
+    L'utilisateur peut gérer son abonnement, moyens de paiement
+    et consulter ses factures directement sur Stripe (P3.1).
+    """
+    from app.db.queries import obtenir_utilisateur_par_id
+    from app.services.stripe_service import creer_portail_client
+
+    uid = utilisateur.get("id")
+    user_row = await obtenir_utilisateur_par_id(uid)
+    if not user_row:
+        raise HTTPException(status_code=404, detail="Utilisateur introuvable.")
+
+    stripe_customer_id = user_row.get("stripe_customer_id")
+    if not stripe_customer_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun abonnement Stripe trouvé. Souscrivez d'abord à un abonnement.",
+        )
+
+    try:
+        portail = await creer_portail_client(
+            stripe_customer_id,
+            return_url=SITE_URL + "/dashboard",
+        )
+        return {"url": portail["url"]}
+    except Exception as e:
+        logger.exception(f"Erreur portail client : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Impossible de créer le portail client. Réessayez ou contactez le support.",
+        )

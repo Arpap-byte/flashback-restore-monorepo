@@ -365,3 +365,81 @@ async def cancel_subscription_for_user(stripe_customer_id: str) -> dict:
     except stripe.error.StripeError as e:
         logger.exception(f"Erreur lors de la résiliation : {e}")
         raise
+
+
+# ---------------------------------------------------------------------------
+# Portail client Stripe (Customer Portal)
+# ---------------------------------------------------------------------------
+
+async def creer_portail_client(
+    stripe_customer_id: str,
+    return_url: str,
+) -> dict:
+    """
+    Crée une session de portail client Stripe (Customer Portal).
+
+    Permet à l'utilisateur de gérer son abonnement, ses moyens de paiement,
+    et consulter ses factures directement sur Stripe.
+
+    Args:
+        stripe_customer_id: L'identifiant client Stripe (ex: « cus_xxxx »).
+        return_url: URL de retour après la session.
+
+    Returns:
+        Dictionnaire avec l'URL du portail.
+    """
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=stripe_customer_id,
+            return_url=return_url,
+            locale="fr",
+        )
+        logger.info(f"Portail client créé pour {stripe_customer_id}")
+        return {"url": session.url}
+    except stripe.error.StripeError as e:
+        logger.exception(f"Erreur création portail client : {e}")
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Factures (invoices)
+# ---------------------------------------------------------------------------
+
+async def obtenir_factures(
+    stripe_customer_id: str,
+    limit: int = 5,
+) -> list[dict]:
+    """
+    Récupère les dernières factures d'un client Stripe.
+
+    Args:
+        stripe_customer_id: L'identifiant client Stripe (ex: « cus_xxxx »).
+        limit: Nombre maximum de factures à retourner.
+
+    Returns:
+        Liste de dictionnaires avec les infos des factures.
+    """
+    try:
+        invoices = stripe.Invoice.list(
+            customer=stripe_customer_id,
+            limit=limit,
+        )
+
+        resultats = []
+        for inv in invoices.data:
+            resultats.append({
+                "id": inv.id,
+                "number": inv.number,
+                "montant": inv.amount_paid / 100.0 if inv.amount_paid else 0,
+                "devise": inv.currency.upper(),
+                "statut": inv.status,
+                "date": datetime.fromtimestamp(inv.created, tz=timezone.utc).isoformat(),
+                "url_pdf": inv.invoice_pdf,
+                "url_portail": inv.hosted_invoice_url,
+                "periode_debut": datetime.fromtimestamp(inv.period_start, tz=timezone.utc).isoformat() if inv.period_start else None,
+                "periode_fin": datetime.fromtimestamp(inv.period_end, tz=timezone.utc).isoformat() if inv.period_end else None,
+            })
+        return resultats
+    except stripe.error.StripeError as e:
+        logger.exception(f"Erreur récupération factures : {e}")
+        return []
