@@ -74,6 +74,7 @@ from app.services.gemini_service import (
     restaurer_photo_ia,
 )
 from app.services.stripe_service import (
+    cancel_subscription_for_user,
     creer_session_paiement,
     creer_session_paiement_credits,
     obtenir_abonnement_stripe,
@@ -1667,4 +1668,57 @@ async def consulter_abonnement(
         raise HTTPException(
             status_code=500,
             detail="Erreur lors de la consultation de l'abonnement.",
+        )
+
+
+@router.post("/stripe/cancel-subscription")
+async def resilier_abonnement(
+    request: Request,
+    utilisateur: dict = Depends(exiger_utilisateur),
+):
+    """
+    Résilie l'abonnement Stripe de l'utilisateur connecté.
+    
+    Résiliation "en 3 clics" conforme à la loi du 16 avril 2024.
+    L'utilisateur conserve l'accès jusqu'à la fin de la période payée.
+    
+    **Authentification JWT requise.**
+    """
+    # L'utilisateur (JWT) n'a pas de stripe_customer_id — il faut le trouver
+    # par l'email ou l'ID utilisateur dans la table abonnements
+    email_utilisateur = utilisateur.get("email", "")
+    stripe_customer_id = None
+    
+    if email_utilisateur:
+        from app.db.session import async_session
+        from app.models.db_models import Abonnement
+        from sqlalchemy import select as sa_select
+        
+        async with async_session() as session:
+            stmt = (
+                sa_select(Abonnement)
+                .where(Abonnement.email_utilisateur == email_utilisateur)
+                .where(Abonnement.statut == "actif")
+                .order_by(Abonnement.cree_le.desc())
+                .limit(1)
+            )
+            result = await session.execute(stmt)
+            abonnement = result.scalar_one_or_none()
+            if abonnement:
+                stripe_customer_id = abonnement.stripe_customer_id
+    
+    if not stripe_customer_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Aucun abonnement Stripe associé à ce compte.",
+        )
+    
+    try:
+        resultat = await cancel_subscription_for_user(stripe_customer_id)
+        return resultat
+    except Exception as e:
+        logger.exception(f"Erreur résiliation : {e}")
+        raise HTTPException(
+            status_code=500,
+            detail="Erreur lors de la résiliation. Contactez le support : apexcyber.eu@gmail.com",
         )

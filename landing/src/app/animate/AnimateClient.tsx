@@ -15,6 +15,7 @@ import {
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { animatePhoto, checkAnimationStatus, getPhotoUrlAsync, AnimationStatus, ApiError } from "@/lib/api";
+import { useRgpdConsent } from "@/components/RgpdConsent";
 
 const POLL_TIMEOUT = 600_000; // 10 minutes
 const POLL_DELAYS = [5_000, 8_000, 12_000, 20_000, 30_000];
@@ -154,8 +155,12 @@ export default function AnimatePage() {
 
   const handleAnimate = async () => {
     if (!file) return;
+
+    // TODO P1.5: Consentement RGPD biométrique — à implémenter
+    // const consent = await requireConsent();
+    // if (!consent) return;
+
     setAnimating(true);
-    setError(null);
     setStatus({ status: "en_attente" });
     pollAttempts.current = 0;
     pollStartTime.current = 0;
@@ -209,7 +214,8 @@ export default function AnimatePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex flex-col min-h-screen bg-background">
+      {RgpdModal}
       <Navbar />
       <main className="pt-24 pb-16">
         <div className="fixed inset-0 pointer-events-none">

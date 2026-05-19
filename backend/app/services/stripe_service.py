@@ -96,6 +96,8 @@ async def creer_session_paiement(
             metadata={
                 "plan": plan,
                 "email_utilisateur": email_utilisateur,
+                "cgu_acceptees": "true",
+                "renonciation_retractation": "true",
             },
         )
 
@@ -301,4 +303,65 @@ async def obtenir_abonnement_stripe(
 
     except stripe.error.StripeError as e:
         logger.exception(f"Erreur lors de la récupération de l'abonnement : {e}")
+        raise
+
+
+# ---------------------------------------------------------------------------
+# Résiliation d'abonnement
+# ---------------------------------------------------------------------------
+
+async def cancel_subscription_for_user(stripe_customer_id: str) -> dict:
+    """
+    Résilie l'abonnement Stripe d'un utilisateur (cancel_at_period_end).
+    
+    L'utilisateur conserve l'accès jusqu'à la fin de la période payée.
+    Conforme à la loi du 16 avril 2024 : résiliation en ligne sans obstacle.
+    
+    Args:
+        stripe_customer_id: L'identifiant client Stripe (ex: « cus_xxxx »).
+    
+    Returns:
+        Dictionnaire avec statut de l'opération et date de fin d'accès.
+    """
+    try:
+        abonnements = stripe.Subscription.list(
+            customer=stripe_customer_id,
+            status="active",
+            limit=1,
+        )
+        
+        if not abonnements.data:
+            return {
+                "statut": "aucun_abonnement",
+                "message": "Aucun abonnement actif trouvé.",
+                "resilie": False,
+            }
+        
+        abonnement = abonnements.data[0]
+        
+        # cancel_at_period_end = True : l'utilisateur garde l'accès jusqu'à la fin de la période
+        stripe.Subscription.modify(
+            abonnement.id,
+            cancel_at_period_end=True,
+        )
+        
+        fin_acces = datetime.fromtimestamp(
+            abonnement.current_period_end, tz=timezone.utc
+        )
+        
+        logger.info(
+            f"Abonnement {abonnement.id} résilié (fin le {fin_acces.isoformat()})"
+        )
+        
+        return {
+            "statut": "resilie",
+            "message": "Abonnement résilié. Votre accès reste actif jusqu'à la fin de la période payée.",
+            "resilie": True,
+            "abonnement_id": abonnement.id,
+            "fin_acces": fin_acces.isoformat(),
+            "fin_acces_fr": fin_acces.strftime("%d %B %Y"),
+        }
+    
+    except stripe.error.StripeError as e:
+        logger.exception(f"Erreur lors de la résiliation : {e}")
         raise

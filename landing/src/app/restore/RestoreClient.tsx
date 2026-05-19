@@ -28,6 +28,7 @@ import { useAuth } from "@/context/AuthContext";
 import { useUser } from "@clerk/nextjs";
 import { useSearchParams } from "next/navigation";
 import { restorePhoto, colorizePhoto, getPhotoUrlAsync, RestoreResult, pollRestoreJob } from "@/lib/api";
+import { useRgpdConsent } from "@/components/RgpdConsent";
 
 function getCreditTotal(resolution: string, colorize: boolean): number {
   const base = resolution === "4k" ? 4 : resolution === "1080p" ? 2 : 1;
@@ -67,6 +68,9 @@ export default function RestorePage() {
   const [restoreProgress, setRestoreProgress] = useState<string>("");
   const [restoredUrl, setRestoredUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  // RGPD consentement
+  const { showConsent, requireConsent, RgpdModal } = useRgpdConsent();
 
   // Nettoyer l'AbortController au démontage du composant (F5)
   useEffect(() => {

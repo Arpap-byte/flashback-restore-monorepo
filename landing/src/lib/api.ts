@@ -328,6 +328,21 @@ export async function createCheckout(
   });
 }
 
+export interface CancelResult {
+  statut: string;
+  message: string;
+  resilie: boolean;
+  abonnement_id?: string;
+  fin_acces?: string;
+  fin_acces_fr?: string;
+}
+
+export async function cancelSubscription(): Promise<CancelResult> {
+  return apiFetch<CancelResult>("/api/stripe/cancel-subscription", {
+    method: "POST",
+  });
+}
+
 export interface UserMe {
   id: string;
   email: string;

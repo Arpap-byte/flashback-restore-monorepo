@@ -21,21 +21,24 @@ const playfair = Playfair_Display({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://flashback-restore.com"),
-  title: "Flashback Restore — Redonnez vie à vos souvenirs avec l'IA",
+  title: "Flashback Restore — Restauration et colorisation de photos par IA",
   description:
-    "Restaurez et animez vos photos anciennes grâce à l'intelligence artificielle. Donnez une seconde vie à vos souvenirs de famille en quelques secondes.",
+    "Restaurez, colorisez et retouchez vos photos anciennes grâce à l'intelligence artificielle. Redonnez vie à vos souvenirs de famille en quelques secondes.",
   keywords: [
     "restauration photo",
-    "animation photo",
+    "colorisation photo",
+    "retouche photo",
+    "restauration image",
+    "photo ancienne",
     "intelligence artificielle",
-    "photos anciennes",
+    "animation photo",
     "souvenirs de famille",
     "Flashback Restore",
   ],
   openGraph: {
-    title: "Flashback Restore — Redonnez vie à vos souvenirs",
+    title: "Flashback Restore — Restauration et colorisation de photos par IA",
     description:
-      "Restaurez et animez vos photos anciennes grâce à l'intelligence artificielle.",
+      "Restaurez, colorisez et retouchez vos photos anciennes grâce à l'intelligence artificielle. Essayez gratuitement.",
     url: "https://flashback-restore.com",
     type: "website",
     locale: "fr_FR",
@@ -45,15 +48,15 @@ export const metadata: Metadata = {
         url: "/og-image.png",
         width: 1200,
         height: 630,
-        alt: "Flashback Restore — Restauration de photos par IA",
+        alt: "Flashback Restore — Restauration et colorisation de photos par IA",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Flashback Restore — Redonnez vie à vos souvenirs",
+    title: "Flashback Restore — Restauration et colorisation de photos",
     description:
-      "Restaurez et animez vos photos anciennes grâce à l'intelligence artificielle.",
+      "Restaurez, colorisez et retouchez vos photos anciennes grâce à l'intelligence artificielle.",
     images: ["/og-image.png"],
   },
   robots: "index, follow",

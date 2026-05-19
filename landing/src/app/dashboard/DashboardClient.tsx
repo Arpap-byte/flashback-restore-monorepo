@@ -16,6 +16,7 @@ import {
   ArrowRight,
   ExternalLink,
   AlertTriangle,
+  Ban,
   RefreshCw,
   Crown,
   Zap,
@@ -23,6 +24,8 @@ import {
   Briefcase,
   Calendar,
   ShieldCheck,
+  XCircle,
+  Loader2,
 } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
@@ -34,8 +37,10 @@ import {
   getPhotoUrl,
   getUserPreferences,
   updatePreferences,
+  cancelSubscription,
   TravailHistorique,
   UserMe,
+  CancelResult,
 } from "@/lib/api";
 
 /* ------------------------------------------------------------------ */
@@ -244,6 +249,12 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [retention, setRetention] = useState<number>(30);
 
+  // Résiliation
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [cancelResult, setCancelResult] = useState<CancelResult | null>(null);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
   /* ---------- Récupération des données ---------- */
 
   const lastFetchedUserId = useRef<string | null>(null);
@@ -355,6 +366,25 @@ export default function DashboardPage() {
       ? `${Math.max(0, userMe.essais_restants)} essais`
       : null
     : null;
+
+  /* ---------- Résiliation ---------- */
+
+  const handleCancelSubscription = async () => {
+    setCancelling(true);
+    setCancelError(null);
+    try {
+      const result = await cancelSubscription();
+      setCancelResult(result);
+      setShowCancelConfirm(false);
+      await fetchData();
+    } catch (err) {
+      setCancelError(
+        err instanceof Error ? err.message : "Erreur lors de la résiliation."
+      );
+    } finally {
+      setCancelling(false);
+    }
+  };
 
   /* ---------- Rendu conditionnel ---------- */
 
@@ -569,6 +599,82 @@ export default function DashboardPage() {
                     ? "Passer à un abonnement"
                     : "Changer de plan"}
                 </button>
+
+                {/* Bouton résilier (plan payant uniquement) */}
+                {userMe?.plan && userMe.plan !== "gratuit" && (
+                  <div className="mt-3">
+                    {!showCancelConfirm ? (
+                      <button
+                        onClick={() => setShowCancelConfirm(true)}
+                        className="w-full inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-red-500/20 text-red-400 hover:bg-red-500/10 hover:border-red-500/40 transition-all text-sm cursor-pointer"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Résilier mon abonnement
+                      </button>
+                    ) : (
+                      /* Confirmation modale inline */
+                      <div className="p-4 rounded-xl bg-red-500/5 border border-red-500/20 space-y-3">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="w-4 h-4 text-red-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-medium text-foreground">
+                              Confirmer la résiliation
+                            </p>
+                            <p className="text-xs text-muted mt-1">
+                              Votre abonnement sera résilié. Vous conserverez
+                              l&apos;accès jusqu&apos;à la fin de la période
+                              payée. Vos crédits restants seront perdus à
+                              l&apos;échéance.
+                            </p>
+                          </div>
+                        </div>
+
+                        {cancelError && (
+                          <p className="text-xs text-red-400">{cancelError}</p>
+                        )}
+
+                        <div className="flex gap-2">
+                          <button
+                            onClick={handleCancelSubscription}
+                            disabled={cancelling}
+                            className="flex-1 py-2 rounded-full bg-red-500 text-white text-sm font-semibold hover:bg-red-600 transition-all disabled:opacity-50 inline-flex items-center justify-center gap-2"
+                          >
+                            {cancelling ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <XCircle className="w-3.5 h-3.5" />
+                            )}
+                            {cancelling ? "Résiliation..." : "Oui, résilier"}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setShowCancelConfirm(false);
+                              setCancelError(null);
+                            }}
+                            disabled={cancelling}
+                            className="flex-1 py-2 rounded-full border border-card-border text-muted hover:text-foreground transition-all text-sm"
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Message de confirmation après résiliation */}
+                {cancelResult && !showCancelConfirm && (
+                  <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
+                    <p className="text-sm text-emerald-400">
+                      ✓ {cancelResult.message || "Abonnement résilié."}
+                    </p>
+                    {cancelResult.fin_acces_fr && (
+                      <p className="text-xs text-muted mt-1">
+                        Accès jusqu&apos;au {cancelResult.fin_acces_fr}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </motion.div>
 
@@ -743,6 +849,102 @@ export default function DashboardPage() {
           )}
         </div>
       </main>
+
+
+      {/* ============================================================ */}
+      {/*  MODAL DE RÉSILIATION (3 clics)                              */}
+      {/* ============================================================ */}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-card border border-card-border rounded-2xl p-6 sm:p-8 max-w-md w-full shadow-2xl"
+          >
+            {!cancelResult && !cancelling ? (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                    <Ban className="w-6 h-6 text-red-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    Résilier votre abonnement ?
+                  </h3>
+                  <p className="text-sm text-muted">
+                    Votre abonnement{" "}
+                    <strong className="text-foreground">{planConfig.label}</strong>{" "}
+                    sera résilié. Vous conserverez l&apos;accès jusqu&apos;à la fin de la période payée.
+                  </p>
+                  {userMe?.date_renouvellement && (
+                    <p className="text-xs text-muted mt-2">
+                      Prochain renouvellement : {formatDate(userMe.date_renouvellement)}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-col gap-3">
+                  <button
+                    onClick={handleCancelSubscription}
+                    className="w-full py-3 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 font-semibold text-sm transition-all cursor-pointer"
+                  >
+                    Oui, résilier mon abonnement
+                  </button>
+                  <button
+                    onClick={resetCancel}
+                    className="w-full py-3 rounded-full border border-card-border text-muted hover:text-foreground hover:border-muted/50 text-sm transition-all cursor-pointer"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </>
+            ) : cancelling ? (
+              <div className="text-center py-8">
+                <RefreshCw className="w-8 h-8 text-accent mx-auto mb-4 animate-spin" />
+                <p className="text-muted">Résiliation en cours...</p>
+              </div>
+            ) : cancelResult?.resilie ? (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-12 h-12 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                    <ShieldCheck className="w-6 h-6 text-emerald-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">
+                    Abonnement résilié
+                  </h3>
+                  <p className="text-sm text-muted">
+                    Votre accès reste actif jusqu&apos;au{" "}
+                    <strong className="text-foreground">{cancelResult.fin_acces_fr}</strong>.
+                    Aucun autre prélèvement ne sera effectué.
+                  </p>
+                </div>
+                <button
+                  onClick={resetCancel}
+                  className="w-full py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all cursor-pointer"
+                >
+                  Compris
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="text-center mb-6">
+                  <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center mx-auto mb-4">
+                    <AlertTriangle className="w-6 h-6 text-red-400" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-foreground mb-2">Erreur</h3>
+                  <p className="text-sm text-muted">
+                    {cancelResult?.message || cancelError || "Une erreur est survenue."}
+                  </p>
+                </div>
+                <button
+                  onClick={resetCancel}
+                  className="w-full py-3 rounded-full border border-card-border text-muted hover:text-foreground text-sm transition-all cursor-pointer"
+                >
+                  Fermer
+                </button>
+              </>
+            )}
+          </motion.div>
+        </div>
+      )}
 
       <Footer />
     </div>

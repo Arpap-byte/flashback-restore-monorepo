@@ -19,9 +19,9 @@ const footerLinks = {
   ],
   Légal: [
     { label: "Confidentialité", href: "/privacy" },
-    { label: "Conditions d'utilisation", href: "/terms" },
+    { label: "Conditions d'utilisation", href: "/conditions-utilisation" },
     { label: "Cookies", href: "/cookies" },
-    { label: "Mentions légales", href: "/terms" },
+    { label: "Mentions légales", href: "/mentions-legales" },
   ],
 };
 
