@@ -21,6 +21,7 @@ export default function AppLayout() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="home" />
       <Stack.Screen name="restore" />
+      <Stack.Screen name="result" />
       <Stack.Screen name="history" />
       <Stack.Screen name="settings" />
     </Stack>
