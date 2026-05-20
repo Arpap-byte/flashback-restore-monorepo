@@ -1,12 +1,17 @@
-import { useSignIn } from '@clerk/clerk-expo'
-import { Stack } from 'expo-router'
+import { useSignIn, useOAuth } from '@clerk/clerk-expo'
+import { Stack, Link } from 'expo-router'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '../../src/theme/theme'
 import { useState } from 'react'
+import * as WebBrowser from 'expo-web-browser'
+
+// Warm up browser for OAuth
+WebBrowser.maybeCompleteAuthSession()
 
 export default function SignInScreen() {
   const { signIn, setActive, isLoaded } = useSignIn()
-  const { colors, spacing, radii } = useTheme()
+  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' })
+  const { colors } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -25,6 +30,20 @@ export default function SignInScreen() {
       setError(e.errors?.[0]?.message || 'Erreur de connexion')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const onGoogleSignIn = async () => {
+    setError('')
+    try {
+      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
+        redirectUrl: 'flashbackrestore://oauth-native-callback',
+      })
+      if (createdSessionId && setOAuthActive) {
+        await setOAuthActive({ session: createdSessionId })
+      }
+    } catch (e: any) {
+      setError(e.message || "Erreur de connexion Google")
     }
   }
 
@@ -69,6 +88,27 @@ export default function SignInScreen() {
           {loading ? 'Connexion...' : 'Se connecter'}
         </Text>
       </TouchableOpacity>
+
+      {/* Divider */}
+      <View style={styles.divider}>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.dividerText, { color: colors.muted }]}>ou</Text>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+      </View>
+
+      {/* Google OAuth */}
+      <TouchableOpacity
+        style={[styles.googleButton, { borderColor: colors.border }]}
+        onPress={onGoogleSignIn}
+      >
+        <Text style={[styles.googleButtonText, { color: colors.foreground }]}>
+          G  Continuer avec Google
+        </Text>
+      </TouchableOpacity>
+
+      <Link href="/(auth)/sign-up" style={[styles.link, { color: colors.accent }]}>
+        Pas encore de compte ? S'inscrire
+      </Link>
     </View>
   )
 }
@@ -81,4 +121,10 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },
   button: { borderRadius: 9999, padding: 16, alignItems: 'center', marginTop: 8 },
   buttonText: { fontSize: 16, fontWeight: '600' },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 14 },
+  googleButton: { borderWidth: 1, borderRadius: 9999, padding: 16, alignItems: 'center' },
+  googleButtonText: { fontSize: 16, fontWeight: '500' },
+  link: { textAlign: 'center', fontSize: 14 },
 })

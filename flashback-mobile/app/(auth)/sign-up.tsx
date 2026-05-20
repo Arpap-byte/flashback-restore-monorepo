@@ -1,11 +1,15 @@
-import { useSignUp } from '@clerk/clerk-expo'
+import { useSignUp, useOAuth } from '@clerk/clerk-expo'
 import { Stack, Link } from 'expo-router'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native'
 import { useTheme } from '../../src/theme/theme'
 import { useState } from 'react'
+import * as WebBrowser from 'expo-web-browser'
+
+WebBrowser.maybeCompleteAuthSession()
 
 export default function SignUpScreen() {
   const { signUp, setActive, isLoaded } = useSignUp()
+  const { startOAuthFlow } = useOAuth({ strategy: 'oauth_google' })
   const { colors } = useTheme()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,6 +29,20 @@ export default function SignUpScreen() {
       setError(e.errors?.[0]?.message || "Erreur d'inscription")
     } finally {
       setLoading(false)
+    }
+  }
+
+  const onGoogleSignUp = async () => {
+    setError('')
+    try {
+      const { createdSessionId, setActive: setOAuthActive } = await startOAuthFlow({
+        redirectUrl: 'flashbackrestore://oauth-native-callback',
+      })
+      if (createdSessionId && setOAuthActive) {
+        await setOAuthActive({ session: createdSessionId })
+      }
+    } catch (e: any) {
+      setError(e.message || "Erreur d'inscription Google")
     }
   }
 
@@ -70,6 +88,21 @@ export default function SignUpScreen() {
         </Text>
       </TouchableOpacity>
 
+      <View style={styles.divider}>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+        <Text style={[styles.dividerText, { color: colors.muted }]}>ou</Text>
+        <View style={[styles.dividerLine, { backgroundColor: colors.border }]} />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.googleButton, { borderColor: colors.border }]}
+        onPress={onGoogleSignUp}
+      >
+        <Text style={[styles.googleButtonText, { color: colors.foreground }]}>
+          G  Continuer avec Google
+        </Text>
+      </TouchableOpacity>
+
       <Link href="/(auth)/sign-in" style={[styles.link, { color: colors.accent }]}>
         Déjà un compte ? Se connecter
       </Link>
@@ -85,5 +118,10 @@ const styles = StyleSheet.create({
   input: { borderWidth: 1, borderRadius: 12, padding: 14, fontSize: 16 },
   button: { borderRadius: 9999, padding: 16, alignItems: 'center', marginTop: 8 },
   buttonText: { fontSize: 16, fontWeight: '600' },
-  link: { textAlign: 'center', fontSize: 14, marginTop: 8 },
+  divider: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  dividerLine: { flex: 1, height: 1 },
+  dividerText: { fontSize: 14 },
+  googleButton: { borderWidth: 1, borderRadius: 9999, padding: 16, alignItems: 'center' },
+  googleButtonText: { fontSize: 16, fontWeight: '500' },
+  link: { textAlign: 'center', fontSize: 14 },
 })
