@@ -26,9 +26,10 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.flashbackrestore.app",
       "permissions": [
-        "CAMERA",
-        "READ_MEDIA_IMAGES",
-        "WRITE_EXTERNAL_STORAGE"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO"
       ],
       "enableProguardInReleaseBuilds": true,
       "enableShrinkResourcesInReleaseBuilds": true
@@ -50,6 +51,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "494fc34f-29e6-4cf3-b7c0-147605a9a9ef"
+      }
+    },
+    "owner": "apexcyber"
   }
 }
