@@ -34,6 +34,23 @@ async function fetchAPI<T>(
   return res.json()
 }
 
+/** Type pour un élément de la bibliothèque */
+export interface ImageBibliotheque {
+  id: string
+  chemin_fichier: string
+  nom_origine: string
+  mime_type?: string
+  taille_octets?: number
+  cree_le: string
+  url: string
+}
+
+export interface BibliothequeReponse {
+  items: ImageBibliotheque[]
+  limite: number
+  offset: number
+}
+
 // ─── Hook React : useAPI ───────────────────────────────────────────────────
 
 export function useAPI() {
@@ -67,6 +84,17 @@ export function useAPI() {
     /** Polling du statut d'un job */
     statutJob: (jobId: string): Promise<StatutJobReponse> =>
       fetchAPI<StatutJobReponse>(getToken, `/api/job/${jobId}`),
+
+    /** Bibliothèque : liste paginée des images */
+    bibliotheque: (limite = 20, offset = 0): Promise<BibliothequeReponse> =>
+      fetchAPI<BibliothequeReponse>(
+        getToken,
+        `/api/library?limite=${limite}&offset=${offset}`,
+      ),
+
+    /** Supprimer une image de la bibliothèque */
+    supprimerImage: (imageId: string): Promise<void> =>
+      fetchAPI<void>(getToken, `/api/library/${imageId}`, { method: 'DELETE' }),
 
     /** Récupérer l'URL complète d'une image (gère chemins relatifs) */
     urlImage: (path: string): string =>
