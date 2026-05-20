@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 14.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://flashback-restore.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dGhvcm91Z2gtc2F0eXItODMuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://flashback-restore.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dGhvcm91Z2gtc2F0eXItODMuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://flashback-restore.com",
+        "EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY": "pk_test_dGhvcm91Z2gtc2F0eXItODMuY2xlcmsuYWNjb3VudHMuZGV2JA"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "android": {
+        "track": "internal",
+        "serviceAccountKeyPath": "./google-services.json"
+      }
+    }
+  }
+}

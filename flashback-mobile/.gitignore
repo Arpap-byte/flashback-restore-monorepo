@@ -1,0 +1,33 @@
+# Expo
+.expo/
+dist/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+
+# Env
+.env.local
+.env.production
+
+# Dependencies
+node_modules/
+
+# Build
+android/
+ios/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Hermes
+*.hbc
