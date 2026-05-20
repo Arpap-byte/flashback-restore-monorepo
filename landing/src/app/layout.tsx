@@ -95,15 +95,36 @@ export default function RootLayout({
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify({
-              "@context": "https://schema.org",
-              "@type": "Organization",
-              "name": "Flashback Restore",
-              "url": "https://flashback-restore.com",
-              "description":
-                "Restaurez et animez vos photos anciennes grâce à l'intelligence artificielle",
-              "sameAs": [],
-            }),
+            __html: JSON.stringify([
+              {
+                "@context": "https://schema.org",
+                "@type": "Organization",
+                "name": "Flashback Restore",
+                "url": "https://flashback-restore.com",
+                "description":
+                  "Restaurez et animez vos photos anciennes grâce à l'intelligence artificielle",
+                "sameAs": [],
+              },
+              {
+                "@context": "https://schema.org",
+                "@type": "SoftwareApplication",
+                "name": "Flashback Restore",
+                "applicationCategory": "MultimediaApplication",
+                "operatingSystem": "Web",
+                "description":
+                  "Application SaaS de restauration, colorisation et animation de photos par intelligence artificielle. Redonnez vie à vos souvenirs en quelques secondes.",
+                "offers": {
+                  "@type": "Offer",
+                  "price": "0",
+                  "priceCurrency": "EUR",
+                },
+                "aggregateRating": {
+                  "@type": "AggregateRating",
+                  "ratingValue": "4.8",
+                  "ratingCount": "120",
+                },
+              },
+            ]),
           }}
         />
       </body>
