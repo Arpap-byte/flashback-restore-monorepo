@@ -24,7 +24,7 @@ export default function SignInPage() {
               colorMutedForeground: "#a8a29e",
               colorInput: "#292524",
               colorInputForeground: "#ffffff",
-              colorNeutral: "#ffffff",
+              colorNeutral: "#78716c",
               borderRadius: "0.5rem",
               fontFamily: "var(--font-inter)",
             },
