@@ -37,6 +37,19 @@ async def _run(*args: str, timeout: float = 5.0) -> str:
         return ""
 
 
+async def _run_with_retry(*args: str, timeout: float = 8.0, retries: int = 3) -> str:
+    """Exécute une commande shell avec retries (pour Docker, qui peut ramer)."""
+    last_out = ""
+    for attempt in range(retries):
+        out = await _run(*args, timeout=timeout)
+        if out:
+            return out
+        if attempt < retries - 1:
+            await asyncio.sleep(1.0)  # court délai entre les tentatives
+        last_out = out
+    return last_out
+
+
 async def _db_query(query: str, params: dict | None = None) -> list[dict]:
     """Exécute une requête SQL read-only sur PostgreSQL et retourne les résultats."""
     try:
@@ -64,9 +77,9 @@ async def collect_services() -> dict:
         out = await _run("systemctl", "is-active", svc)
         services[svc] = out == "active"
 
-    # Conteneurs Docker
+    # Conteneurs Docker — avec retry (Docker peut ramer, surtout pendant le backup à 3h)
     for container in ["flashback-db", "traefik"]:
-        out = await _run("docker", "inspect", "-f", "{{.State.Status}}", container)
+        out = await _run_with_retry("docker", "inspect", "-f", "{{.State.Status}}", container)
         services[container] = out == "running"
 
     # Health check backend
