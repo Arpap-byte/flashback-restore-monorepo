@@ -40,6 +40,11 @@ const nextConfig: NextConfig = {
         destination: '/#footer',
         permanent: true,
       },
+      {
+        source: '/historique',
+        destination: '/bibliotheque?tab=retouchees',
+        permanent: true,
+      },
     ];
   },
   async headers() {

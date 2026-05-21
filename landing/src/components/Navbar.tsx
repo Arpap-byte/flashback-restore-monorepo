@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X, Sparkles, Sun, Moon, User, History, LayoutDashboard } from "lucide-react";
+import { Menu, X, Sparkles, Sun, Moon, User, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import { UserButton, SignInButton, useAuth, useClerk } from "@clerk/nextjs";
 import { LogOut } from "lucide-react";
@@ -95,13 +95,6 @@ export default function Navbar() {
 
             {isSignedIn ? (
               <>
-                <Link
-                  href="/historique"
-                  className="text-sm text-muted hover:text-accent transition-colors font-medium px-3 py-2 rounded-lg hover:bg-accent/5 flex items-center gap-1.5"
-                >
-                  <History className="w-4 h-4" />
-                  Historique
-                </Link>
                 <Link
                   href="/dashboard"
                   className="text-sm text-muted hover:text-accent transition-colors font-medium px-3 py-2 rounded-lg hover:bg-accent/5 flex items-center gap-1.5"
@@ -205,13 +198,6 @@ export default function Navbar() {
               ))}
               {isSignedIn ? (
                 <>
-                  <Link
-                    href="/historique"
-                    onClick={() => setMobileOpen(false)}
-                    className="block py-2.5 px-3 text-muted hover:text-accent hover:bg-accent/5 rounded-lg transition-colors font-medium"
-                  >
-                    Historique
-                  </Link>
                   <Link
                     href="/dashboard"
                     onClick={() => setMobileOpen(false)}

@@ -765,7 +765,7 @@ export default function DashboardPage() {
                 </div>
                 {travaux.length > 0 && (
                   <Link
-                    href="/historique"
+                    href="/bibliotheque?tab=retouchees"
                     className="text-sm text-accent hover:underline flex items-center gap-1"
                   >
                     Tout voir
