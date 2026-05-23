@@ -86,7 +86,7 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
       </head>
       <body className="min-h-full bg-background text-foreground font-sans transition-colors">
-        <ClerkProvider localization={frFR} ui={ui} domain="auth.flashback-restore.com">
+        <ClerkProvider localization={frFR} ui={ui} domain="thorough-satyr-83.clerk.accounts.dev">
           <ThemeProvider>
             <AuthProvider>{children}</AuthProvider>
           </ThemeProvider>

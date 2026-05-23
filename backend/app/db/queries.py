@@ -584,78 +584,99 @@ async def consommer_credit(
     Utilise SELECT ... FOR UPDATE pour verrouiller la ligne utilisateur
     et éviter les race conditions (ex: double consommation sous charge).
     """
+    return await consommer_credits(utilisateur_id, type_operation, travail_id, nb_credits=1)
+
+
+async def consommer_credits(
+    utilisateur_id: str, type_operation: str, travail_id: str, nb_credits: int = 1
+) -> dict:
+    """
+    Consomme jusqu'à nb_credits pour une opération, en une seule transaction atomique.
+    Priorité : essais gratuits puis crédits payants.
+
+    Utilise SELECT ... FOR UPDATE pour verrouiller la ligne utilisateur
+    et éviter les race conditions (ex: double consommation sous charge).
+    """
+    if nb_credits < 1:
+        return {"succes": False, "raison": "nb_credits doit être >= 1"}
+
     async with async_session() as session:
         async with session.begin():
-            # Récupérer crédits et essais AVEC verrou de ligne
             stmt = select(
                 Utilisateur.credits, Utilisateur.essais_restants
             ).where(Utilisateur.id == utilisateur_id).with_for_update()
             result = await session.execute(stmt)
             user = result.one_or_none()
             if not user:
-                return {
-                    "succes": False,
-                    "raison": "Utilisateur introuvable",
-                }
+                return {"succes": False, "raison": "Utilisateur introuvable"}
 
             credits = user.credits
             essais = user.essais_restants
 
+            # Vérification préalable : le solde total est-il suffisant ?
+            # (évite tout débit partiel si jamais on passe le check amont)
+            if essais + credits < nb_credits:
+                return {
+                    "succes": False,
+                    "raison": f"Crédits insuffisants (disponible {essais + credits}, requis {nb_credits})",
+                }
+
+            restant = nb_credits
+            nb_essais = 0
+            nb_payants = 0
+
             # Priorité aux essais gratuits
-            if essais > 0:
+            if essais > 0 and restant > 0:
+                a_consommer = min(essais, restant)
                 await session.execute(
                     update(Utilisateur)
                     .where(Utilisateur.id == utilisateur_id)
-                    .values(essais_restants=Utilisateur.essais_restants - 1)
+                    .values(essais_restants=Utilisateur.essais_restants - a_consommer)
                 )
-                essai_id = _new_uuid()
                 maintenant = _utcnow()
-                session.add(
-                    EssaiGratuit(
-                        id=essai_id,
+                for _ in range(a_consommer):
+                    session.add(EssaiGratuit(
+                        id=_new_uuid(),
                         utilisateur_id=utilisateur_id,
                         type_travail=type_operation,
                         travail_id=travail_id,
                         cree_le=maintenant,
-                    )
-                )
-                return {
-                    "succes": True,
-                    "type": "essai",
-                    "credits_restants": credits,
-                    "essais_restants": essais - 1,
-                }
+                    ))
+                nb_essais = a_consommer
+                restant -= a_consommer
 
             # Puis crédits payants
-            if credits > 0:
+            if credits > 0 and restant > 0:
+                a_consommer = min(credits, restant)
                 await session.execute(
                     update(Utilisateur)
                     .where(Utilisateur.id == utilisateur_id)
-                    .values(credits=Utilisateur.credits - 1)
+                    .values(credits=Utilisateur.credits - a_consommer)
                 )
-                conso_id = _new_uuid()
-                maintenant = _utcnow()
-                session.add(
-                    ConsommationCredits(
-                        id=conso_id,
-                        utilisateur_id=utilisateur_id,
-                        travail_id=travail_id,
-                        type_operation=type_operation,
-                        credits_utilises=1,
-                        cree_le=maintenant,
-                    )
-                )
+                session.add(ConsommationCredits(
+                    id=_new_uuid(),
+                    utilisateur_id=utilisateur_id,
+                    travail_id=travail_id,
+                    type_operation=type_operation,
+                    credits_utilises=a_consommer,
+                    cree_le=_utcnow(),
+                ))
+                nb_payants = a_consommer
+                restant -= a_consommer
+
+            if restant > 0:
                 return {
-                    "succes": True,
-                    "type": "credit",
-                    "credits_restants": credits - 1,
-                    "essais_restants": 0,
+                    "succes": False,
+                    "raison": f"Crédits insuffisants (manque {restant})",
                 }
 
-            # Plus rien
             return {
-                "succes": False,
-                "raison": "Plus de crédits ni d'essais gratuits",
+                "succes": True,
+                "type": "credit" if nb_payants > 0 else "essai",
+                "nb_essais": nb_essais,
+                "nb_payants": nb_payants,
+                "credits_restants": credits - nb_payants,
+                "essais_restants": essais - nb_essais,
             }
 
 
@@ -672,7 +693,7 @@ async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
     """
     async with async_session() as session:
         async with session.begin():
-            # 1. Vérifier si c'était un essai gratuit
+            # 1. Vérifier si des essais gratuits ont été consommés
             stmt_essai = select(EssaiGratuit).where(
                 and_(
                     EssaiGratuit.utilisateur_id == utilisateur_id,
@@ -680,15 +701,16 @@ async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
                 )
             )
             result_essai = await session.execute(stmt_essai)
-            essai = result_essai.scalar_one_or_none()
+            essais = result_essai.scalars().all()
 
-            if essai:
-                # Rembourser l'essai
-                await session.delete(essai)
+            if essais:
+                nb_essais = len(essais)
+                for e in essais:
+                    await session.delete(e)
                 await session.execute(
                     update(Utilisateur)
                     .where(Utilisateur.id == utilisateur_id)
-                    .values(essais_restants=Utilisateur.essais_restants + 1)
+                    .values(essais_restants=Utilisateur.essais_restants + nb_essais)
                 )
                 # Annuler l'incrémentation du compteur d'animations
                 await session.execute(
@@ -704,7 +726,7 @@ async def rembourser_credit(utilisateur_id: str, travail_id: str) -> dict:
                 return {
                     "succes": True,
                     "type": "essai",
-                    "message": "Essai gratuit remboursé",
+                    "message": f"{nb_essais} essai(s) gratuit(s) remboursé(s)",
                 }
 
             # 2. Vérifier si c'était un/des crédit(s) payant(s)

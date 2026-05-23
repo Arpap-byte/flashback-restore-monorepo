@@ -38,6 +38,7 @@ async def restauration_job(
     coloriser: bool,
     travail_id: int,
     nb_credits_total: int,
+    nb_credits_restauration: int = 1,
     resolution: str = "720p",
 ) -> dict:
     """
@@ -88,7 +89,7 @@ async def restauration_job(
                 resultat_json=json.dumps({
                     "analyse": analyse.model_dump(),
                     "colorise": False,
-                    "credits_consommes": 1,
+                    "credits_consommes": nb_credits_restauration,
                     "etape": "restauration",
                 }),
             )
@@ -120,22 +121,40 @@ async def restauration_job(
             nb_credits_restant = nb_credits_total
 
         # Succès : upload B2 + mise à jour du travail
-        # Upload du résultat vers B2 (stockage cloud redondant)
+        # Upload du résultat vers B2 (stockage cloud redondant) avec retry
         url_b2 = None
+        b2_error = None
         try:
             from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
             if b2_est_disponible():
                 cle = generer_cle_distant("resultats", chemin_final.name, utilisateur_id)
-                url_b2 = uploader_bytes(chemin_final.read_bytes(), cle, "image/jpeg")
-                logger.info("Résultat uploadé vers B2: %s", url_b2)
+                for tentative in range(3):
+                    try:
+                        url_b2 = uploader_bytes(chemin_final.read_bytes(), cle, "image/jpeg")
+                        logger.info("Résultat uploadé vers B2: %s", url_b2)
+                        break
+                    except Exception as retry_err:
+                        if tentative < 2:
+                            logger.warning(
+                                "Tentative B2 %d/3 échouée, retry dans 2s: %s",
+                                tentative + 1, retry_err,
+                            )
+                            import asyncio
+                            await asyncio.sleep(2)
+                        else:
+                            raise
+            else:
+                logger.warning("B2 non disponible, résultat stocké localement uniquement")
         except Exception as e:
-            logger.warning("Échec upload B2 résultat (fallback local): %s", e)
+            b2_error = str(e)
+            logger.error("ÉCHEC upload B2 résultat après 3 tentatives: %s", e)
 
         resultat_json = json.dumps({
             "analyse": analyse.model_dump(),
             "colorise": coloriser,
             "credits_consommes": nb_credits_total,
             "url_b2": url_b2,
+            "b2_error": b2_error,
         })
         await mettre_a_jour_travail(
             travail_id,
@@ -222,18 +241,35 @@ async def animation_job(
             f"({taille_video} octets)"
         )
 
-        # Upload B2
+        # Upload B2 avec retry
         url_b2 = None
+        b2_error = None
         try:
             from app.storage import uploader_bytes, generer_cle_distant, b2_est_disponible
             if b2_est_disponible():
                 cle = generer_cle_distant("animations", Path(chemin_video).name, utilisateur_id)
-                url_b2 = uploader_bytes(
-                    Path(chemin_video).read_bytes(), cle, "video/mp4"
-                )
-                logger.info("Animation uploadée vers B2: %s", url_b2)
+                for tentative in range(3):
+                    try:
+                        url_b2 = uploader_bytes(
+                            Path(chemin_video).read_bytes(), cle, "video/mp4"
+                        )
+                        logger.info("Animation uploadée vers B2: %s", url_b2)
+                        break
+                    except Exception as retry_err:
+                        if tentative < 2:
+                            logger.warning(
+                                "Tentative B2 %d/3 échouée, retry dans 2s: %s",
+                                tentative + 1, retry_err,
+                            )
+                            import asyncio
+                            await asyncio.sleep(2)
+                        else:
+                            raise
+            else:
+                logger.warning("B2 non disponible, animation stockée localement uniquement")
         except Exception as e:
-            logger.warning("Échec upload B2 animation (fallback local): %s", e)
+            b2_error = str(e)
+            logger.error("ÉCHEC upload B2 animation après 3 tentatives: %s", e)
 
         # Mise à jour finale du travail
         await mettre_a_jour_chemin_animation(travail_id, chemin_video)
@@ -246,6 +282,7 @@ async def animation_job(
                 "local": chemin_video,
                 "url_video": url_video,
                 "url_b2": url_b2,
+                "b2_error": b2_error,
                 "comportement": comportement,
                 "resolution": resolution,
             }),

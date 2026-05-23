@@ -83,12 +83,15 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     // @ts-ignore — Clerk injects a global Clerk object
     const clerk = (window as any).Clerk;
     if (clerk?.session) {
-      const token = await clerk.session.getToken();
+      // skipCache=true force un token frais (évite les tokens expirés)
+      const token = await clerk.session.getToken({ skipCache: true });
       if (token) {
         return { Authorization: `Bearer ${token}` };
       }
     }
-  } catch {}
+  } catch (e) {
+    console.warn("[auth] Clerk getToken() failed, trying localStorage fallback:", e);
+  }
 
   // 2. Fallback: localStorage token (legacy email/password auth)
   try {
@@ -112,7 +115,7 @@ async function getAuthToken(): Promise<string | null> {
   try {
     const clerk = (window as any).Clerk;
     if (clerk?.session) {
-      const token = await clerk.session.getToken();
+      const token = await clerk.session.getToken({ skipCache: true });
       if (token) return token;
     }
   } catch {}
@@ -146,30 +149,61 @@ async function apiFetch<T>(
     delete options.headers;
   }
 
-  try {
-    const url = `${API_BASE}${endpoint}`;
-    const res = await fetch(url, {
-      ...options,
-      headers,
-      signal: controller.signal,
-    });
+  let lastStatus = 0;
 
-    if (!res.ok) {
-      const body = await res.text();
-      let message: string;
-      try {
-        const json = JSON.parse(body);
-        message = json.detail || json.message || body;
-      } catch {
-        message = body || `Erreur ${res.status}`;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const url = `${API_BASE}${endpoint}`;
+      const res = await fetch(url, {
+        ...options,
+        headers,
+        signal: controller.signal,
+      });
+
+      lastStatus = res.status;
+
+      if (!res.ok) {
+        // 401 → tenter un refresh du token Clerk et réessayer une fois
+        if (res.status === 401 && attempt === 0) {
+          try {
+            const clerk = (window as any).Clerk;
+            if (clerk?.session) {
+              const freshToken = await clerk.session.getToken({ skipCache: true });
+              if (freshToken) {
+                headers["Authorization"] = `Bearer ${freshToken}`;
+                continue; // retry avec le nouveau token
+              }
+            }
+          } catch (e) {
+            console.warn("[auth] Token refresh on 401 failed:", e);
+          }
+        }
+
+        const body = await res.text();
+        let message: string;
+        try {
+          const json = JSON.parse(body);
+          message = json.detail || json.message || body;
+        } catch {
+          message = body || `Erreur ${res.status}`;
+        }
+        throw new ApiError(message, res.status);
       }
-      throw new ApiError(message, res.status);
-    }
 
-    return res.json();
-  } finally {
-    clearTimeout(timeoutId);
+      return res.json();
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      if (e instanceof DOMException && e.name === "AbortError") {
+        throw new ApiError("La requête a expiré (timeout)", 408);
+      }
+      throw e;
+    } finally {
+      if (attempt === 1) clearTimeout(timeoutId);
+    }
   }
+
+  clearTimeout(timeoutId);
+  throw new ApiError("Échec d'authentification après tentative de renouvellement du token", lastStatus || 401);
 }
 
 export async function analyzePhoto(file: File): Promise<AnalysisResult> {

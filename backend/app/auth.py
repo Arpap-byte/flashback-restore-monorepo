@@ -217,9 +217,13 @@ async def obtenir_utilisateur_courant(
     try:
         payload = decoder_token(token)
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expiré.")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Token invalide.")
+        logger.warning("Token expiré — IP=%s, token_preview=%s...", 
+                       request.client.host if request.client else "?", token[:20])
+        raise HTTPException(status_code=401, detail="Token expiré. Veuillez vous reconnecter.")
+    except jwt.InvalidTokenError as e:
+        logger.warning("Token invalide — IP=%s, raison=%s, token_preview=%s...",
+                       request.client.host if request.client else "?", str(e), token[:20])
+        raise HTTPException(status_code=401, detail="Token invalide. Veuillez vous reconnecter.")
 
     utilisateur = await _trouver_ou_creer_utilisateur(payload)
     if utilisateur is None:

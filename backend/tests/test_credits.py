@@ -143,7 +143,7 @@ class TestConsommerCredit:
         res = await consommer_credit(uid, "restauration", "travail_fail")
         assert res["succes"] is False
         assert "raison" in res
-        assert "Plus de crédits" in res["raison"]
+        assert "Crédits insuffisants" in res["raison"]
 
     @pytest.mark.asyncio
     async def test_consommer_credit_atomique(self, utilisateur_test):
@@ -312,7 +312,7 @@ class TestConsommerOperation:
         """Consommer sans crédits → RuntimeError."""
         uid = utilisateur_sans_essais
 
-        with pytest.raises(RuntimeError, match="Plus de crédits"):
+        with pytest.raises(RuntimeError, match="Crédits insuffisants"):
             await consommer_operation(uid, "restauration", "travail_fail")
 
     @pytest.mark.asyncio

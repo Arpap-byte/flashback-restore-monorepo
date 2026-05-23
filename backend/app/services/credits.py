@@ -13,7 +13,7 @@ Cas gérés :
 import logging
 
 from app.db.queries import (
-    consommer_credit,
+    consommer_credits,
     obtenir_credits_restants,
     peut_animer as _db_peut_animer,
     rembourser_credit,
@@ -22,46 +22,56 @@ from app.db.queries import (
 logger = logging.getLogger(__name__)
 
 
-async def peut_restaurer(utilisateur_id: str) -> tuple[bool, str]:
+async def peut_restaurer(utilisateur_id: str, nb_credits: int = 1) -> tuple[bool, str]:
     """
     Vérifie si l'utilisateur peut effectuer une restauration.
 
-    Un crédit payant OU un essai gratuit est requis.
+    Vérifie que l'utilisateur dispose bien de nb_credits (essais + crédits payants).
 
     Args:
         utilisateur_id: Identifiant de l'utilisateur.
+        nb_credits: Nombre de crédits requis (défaut: 1).
 
     Returns:
         tuple[bool, str]: (autorisé, raison du refus si non autorisé).
     """
     credits_info = await obtenir_credits_restants(utilisateur_id)
-    total = credits_info.get("credits", 0) + credits_info.get("credits_perpetuels", 0)
-    if credits_info["essais_restants"] > 0 or total > 0:
+    total = (
+        credits_info.get("credits", 0)
+        + credits_info.get("credits_perpetuels", 0)
+        + credits_info.get("essais_restants", 0)
+    )
+    if total >= nb_credits:
         return (True, "")
-    return (False, "Crédits insuffisants. Achetez des crédits pour continuer.")
+    return (
+        False,
+        f"Crédits insuffisants ({total} disponible(s), {nb_credits} requis). "
+        "Achetez des crédits pour continuer.",
+    )
 
 
-async def peut_animer(utilisateur_id: str) -> tuple[bool, str]:
+async def peut_animer(utilisateur_id: str, nb_credits: int = 1) -> tuple[bool, str]:
     """
     Vérifie si l'utilisateur peut créer une animation.
 
     Deux conditions sont vérifiées :
-    1. Disponibilité d'au moins 1 crédit payant OU 1 essai gratuit.
+    1. Disponibilité d'au moins nb_credits (essais + crédits payants).
     2. Respect de la limite mensuelle d'animations par forfait.
 
     Args:
         utilisateur_id: Identifiant de l'utilisateur.
+        nb_credits: Nombre de crédits requis (défaut: 1).
 
     Returns:
         tuple[bool, str]: (autorisé, raison du refus si non autorisé).
     """
     # 1. Vérifier la disponibilité de crédits/essais
     credits_info = await obtenir_credits_restants(utilisateur_id)
-    if credits_info["essais_restants"] <= 0 and credits_info["credits"] <= 0:
+    total = credits_info.get("essais_restants", 0) + credits_info.get("credits", 0)
+    if total < nb_credits:
         return (
             False,
-            f"Crédits insuffisants (crédits restants : {credits_info['credits']}, "
-            f"essais gratuits : {credits_info['essais_restants']}). "
+            f"Crédits insuffisants ({total} disponible(s), {nb_credits} requis). "
             "Achetez des crédits pour continuer.",
         )
 
@@ -79,9 +89,11 @@ async def peut_animer(utilisateur_id: str) -> tuple[bool, str]:
     return (True, "")
 
 
-async def consommer_operation(utilisateur_id: str, type_operation: str, travail_id: str) -> None:
+async def consommer_operation(
+    utilisateur_id: str, type_operation: str, travail_id: str, nb_credits: int = 1
+) -> None:
     """
-    Consomme un crédit ou essai gratuit pour une opération.
+    Consomme un ou plusieurs crédits/essais pour une opération.
 
     La priorité est donnée aux essais gratuits, puis aux crédits payants.
     Pour les animations, le compteur mensuel est également incrémenté.
@@ -90,20 +102,21 @@ async def consommer_operation(utilisateur_id: str, type_operation: str, travail_
         utilisateur_id: Identifiant de l'utilisateur.
         type_operation: "restauration" ou "animation".
         travail_id: Identifiant du travail associé.
+        nb_credits: Nombre de crédits à consommer (défaut: 1).
 
     Raises:
         RuntimeError: Si la consommation échoue (crédits/essais épuisés).
     """
-    resultat = await consommer_credit(utilisateur_id, type_operation, travail_id)
+    resultat = await consommer_credits(utilisateur_id, type_operation, travail_id, nb_credits)
     if not resultat["succes"]:
         raise RuntimeError(resultat.get("raison", "Crédits insuffisants"))
 
     # NOTE: l'enregistrement du compteur mensuel d'animations n'est PAS fait ici.
     # Il est appelé une seule fois dans la route /api/animate (avant la boucle
     # de consommation des crédits) pour éviter d'incrémenter N fois.
-    # Pour les opérations non-animation, on log simplement.
     logger.info(
-        f"Crédit consommé pour {type_operation}, "
+        f"{nb_credits} crédit(s) consommé(s) pour {type_operation} "
+        f"(essais={resultat['nb_essais']}, payants={resultat['nb_payants']}), "
         f"utilisateur={utilisateur_id}, travail={travail_id}"
     )
 

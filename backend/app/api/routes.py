@@ -27,7 +27,7 @@ from arq import create_pool
 from arq.connections import RedisSettings
 from arq.jobs import Job as ArqJob, JobStatus as ArqJobStatus
 
-from app.config import GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL
+from app.config import GEMINI_API_KEY, STRIPE_API_KEY, ADMIN_API_KEY, UPLOAD_DIR, PUBLIC_BACKEND_URL, SITE_URL, ENVIRONMENT
 from app.auth import creer_token_telechargement, exiger_utilisateur, obtenir_utilisateur_courant
 from app.db.queries import (
     CREDITS_PAR_PLAN,
@@ -310,6 +310,16 @@ async def sante(request: Request):
     except Exception as e:
         logger.warning(f"Test de connectivité B2 échoué : {e}")
 
+    # En production, ne pas exposer les détails d'infrastructure
+    if ENVIRONMENT == "production":
+        return SanteReponse(
+            statut="OK" if (gemini_ok and db_ok) else "DEGRADED",
+            version="1.0.0",
+            gemini_disponible=gemini_ok,
+            db_disponible=db_ok,
+            stripe_disponible=stripe_ok,
+            b2_disponible=b2_ok,
+        )
     return SanteReponse(
         statut="OK",
         version="1.0.0",
@@ -918,10 +928,9 @@ async def restaurer(
         nb_credits_total += TARIF_COLORISATION[resolution]
 
     # Vérifier les crédits AVANT de sauvegarder le fichier
-    for i in range(nb_credits_total):
-        peut, raison = await peut_restaurer(utilisateur["id"])
-        if not peut:
-            raise HTTPException(status_code=402, detail=raison)
+    peut, raison = await peut_restaurer(utilisateur["id"], nb_credits_total)
+    if not peut:
+        raise HTTPException(status_code=402, detail=raison)
 
     # Récupérer le contenu : soit du fichier uploadé, soit de la galerie
     if image_importee_id:
@@ -973,6 +982,7 @@ async def restaurer(
             coloriser,
             travail_id,
             nb_credits_total,
+            TARIF_RESTAURATION[resolution],
             resolution,
         )
     except Exception as e:
@@ -985,8 +995,7 @@ async def restaurer(
         raise HTTPException(status_code=503, detail="Service de traitement indisponible. Aucun crédit débité.")
 
     # Consommation des crédits (seulement après enqueue réussie)
-    for i in range(nb_credits_total):
-        await consommer_operation(utilisateur["id"], "restauration", travail_id)
+    await consommer_operation(utilisateur["id"], "restauration", travail_id, nb_credits_total)
 
     # Stocker le job_id ARQ dans le travail pour le suivi
     await mettre_a_jour_travail(
@@ -1053,13 +1062,14 @@ async def coloriser_standalone(
     travail_id = await creer_travail("colorisation", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Vérification des crédits
-    for i in range(nb_credits):
-        peut, raison = await peut_restaurer(utilisateur["id"])
-        if not peut:
-            await mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
-            raise HTTPException(status_code=402, detail=raison)
-        await consommer_operation(utilisateur["id"], "colorisation", travail_id)
+    # Vérification des crédits (1 appel, pas de boucle)
+    peut, raison = await peut_restaurer(utilisateur["id"], nb_credits)
+    if not peut:
+        await mettre_a_jour_travail(travail_id, statut="erreur", message_erreur=raison)
+        raise HTTPException(status_code=402, detail=raison)
+
+    # Consommation atomique
+    await consommer_operation(utilisateur["id"], "colorisation", travail_id, nb_credits)
 
     try:
         nom_colorise = f"{nom_base}_colorized.jpg"
@@ -1130,10 +1140,9 @@ async def animer(
 
     # Vérification des crédits AVANT toute écriture disque (Bug #7)
     nb_credits_anim = TARIF_ANIMATION.get(resolution, 10)
-    for i in range(nb_credits_anim):
-        peut, raison = await peut_animer(utilisateur["id"])
-        if not peut:
-            raise HTTPException(status_code=403, detail=raison)
+    peut, raison = await peut_animer(utilisateur["id"], nb_credits_anim)
+    if not peut:
+        raise HTTPException(status_code=403, detail=raison)
 
     # Création du travail ET sauvegarde fichier disque (seulement si crédits OK)
     travail_id = await creer_travail("animation", chemin_photo=str(chemin), utilisateur_id=utilisateur["id"])
@@ -1165,8 +1174,7 @@ async def animer(
     await enregistrer_animation(utilisateur["id"])
 
     # Consommation des crédits (seulement après enqueue réussie)
-    for i in range(nb_credits_anim):
-        await consommer_operation(utilisateur["id"], "animation", travail_id)
+    await consommer_operation(utilisateur["id"], "animation", travail_id, nb_credits_anim)
 
     # Sauvegarder l'ID du job ARQ pour le suivi
     await mettre_a_jour_job_externe_id(travail_id, job.job_id)

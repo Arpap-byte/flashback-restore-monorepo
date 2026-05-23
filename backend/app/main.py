@@ -97,7 +97,7 @@ app = FastAPI(
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     try:
-        check_rate_limit(request)
+        await check_rate_limit(request)
     except HTTPException as e:
         return JSONResponse(
             status_code=e.status_code,
