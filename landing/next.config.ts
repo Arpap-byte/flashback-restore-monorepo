@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Strict-Transport-Security', value: 'max-age=31536000; includeSubDomains' },
-          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com https://thorough-satyr-83.clerk.accounts.dev https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://thorough-satyr-83.clerk.accounts.dev https://img.clerk.com; img-src 'self' data: https: https://img.clerk.com https://thorough-satyr-83.clerk.accounts.dev; frame-src https://js.stripe.com https://thorough-satyr-83.clerk.accounts.dev https://challenges.cloudflare.com; connect-src 'self' https://api.stripe.com https://thorough-satyr-83.clerk.accounts.dev https://challenges.cloudflare.com; font-src 'self' data: https://thorough-satyr-83.clerk.accounts.dev https://img.clerk.com" },
+          { key: 'Content-Security-Policy', value: "default-src 'self'; script-src 'self' 'unsafe-inline' https://js.stripe.com https://clerk.flashback-restore.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://clerk.flashback-restore.com https://img.clerk.com; img-src 'self' data: https: https://img.clerk.com https://clerk.flashback-restore.com; frame-src https://js.stripe.com https://clerk.flashback-restore.com https://challenges.cloudflare.com; connect-src 'self' https://api.stripe.com https://clerk.flashback-restore.com https://challenges.cloudflare.com; font-src 'self' data: https://clerk.flashback-restore.com https://img.clerk.com" },
         ],
       },
     ];

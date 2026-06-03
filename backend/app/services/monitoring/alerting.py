@@ -44,7 +44,7 @@ def evaluate_alerts(snapshot: dict) -> list[dict]:
     ssl_info = snapshot.get("ssl") or {}
     db = snapshot.get("db", {})
     system = snapshot.get("system", {})
-    arq = snapshot.get("arq", {})
+    arq = snapshot.get("arq") or {}
 
     # ── CRITIQUE : Services down ──
     if not services:
