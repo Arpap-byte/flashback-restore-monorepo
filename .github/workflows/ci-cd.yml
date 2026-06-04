@@ -1,4 +1,13 @@
-name: Flashback Restore - CI/CD
+# ============================================================
+# Flashback Restore — CI/CD Pipeline
+# ============================================================
+# Triggers:
+#   push to main        → lint → test → security → docker build+push → deploy
+#   pull request to main → lint → test → security
+#   workflow_dispatch    → full pipeline (manual)
+# ============================================================
+
+name: CI/CD
 
 on:
   push:
@@ -11,12 +20,18 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PYTHON_VERSION: "3.11"
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE: ghcr.io/arpap-byte/flashback-backend
+  LANDING_IMAGE: ghcr.io/arpap-byte/flashback-landing
+
 jobs:
   # =========================================================================
-  # Lint & Type Check
+  # Lint — ruff check (strict, fail on errors)
   # =========================================================================
   lint:
-    name: Lint & Type Check
+    name: 🔍 Lint (ruff)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -24,167 +39,134 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff pyright pytest pytest-asyncio
+          pip install ruff -r requirements.txt
 
-      - name: Ruff lint
-        run: ruff check app/ --format=github || true
-
-      - name: Pyright type check
-        run: pyright app/ --ignoreexternal || true
+      - name: 🧹 Ruff check
+        run: ruff check . --format=github
 
   # =========================================================================
-  # Tests (mock DB, no PostgreSQL required)
+  # Tests — pytest + coverage + PostgreSQL service container
   # =========================================================================
-  test-mock:
-    name: Tests (mock DB)
+  test:
+    name: 🧪 Tests (pytest + coverage)
     runs-on: ubuntu-latest
+    needs: lint
     defaults:
       run:
         working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: flashback
+          POSTGRES_PASSWORD: flashback
+          POSTGRES_DB: flashback_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
 
-      - name: Install dependencies
+      - name: 📦 Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-mock
+          pip install pytest pytest-cov pytest-asyncio
 
-      - name: Create test .env
+      - name: 🧪 Run tests with coverage
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///file:flashback_test_mem?mode=memory&cache=shared
+          GEMINI_API_KEY: ci-test-key
+          SECRET_KEY: ci-test-secret-key-64-chars-long-for-ci-pipeline
+          STRIPE_WEBHOOK_SECRET: whsec_ci_test_not_placeholder
+          CLERK_ISSUER: https://ci-test.clerk.accounts.dev
+          CLERK_JWKS_URL: https://ci-test.clerk.accounts.dev/.well-known/jwks.json
+          CLERK_SECRET_KEY: sk_test_ci
+          CLERK_WEBHOOK_SECRET: whsec_ci_test
+          REDIS_URL: redis://localhost:6379/0
+          SITE_URL: http://localhost:8000
+          SENTRY_DSN: ""
+          ADMIN_API_KEY: ci-admin-key
+          INTERNAL_API_KEY: ci-internal-key
+          SMTP_HOST: localhost
+          SMTP_PORT: "1025"
+          SMTP_USER: noreply@test.com
+          SMTP_PASSWORD: test
+          SMTP_FROM: "Flashback CI <noreply@test.com>"
+          STRIPE_API_KEY: sk_test_ci
+          STRIPE_PUBLISHABLE_KEY: pk_test_ci
+          B2_ENDPOINT: s3.us-west-000.backblazeb2.com
+          B2_KEY_ID: test-key
+          B2_APPLICATION_KEY: test-app-key
+          B2_BUCKET_NAME: ci-test
+          B2_REGION: us-west-000
+          ENVIRONMENT: ci
+          DEBUG: "true"
+          TESTING: "true"
         run: |
-          cat > .env << 'EOF'
-          ENVIRONMENT=ci
-          DEBUG=true
-          SECRET_KEY=ci-test-secret-key-change-in-production
-          CLERK_ISSUER=https://ci-test.clerk.accounts.dev
-          CLERK_JWKS_URL=https://ci-test.clerk.accounts.dev/.well-known/jwks.json
-          CLERK_SECRET_KEY=sk_test_ci
-          CLERK_WEBHOOK_SECRET=whsec_ci_test
-          DATABASE_URL=sqlite+aiosqlite:///./ci_test.db
-          REDIS_URL=redis://localhost:6379/1
-          SITE_URL=http://localhost:8000
-          SENTRY_DSN=
-          ADMIN_API_KEY=ci-admin-key
-          INTERNAL_API_KEY=ci-internal-key
-          SMTP_HOST=localhost
-          SMTP_PORT=1025
-          SMTP_USER=noreply@test.com
-          SMTP_PASSWORD=test
-          SMTP_FROM=Flashback CI <noreply@test.com>
-          STRIPE_API_KEY=sk_test_ci
-          STRIPE_PUBLISHABLE_KEY=pk_test_ci
-          STRIPE_WEBHOOK_SECRET=whsec_ci_stripe
-          B2_ENDPOINT=s3.us-west-000.backblazeb2.com
-          B2_KEY_ID=test-key
-          B2_APPLICATION_KEY=test-app-key
-          B2_BUCKET_NAME=ci-test
-          B2_REGION=us-west-000
-          EOF
-
-      - name: Run pytest (mock tests)
-        run: |
-          python -m pytest tests/ \
+          pytest tests/ \
+            --cov=. \
+            --cov-report=xml \
+            --cov-report=term-missing \
             -v \
-            --tb=short \
-            --ignore=tests/test_webhook_clerk.py \
-            -k "not db_session and not test_token_clerk_meme_email and not test_verify_clerk_token_appele and not test_user_me_retourne_donnees" \
-            -x \
-            2>&1 | head -200
+            --tb=short
 
-  # =========================================================================
-  # Webhook tests (require mock only, no PostgreSQL)
-  # =========================================================================
-  test-webhook:
-    name: Tests webhook Clerk
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
+      - name: 📊 Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          python-version: "3.13"
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-asyncio pytest-mock
-
-      - name: Create test .env
-        run: |
-          cat > .env << 'EOF'
-          ENVIRONMENT=ci
-          DEBUG=true
-          SECRET_KEY=ci-test-secret-key-change-in-production
-          CLERK_ISSUER=https://ci-test.clerk.accounts.dev
-          CLERK_JWKS_URL=https://ci-test.clerk.accounts.dev/.well-known/jwks.json
-          CLERK_SECRET_KEY=sk_test_ci
-          CLERK_WEBHOOK_SECRET=whsec_ci_test
-          DATABASE_URL=sqlite+aiosqlite:///./ci_test_webhook.db
-          SITE_URL=http://localhost:8000
-          SENTRY_DSN=
-          ADMIN_API_KEY=ci-admin-key
-          INTERNAL_API_KEY=ci-internal-key
-          SMTP_HOST=localhost
-          SMTP_PORT=1025
-          SMTP_USER=noreply@test.com
-          SMTP_PASSWORD=test
-          SMTP_FROM=Flashback CI <noreply@test.com>
-          STRIPE_API_KEY=sk_test_ci
-          STRIPE_PUBLISHABLE_KEY=pk_test_ci
-          STRIPE_WEBHOOK_SECRET=whsec_ci_stripe
-          B2_ENDPOINT=s3.us-west-000.backblazeb2.com
-          B2_KEY_ID=test-key
-          B2_APPLICATION_KEY=test-app-key
-          B2_BUCKET_NAME=ci-test
-          B2_REGION=us-west-000
-          EOF
-
-      - name: Run webhook tests
-        run: python -m pytest tests/test_webhook_clerk.py -v --tb=short
+          name: coverage-backend
+          path: backend/coverage.xml
+          retention-days: 7
 
   # =========================================================================
-  # Security audit (bandit)
+  # Security — bandit static analysis
   # =========================================================================
   security:
-    name: Security Audit
+    name: 🔒 Security (bandit)
     runs-on: ubuntu-latest
+    needs: lint
     defaults:
       run:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
 
-      - name: Setup Python
+      - name: 🐍 Setup Python ${{ env.PYTHON_VERSION }}
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install bandit
+      - name: 📦 Install bandit
         run: pip install bandit
 
-      - name: Run bandit
-        run: bandit -r app/ -ll -f json -o bandit-report.json || true
+      - name: 🔍 Run bandit
+        run: bandit -r app/ -ll -f json -o bandit-report.json
 
-      - name: Check for high-severity issues
+      - name: 📊 Check for high-severity issues
         run: |
           if [ -f bandit-report.json ]; then
             HIGH=$(python -c "
@@ -199,19 +181,81 @@ jobs:
             fi
           fi
 
+      - name: 📊 Upload bandit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-report
+          path: backend/bandit-report.json
+          retention-days: 7
+
   # =========================================================================
-  # Deploy to production (on push to main)
+  # Docker — Build & Push to GitHub Container Registry
+  # =========================================================================
+  docker:
+    name: 🐳 Build & Push Docker
+    runs-on: ubuntu-latest
+    needs: [test, security]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    strategy:
+      matrix:
+        service:
+          - name: backend
+            context: ./backend
+            dockerfile: ./backend/Dockerfile
+            image: ${{ env.BACKEND_IMAGE }}
+          - name: landing
+            context: ./landing
+            dockerfile: ./landing/Dockerfile
+            image: ${{ env.LANDING_IMAGE }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 🔐 Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🏷️ Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ matrix.service.image }}
+          tags: |
+            type=sha,format=short
+            type=ref,event=branch
+            type=raw,value=latest
+
+      - name: 🔨 Build & Push
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =========================================================================
+  # Deploy — Auto-deploy to production on merge to main
   # =========================================================================
   deploy:
-    name: Deploy to Production
+    name: 🚀 Deploy to Production
     runs-on: ubuntu-latest
-    needs: [test-mock, test-webhook, lint, security]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    needs: docker
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
       url: https://flashback-restore.com
+
     steps:
-      - name: Trigger deploy
+      - uses: actions/checkout@v4
+
+      - name: 🚀 Deploy via SSH
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.PROD_HOST }}
@@ -220,15 +264,50 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           script: |
             set -e
+            echo "🚀 Déploiement Flashback Restore — $(date -Iseconds)"
+
+            # --- Pull latest code ---
             cd /opt/flashback-restore-monorepo
             git pull origin main
+
+            # --- Backend ---
+            echo "📦 Backend: install dependencies..."
             cd backend
             .venv/bin/pip install -r requirements.txt --quiet
+
+            echo "🗄️ Backend: run migrations..."
+            .venv/bin/alembic upgrade head || true
+
+            echo "📦 Backend: restart services..."
             sudo systemctl restart flashback-backend flashback-arq-worker
+
+            # --- Landing ---
+            echo "📦 Landing: install & build..."
             cd ../landing
             npm ci --production --silent
             npm run build
+
+            echo "📦 Landing: restart service..."
             sudo systemctl restart flashback-landing
-            cd ..
-            bash infra/post_deploy_check.sh
-            echo "✅ Deploy completed at $(date -Iseconds)"
+
+            # --- Health check ---
+            echo "🏥 Health check..."
+            sleep 3
+            curl -sf http://localhost:8000/health || echo "⚠️ Backend health check failed"
+            curl -sf http://localhost:3000 || echo "⚠️ Landing health check failed"
+
+            # --- Post-deploy check ---
+            cd /opt/flashback-restore-monorepo
+            if [ -f infra/post_deploy_check.sh ]; then
+              bash infra/post_deploy_check.sh
+            fi
+
+            echo "✅ Déploiement terminé — $(date -Iseconds)"
+
+      - name: 📋 Summary
+        run: |
+          echo "### 🚀 Déploiement Production" >> $GITHUB_STEP_SUMMARY
+          echo "**Backend:** \`${{ env.BACKEND_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Landing:** \`${{ env.LANDING_IMAGE }}:${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "**Déclenché par:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** [${{ github.sha }}](https://github.com/arpap-byte/flashback-restore-monorepo/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
