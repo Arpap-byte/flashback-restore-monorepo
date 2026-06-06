@@ -148,8 +148,8 @@ async def ajouter_headers_securite(request: Request, call_next):
         "script-src 'self' https://js.stripe.com; "
         "style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data: https:; "
-        "connect-src 'self' https://*.clerk.accounts.dev https://api.clerk.com; "
-        "frame-src 'self' https://*.clerk.accounts.dev https://js.stripe.com"
+        "connect-src 'self' https://clerk.flashback-restore.com https://api.clerk.com; "
+        "frame-src 'self' https://clerk.flashback-restore.com https://js.stripe.com"
     )
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
     return response
@@ -314,7 +314,9 @@ async def arret():
 
 @app.get("/api/sentry-test")
 async def sentry_test():
-    """Endpoint de test : déclenche une exception pour vérifier Sentry."""
+    """Endpoint de test Sentry — désactivé en production."""
+    if ENVIRONMENT == "production":
+        raise HTTPException(status_code=404, detail="Not found")
     raise Exception("Test Sentry — si SENTRY_DSN est configuré, cette erreur remonte dans Sentry")
 
 
