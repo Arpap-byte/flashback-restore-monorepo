@@ -603,7 +603,7 @@ async def consommer_credits(
     async with async_session() as session:
         async with session.begin():
             stmt = select(
-                Utilisateur.credits, Utilisateur.essais_restants
+                Utilisateur.credits, Utilisateur.credits_perpetuels, Utilisateur.essais_restants
             ).where(Utilisateur.id == utilisateur_id).with_for_update()
             result = await session.execute(stmt)
             user = result.one_or_none()
@@ -611,19 +611,21 @@ async def consommer_credits(
                 return {"succes": False, "raison": "Utilisateur introuvable"}
 
             credits = user.credits
+            credits_perp = user.credits_perpetuels
             essais = user.essais_restants
 
             # Vérification préalable : le solde total est-il suffisant ?
             # (évite tout débit partiel si jamais on passe le check amont)
-            if essais + credits < nb_credits:
+            if essais + credits + credits_perp < nb_credits:
                 return {
                     "succes": False,
-                    "raison": f"Crédits insuffisants (disponible {essais + credits}, requis {nb_credits})",
+                    "raison": f"Crédits insuffisants (disponible {essais + credits + credits_perp}, requis {nb_credits})",
                 }
 
             restant = nb_credits
             nb_essais = 0
             nb_payants = 0
+            nb_perpetuels = 0
 
             # Priorité aux essais gratuits
             if essais > 0 and restant > 0:
@@ -645,7 +647,7 @@ async def consommer_credits(
                 nb_essais = a_consommer
                 restant -= a_consommer
 
-            # Puis crédits payants
+            # Puis crédits d'abonnement (expirent en fin de cycle)
             if credits > 0 and restant > 0:
                 a_consommer = min(credits, restant)
                 await session.execute(
@@ -664,6 +666,25 @@ async def consommer_credits(
                 nb_payants = a_consommer
                 restant -= a_consommer
 
+            # Enfin crédits perpétuels (packs achetés, n'expirent jamais)
+            if credits_perp > 0 and restant > 0:
+                a_consommer = min(credits_perp, restant)
+                await session.execute(
+                    update(Utilisateur)
+                    .where(Utilisateur.id == utilisateur_id)
+                    .values(credits_perpetuels=Utilisateur.credits_perpetuels - a_consommer)
+                )
+                session.add(ConsommationCredits(
+                    id=_new_uuid(),
+                    utilisateur_id=utilisateur_id,
+                    travail_id=travail_id,
+                    type_operation=type_operation,
+                    credits_utilises=a_consommer,
+                    cree_le=_utcnow(),
+                ))
+                nb_perpetuels = a_consommer
+                restant -= a_consommer
+
             if restant > 0:
                 return {
                     "succes": False,
@@ -672,10 +693,12 @@ async def consommer_credits(
 
             return {
                 "succes": True,
-                "type": "credit" if nb_payants > 0 else "essai",
+                "type": "credit" if (nb_payants > 0 or nb_perpetuels > 0) else "essai",
                 "nb_essais": nb_essais,
                 "nb_payants": nb_payants,
+                "nb_perpetuels": nb_perpetuels,
                 "credits_restants": credits - nb_payants,
+                "credits_perpetuels_restants": credits_perp - nb_perpetuels,
                 "essais_restants": essais - nb_essais,
             }
 

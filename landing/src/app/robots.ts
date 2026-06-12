@@ -5,7 +5,7 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
-      disallow: ["/admin/", "/api/", "/sign-in/", "/sign-up/", "/auth/", "/dashboard/", "/restore/", "/animate/", "/abonnement/"],
+      disallow: ["/admin/", "/api/", "/sign-in/", "/sign-up/", "/auth/", "/dashboard/", "/abonnement/"],
     },
     sitemap: "https://flashback-restore.com/sitemap.xml",
   };

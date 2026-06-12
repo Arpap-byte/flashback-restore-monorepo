@@ -13,10 +13,7 @@ const isPublicRoute = createRouteMatcher([
   '/conditions-utilisation',
   '/mentions-legales',
   '/credits',
-  '/bibliotheque',
-  '/dashboard',
-  '/restore',
-  '/animate',
+  // Pages protégées — la redirection vers /sign-in est gérée par le middleware Clerk
   '/abonnement(.*)',
   '/business',
   '/blog',

@@ -531,7 +531,7 @@ export async function restoreFromLibrary(
 ): Promise<{ jobId: string; travailId: string }> {
   const fd = new FormData();
   fd.append("image_importee_id", imageId);
-  fd.append("colorize", String(colorize));
+  fd.append("coloriser", String(colorize));
   fd.append("resolution", resolution);
   // apiFetch ne gère pas les réponses non-JSON, mais /restore renvoie du JSON
   const raw = await apiFetch<any>("/api/restore", { method: "POST", body: fd }, 120000);

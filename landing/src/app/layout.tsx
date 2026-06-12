@@ -3,7 +3,6 @@ import { Inter, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { ClerkProvider } from "@clerk/nextjs";
-import { ui } from "@clerk/ui";
 import { frFR } from "@clerk/localizations";
 import CookieBanner from "@/components/CookieBanner";
 import "./globals.css";
@@ -86,7 +85,28 @@ export default function RootLayout({
         <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
       </head>
       <body className="min-h-full bg-background text-foreground font-sans transition-colors">
-        <ClerkProvider localization={frFR} ui={ui} domain="clerk.flashback-restore.com">
+        <ClerkProvider
+          localization={frFR}
+          domain="clerk.flashback-restore.com"
+          appearance={{
+            variables: {
+              colorPrimary: "#f59e0b",
+              colorBackground: "#1c1917",
+              colorForeground: "#ffffff",
+              colorMutedForeground: "#a8a29e",
+              colorInput: "#292524",
+              colorInputForeground: "#ffffff",
+              colorNeutral: "#78716c",
+              borderRadius: "0.5rem",
+              fontFamily: "var(--font-inter)",
+            },
+            elements: {
+              card: "border border-[#292524] shadow-2xl",
+              formButtonPrimary: "bg-[#f59e0b] hover:bg-[#d97706] text-black font-semibold",
+              footerActionLink: "text-[#f59e0b] hover:text-[#d97706]",
+            },
+          }}
+        >
           <ThemeProvider>
             <AuthProvider>{children}</AuthProvider>
           </ThemeProvider>
