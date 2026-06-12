@@ -53,6 +53,7 @@ from app.db.queries import (
     obtenir_travail,
     obtenir_travail_par_job_externe,
     obtenir_utilisateur_par_email,
+    rembourser_credit,
     stripe_event_deja_traite,
     supprimer_image_importee,
 )
@@ -971,8 +972,13 @@ async def restaurer(
     travail_id = await creer_travail("restauration", chemin_photo=str(chemin_original), utilisateur_id=utilisateur["id"])
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
 
-    # Délégation au worker ARQ (non-bloquant) AVANT consommation des crédits
-    # pour garantir l'atomicité : si l'enqueue échoue, aucun crédit n'est perdu.
+    # Consommation atomique des crédits AVANT enqueue ARQ
+    # pour éviter le TOCTOU : deux requêtes concurrentes ne doivent pas
+    # toutes les deux enqueuer un job alors qu'une seule a les crédits.
+    await consommer_operation(utilisateur["id"], "restauration", travail_id, nb_credits_total)
+
+    # Délégation au worker ARQ (non-bloquant)
+    # Si l'enqueue échoue, on rembourse les crédits consommés.
     try:
         pool = await _get_arq_pool()
         job = await pool.enqueue_job(
@@ -987,15 +993,13 @@ async def restaurer(
         )
     except Exception as e:
         logger.exception(f"Erreur lors de l'envoi du job ARQ (restauration) : {e}")
+        await rembourser_credit(utilisateur["id"], travail_id)
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
             message_erreur=f"Service de traitement indisponible ({e})",
         )
-        raise HTTPException(status_code=503, detail="Service de traitement indisponible. Aucun crédit débité.")
-
-    # Consommation des crédits (seulement après enqueue réussie)
-    await consommer_operation(utilisateur["id"], "restauration", travail_id, nb_credits_total)
+        raise HTTPException(status_code=503, detail="Service de traitement indisponible. Crédits remboursés.")
 
     # Stocker le job_id ARQ dans le travail pour le suivi
     await mettre_a_jour_travail(
@@ -1149,8 +1153,12 @@ async def animer(
     await mettre_a_jour_travail(travail_id, statut="en_cours", taille_original=len(contenu))
     chemin.write_bytes(contenu)
 
-    # Délégation au worker ARQ (non-bloquant) AVANT consommation
-    # Atomicité : si l'enqueue échoue, aucun crédit n'est perdu.
+    # Consommation atomique AVANT enqueue ARQ (évite TOCTOU)
+    await consommer_operation(utilisateur["id"], "animation", travail_id, nb_credits_anim)
+    await enregistrer_animation(utilisateur["id"])
+
+    # Délégation au worker ARQ (non-bloquant)
+    # Si l'enqueue échoue, on rembourse les crédits.
     try:
         pool = await _get_arq_pool()
         job = await pool.enqueue_job(
@@ -1163,18 +1171,13 @@ async def animer(
         )
     except Exception as e:
         logger.exception(f"Erreur lors de l'envoi du job ARQ (animation) : {e}")
+        await rembourser_credit(utilisateur["id"], travail_id)
         await mettre_a_jour_travail(
             travail_id,
             statut="erreur",
             message_erreur=f"Service de traitement indisponible ({e})",
         )
-        raise HTTPException(status_code=503, detail="Service de traitement indisponible. Aucun crédit débité.")
-
-    # Enregistrer l'animation (une seule fois, pas par crédit)
-    await enregistrer_animation(utilisateur["id"])
-
-    # Consommation des crédits (seulement après enqueue réussie)
-    await consommer_operation(utilisateur["id"], "animation", travail_id, nb_credits_anim)
+        raise HTTPException(status_code=503, detail="Service de traitement indisponible. Crédits remboursés.")
 
     # Sauvegarder l'ID du job ARQ pour le suivi
     await mettre_a_jour_job_externe_id(travail_id, job.job_id)

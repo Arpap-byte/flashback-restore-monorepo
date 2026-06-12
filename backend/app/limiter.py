@@ -12,6 +12,9 @@ import redis.asyncio as redis
 
 logger = logging.getLogger(__name__)
 
+# IP de confiance autorisées à fournir X-Forwarded-For (Traefik local)
+TRUSTED_PROXIES = {"127.0.0.1", "::1"}
+
 _redis: redis.Redis | None = None
 
 
@@ -61,8 +64,8 @@ class Limiter:
 
                 ip = request.client.host if request.client else "unknown"
                 forwarded = request.headers.get("X-Forwarded-For", "")
-                if forwarded:
-                    ip = forwarded.split(",")[0].strip()
+                if forwarded and ip in TRUSTED_PROXIES:
+                    ip = forwarded.split(",")[-1].strip()
 
                 key = f"rate:{ip}:{request.url.path}"
                 try:

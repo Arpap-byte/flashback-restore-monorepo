@@ -45,13 +45,23 @@ async def _get_redis() -> redis.Redis:
     return _redis
 
 
+# IP de confiance autorisées à fournir X-Forwarded-For (Traefik local)
+TRUSTED_PROXIES = {"127.0.0.1", "::1"}
+
+
 def get_client_ip(request: Request) -> str:
-    """Extrait l'IP client, en tenant compte du proxy Traefik."""
-    forwarded = request.headers.get("X-Forwarded-For", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
+    """Extrait l'IP client, en tenant compte du proxy Traefik.
+
+    Ne fait confiance qu'aux IP de TRUSTED_PROXIES pour le header X-Forwarded-For.
+    Prend la dernière IP ajoutée par notre proxy (la seule de confiance).
+    """
     client = request.client
-    return client.host if client else "unknown"
+    peer_ip = client.host if client else "unknown"
+    forwarded = request.headers.get("X-Forwarded-For", "")
+    if forwarded and peer_ip in TRUSTED_PROXIES:
+        # Prendre la DERNIÈRE IP ajoutée par notre proxy (la seule fiable)
+        return forwarded.split(",")[-1].strip()
+    return peer_ip
 
 
 async def check_rate_limit(request: Request) -> None:
