@@ -5,6 +5,7 @@ import { motion, useInView } from "framer-motion";
 import { Check, Sparkles, Zap, Crown, Gift, Briefcase, Shield, Info } from "lucide-react";
 import Link from "next/link";
 import StripeCheckoutButton from "@/components/StripeCheckoutButton";
+import { checkoutCreditPack } from "@/lib/api";
 
 const plans = [
   {
@@ -298,19 +299,12 @@ function CreditPacksSection() {
   }, []);
 
   const handleBuy = async (code: string) => {
-    const token = localStorage.getItem("__clerk_db_jwt") || "";
-    const res = await fetch("/api/stripe/create-pack-checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-      credentials: "include",
-      body: JSON.stringify({ pack: code }),
-    });
-    if (!res.ok) {
-      if (res.status === 401) { window.location.href = "/sign-in"; return; }
-      return;
+    try {
+      const data = await checkoutCreditPack(code);
+      window.location.href = data.url;
+    } catch (e: any) {
+      if (e?.status === 401) { window.location.href = "/sign-in"; return; }
     }
-    const data = await res.json();
-    window.location.href = data.checkout_url;
   };
 
   if (!packs || packs.length === 0) return null;

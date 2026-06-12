@@ -83,8 +83,7 @@ async function getAuthHeader(): Promise<Record<string, string>> {
     // @ts-ignore — Clerk injects a global Clerk object
     const clerk = (window as any).Clerk;
     if (clerk?.session) {
-      // skipCache=true force un token frais (évite les tokens expirés)
-      const token = await clerk.session.getToken({ skipCache: true });
+      const token = await clerk.session.getToken();
       if (token) {
         return { Authorization: `Bearer ${token}` };
       }
@@ -592,9 +591,10 @@ export async function getCreditPacks(): Promise<{ packs: CreditPack[]; est_abonn
 }
 
 export async function checkoutCreditPack(packCode: string): Promise<{ url: string }> {
-  return apiFetch<{ url: string }>("/api/stripe/create-pack-checkout", {
+  const raw = await apiFetch<{ checkout_url: string }>("/api/stripe/create-pack-checkout", {
     method: "POST",
     body: JSON.stringify({ pack: packCode }),
     headers: { "Content-Type": "application/json" },
   });
+  return { url: raw.checkout_url };
 }
