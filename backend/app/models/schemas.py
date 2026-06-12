@@ -76,7 +76,9 @@ class RestaurationReponse(BaseModel):
     """Réponse après restauration d'une photo."""
 
     message: str = Field(..., description="Message de succès")
-    analyse: AnalyseReponse
+    analyse: Optional[AnalyseReponse] = Field(
+        default=None, description="Analyse des défauts (absente pour la colorisation standalone)"
+    )
     parametres: Optional[ParametresRestauration] = Field(default=None, description="Paramètres de restauration (obsolète avec restauration IA)")
     url_image: str = Field(..., description="URL ou chemin de l'image restaurée")
     credits_consommes: int = Field(default=1, description="Nombre de crédits consommés")

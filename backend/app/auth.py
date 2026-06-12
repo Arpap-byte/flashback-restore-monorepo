@@ -232,6 +232,7 @@ async def obtenir_utilisateur_courant(
     return {
         "id": utilisateur["id"],
         "email": utilisateur["email"],
+        "est_abonne": utilisateur.get("est_abonne", False),
     }
 
 

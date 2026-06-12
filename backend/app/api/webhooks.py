@@ -76,13 +76,7 @@ def _verifier_signature(request: Request, payload: bytes) -> dict:
         raise HTTPException(status_code=500, detail="Webhook verification unavailable")
     except WebhookVerificationError as e:
         logger.warning("Signature webhook Clerk invalide: svix-id=%s, erreur=%s", svix_id, e)
-        # Audit de sécurité
-        from app.services.audit import log_security_event
-        import asyncio
-        asyncio.create_task(log_security_event(
-            "webhook_signature_invalide",
-            detail=f"svix-id={svix_id}, timestamp={svix_timestamp}",
-        ))
+        # L'audit de sécurité sera loggé dans le handler async clerk_webhook
         raise HTTPException(status_code=401, detail="Invalid signature")
 
 

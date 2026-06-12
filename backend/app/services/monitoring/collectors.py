@@ -385,7 +385,7 @@ async def collect_all() -> dict:
 
 async def collect_critical_only() -> dict:
     """Collecte légère pour les alertes toutes les 15 minutes."""
-    services, _, _, system, _ = await asyncio.gather(
+    services, ssl, _, system, arq = await asyncio.gather(
         collect_services(),
         collect_ssl(),
         asyncio.sleep(0),  # skip DB pour les alertes rapides
@@ -400,7 +400,7 @@ async def collect_critical_only() -> dict:
         "timestamp": now.isoformat(),
         "date_fr": now.strftime("%d/%m/%Y %H:%M"),
         "services": services if not isinstance(services, Exception) else {"error": str(services)},
-        "ssl": _s if not isinstance(_s := None, Exception) else {},
+        "ssl": ssl if not isinstance(ssl, Exception) else {},
         "system": system if not isinstance(system, Exception) else {},
-        "arq": _a if not isinstance(_a := None, Exception) else {},
+        "arq": arq if not isinstance(arq, Exception) else {},
     }
