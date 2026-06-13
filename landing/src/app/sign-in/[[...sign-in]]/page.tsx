@@ -33,6 +33,9 @@ export default function SignInPage() {
               formButtonPrimary:
                 "bg-[#f59e0b] hover:bg-[#d97706] text-black font-semibold rounded-lg",
               footerActionLink: "text-[#f59e0b] hover:text-[#d97706]",
+              socialButtonsBlockButton:
+                "border border-[#3a3a3a] bg-[#292524] text-white hover:bg-[#33302c] rounded-lg",
+              socialButtonsBlockButtonText: "text-white font-medium",
             },
           }}
         />
