@@ -3,6 +3,7 @@ import { Inter, Playfair_Display } from "next/font/google";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { ClerkProvider } from "@clerk/nextjs";
+import { ui } from "@clerk/ui";
 import { frFR } from "@clerk/localizations";
 import CookieBanner from "@/components/CookieBanner";
 import "./globals.css";
@@ -87,6 +88,7 @@ export default function RootLayout({
       <body className="min-h-full bg-background text-foreground font-sans transition-colors">
         <ClerkProvider
           localization={frFR}
+          ui={ui}
           domain="clerk.flashback-restore.com"
           appearance={{
             variables: {
