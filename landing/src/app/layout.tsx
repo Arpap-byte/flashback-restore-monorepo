@@ -106,6 +106,7 @@ export default function RootLayout({
               card: "border border-[#292524] shadow-2xl",
               formButtonPrimary: "bg-[#f59e0b] hover:bg-[#d97706] text-black font-semibold",
               footerActionLink: "text-[#f59e0b] hover:text-[#d97706]",
+              providerIcon: "w-5 h-5",
             },
           }}
         >

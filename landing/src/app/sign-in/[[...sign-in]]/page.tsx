@@ -36,6 +36,10 @@ export default function SignInPage() {
               socialButtonsBlockButton:
                 "border border-[#3a3a3a] bg-[#292524] text-white hover:bg-[#33302c] rounded-lg",
               socialButtonsBlockButtonText: "text-white font-medium",
+              providerIcon: "w-5 h-5",
+              providerIcon__google: "filter-none",
+              providerIcon__facebook: "filter-none",
+              providerIcon__tiktok: "brightness-0 invert",
             },
           }}
         />
