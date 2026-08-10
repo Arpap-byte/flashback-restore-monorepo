@@ -218,46 +218,51 @@ def demarrer_scheduler():
         replace_existing=True,
     )
 
+    # ── Jobs d'emails de monitoring DÉSACTIVÉS (27/07/2026) ──
+    # Seb a demandé l'arrêt de tous les emails automatiques.
+    # Jobs concernés : monitoring matin/soir, alertes, relances abo.
+    # Le nettoyage et le backup (Google Drive, pas d'email) restent actifs.
+    #
     # ── Job 3 : Rapport monitoring — matin (5h UTC = 7h Paris) ──
-    scheduler.add_job(
-        run_monitoring_report,
-        trigger=CronTrigger(hour=5, minute=0),
-        id="monitoring_matin",
-        name="Rapport monitoring 7h (Paris)",
-        replace_existing=True,
-    )
-
+    # scheduler.add_job(
+    #     run_monitoring_report,
+    #     trigger=CronTrigger(hour=5, minute=0),
+    #     id="monitoring_matin",
+    #     name="Rapport monitoring 7h (Paris)",
+    #     replace_existing=True,
+    # )
+    #
     # ── Job 4 : Rapport monitoring — soir (16h UTC = 18h Paris) ──
-    scheduler.add_job(
-        run_monitoring_report,
-        trigger=CronTrigger(hour=16, minute=0),
-        id="monitoring_soir",
-        name="Rapport monitoring 18h (Paris)",
-        replace_existing=True,
-    )
-
+    # scheduler.add_job(
+    #     run_monitoring_report,
+    #     trigger=CronTrigger(hour=16, minute=0),
+    #     id="monitoring_soir",
+    #     name="Rapport monitoring 18h (Paris)",
+    #     replace_existing=True,
+    # )
+    #
     # ── Job 5 : Vérification alertes critiques (toutes les 15 min) ──
-    scheduler.add_job(
-        run_alert_check,
-        trigger=IntervalTrigger(minutes=15),
-        id="alert_check",
-        name="Vérification alertes critiques",
-        replace_existing=True,
-    )
-
+    # scheduler.add_job(
+    #     run_alert_check,
+    #     trigger=IntervalTrigger(minutes=15),
+    #     id="alert_check",
+    #     name="Vérification alertes critiques",
+    #     replace_existing=True,
+    # )
+    #
     # ── Job 6 : Relances expiration abonnement (10h UTC = 12h Paris) ──
-    scheduler.add_job(
-        run_subscription_reminders,
-        trigger=CronTrigger(hour=10, minute=0),
-        id="subscription_reminders",
-        name="Relances expiration abonnement (J-3)",
-        replace_existing=True,
-    )
+    # scheduler.add_job(
+    #     run_subscription_reminders,
+    #     trigger=CronTrigger(hour=10, minute=0),
+    #     id="subscription_reminders",
+    #     name="Relances expiration abonnement (J-3)",
+    #     replace_existing=True,
+    # )
 
     scheduler.start()
     logger.info(
-        "📅 Scheduler démarré — 6 jobs : cleanup (3h), backup (3h), "
-        "monitoring (5h+16h), alertes (15min), relances abo (10h)"
+        "📅 Scheduler démarré — 2 jobs : cleanup (3h), backup (3h05). "
+        "Emails de monitoring désactivés (27/07/2026)."
     )
 
 
