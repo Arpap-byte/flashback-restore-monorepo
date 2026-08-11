@@ -123,7 +123,7 @@ async def exporter_rapport_cleanup(resultat: dict) -> str | None:
     rapport_json = json.dumps(rapport, indent=2, ensure_ascii=False)
 
     # Sauvegarde locale
-    rapport_dir = Path("/root/backups/flashback/rapports")
+    rapport_dir = Path("/opt/flashback-restore-monorepo/backups/rapports")
     rapport_dir.mkdir(parents=True, exist_ok=True)
     rapport_path = rapport_dir / f"rapport_cleanup_{date_str}.json"
     rapport_path.write_text(rapport_json, encoding="utf-8")

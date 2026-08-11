@@ -209,14 +209,17 @@ def demarrer_scheduler():
         replace_existing=True,
     )
 
-    # ── Job 2 : Backup PostgreSQL (3h05 UTC — décalé pour éviter conflit cleanup) ──
-    scheduler.add_job(
-        run_backup_job,
-        trigger=CronTrigger(hour=3, minute=5),
-        id="backup_quotidien",
-        name="Backup PostgreSQL + B2",
-        replace_existing=True,
-    )
+    # ── Job 2 : Backup PostgreSQL — DÉSACTIVÉ (11/08/2026) ──
+    # Le user flashback n'a pas accès au docker.sock → PermissionError.
+    # Remplacé par le cron root: 0 3 * * * infra/backup_pg.sh
+    # (dump + n8n + upload B2 + rétention 30j) — voir infra/backup_pg.sh
+    # scheduler.add_job(
+    #     run_backup_job,
+    #     trigger=CronTrigger(hour=3, minute=5),
+    #     id="backup_quotidien",
+    #     name="Backup PostgreSQL + B2",
+    #     replace_existing=True,
+    # )
 
     # ── Jobs d'emails de monitoring DÉSACTIVÉS (27/07/2026) ──
     # Seb a demandé l'arrêt de tous les emails automatiques.
@@ -261,8 +264,8 @@ def demarrer_scheduler():
 
     scheduler.start()
     logger.info(
-        "📅 Scheduler démarré — 2 jobs : cleanup (3h), backup (3h05). "
-        "Emails de monitoring désactivés (27/07/2026)."
+        "📅 Scheduler démarré — 1 job : cleanup (3h). "
+        "Backup via cron root (backup_pg.sh). Emails de monitoring désactivés (27/07/2026)."
     )
 
 

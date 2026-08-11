@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 # ── Configuration ──
 
-BACKUP_DIR = Path("/root/backups/flashback/postgresql")
+BACKUP_DIR = Path("/opt/flashback-restore-monorepo/backups/postgresql")
 RETENTION_DAYS = 30
 DB_NAME = "flashback"
 DB_USER = "flashback"
