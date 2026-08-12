@@ -40,7 +40,7 @@ export default function OutOfCreditsModal({ onClose, redirectPath = "/#pricing" 
 
           {/* Description */}
           <p className="text-sm text-center text-muted mb-1">
-            Vous avez utilisé tous vos essais gratuits et vous n&apos;avez
+            Vous avez utilisé tous vos essais gratuits et vous n'avez
             plus de crédits.
           </p>
           <p className="text-sm text-center text-muted mb-6">

@@ -23,9 +23,9 @@ const features = [
     icon: Bot,
     techIcon: Film,
     title: "Animation magique",
-    tech: "IA d&apos;animation",
+    tech: "IA d'animation",
     description:
-      "Donnez vie à vos photos comme dans Harry Potter. Notre IA d&apos;animation transforme vos clichés en portraits animés avec des expressions naturelles : sourires, clignements, mouvements subtils. Un effet saisissant.",
+      "Donnez vie à vos photos comme dans Harry Potter. Notre IA d'animation transforme vos clichés en portraits animés avec des expressions naturelles : sourires, clignements, mouvements subtils. Un effet saisissant.",
     gradient: "from-violet-600/20 to-violet-500/5",
     border: "border-violet-500/20",
     iconBg: "bg-violet-500/10",
@@ -139,7 +139,7 @@ export default function Features() {
           </h2>
           <p className="text-muted max-w-2xl mx-auto text-lg">
             Flashback Restore combine intelligence artificielle de pointe pour offrir une
-            restauration et une animation d&apos;une qualité exceptionnelle,
+            restauration et une animation d'une qualité exceptionnelle,
             accessible à tous.
           </p>
         </motion.div>

@@ -89,7 +89,7 @@ export default function AboutPage() {
               <span className="text-gradient">Flashback Restore</span>
             </h1>
             <p className="text-muted text-lg max-w-2xl mx-auto">
-              Nous redonnons vie aux souvenirs grâce à l&apos;intelligence
+              Nous redonnons vie aux souvenirs grâce à l'intelligence
               artificielle. Chaque photo restaurée est une histoire qui continue.
             </p>
           </motion.div>
@@ -127,17 +127,17 @@ export default function AboutPage() {
                   </div>
                 </div>
                 <p className="text-muted leading-relaxed text-base sm:text-lg mb-4">
-                  Flashback Restore est né d&apos;une conviction simple :{" "}
+                  Flashback Restore est né d'une conviction simple :{" "}
                   <strong className="text-foreground">
-                    les souvenirs méritent d&apos;être préservés
+                    les souvenirs méritent d'être préservés
                   </strong>
-                  . Nous avons vu trop de photos de famille s&apos;abîmer avec le
+                  . Nous avons vu trop de photos de famille s'abîmer avec le
                   temps — déchirures, décoloration, pliures. Ces images sont
                   souvent les seuls témoins visuels de moments irremplaçables.
                 </p>
                 <p className="text-muted leading-relaxed text-base sm:text-lg">
-                  En combinant les technologies d&apos;IA les plus avancées —
-                  notre IA de restauration et notre technologie d&apos;animation —
+                  En combinant les technologies d'IA les plus avancées —
+                  notre IA de restauration et notre technologie d'animation —
                   nous permettons à chacun de redonner vie à ses photos anciennes
                   en quelques secondes, sans aucune compétence technique. Notre
                   plateforme est pensée pour être simple, rapide et respectueuse
@@ -253,7 +253,7 @@ export default function AboutPage() {
             </h2>
             <p className="text-muted mb-6 max-w-md mx-auto">
               Essayez Flashback Restore gratuitement. Téléchargez une photo et
-              découvrez la magie de l&apos;IA en quelques secondes.
+              découvrez la magie de l'IA en quelques secondes.
             </p>
             <Link
               href="/upload"

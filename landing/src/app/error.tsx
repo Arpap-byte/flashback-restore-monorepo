@@ -41,7 +41,7 @@ export default function Error({
           </h1>
 
           <p className="text-muted leading-relaxed mb-2">
-            Quelque chose s&apos;est mal passé lors du chargement de cette page.
+            Quelque chose s'est mal passé lors du chargement de cette page.
           </p>
 
           {error.message && (
@@ -64,7 +64,7 @@ export default function Error({
               className="inline-flex items-center gap-2 px-6 py-3 rounded-full border border-card-border text-foreground font-semibold text-sm hover:bg-card transition-all hover:border-accent/30 active:scale-[0.97] justify-center"
             >
               <Home className="w-4 h-4" />
-              Retour à l&apos;accueil
+              Retour à l'accueil
             </a>
           </div>
         </div>

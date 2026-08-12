@@ -147,15 +147,15 @@ export default function ConditionsUtilisationPage() {
           >
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-6">
               <Gavel className="w-4 h-4" />
-              Conditions d&apos;utilisation
+              Conditions d'utilisation
             </div>
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-foreground mb-4 font-[family-name:var(--font-playfair)]">
               Conditions Générales{" "}
-              <span className="text-gradient">d&apos;Utilisation</span>
+              <span className="text-gradient">d'Utilisation</span>
             </h1>
             <p className="text-muted text-lg max-w-xl mx-auto">
-              Les règles qui encadrent l&apos;utilisation de Flashback Restore.
-              Lisez-les attentivement avant d&apos;utiliser notre Service.
+              Les règles qui encadrent l'utilisation de Flashback Restore.
+              Lisez-les attentivement avant d'utiliser notre Service.
             </p>
             <p className="text-muted/60 text-sm mt-4">
               En vigueur depuis le 19 mai 2026
@@ -168,7 +168,7 @@ export default function ConditionsUtilisationPage() {
                 Accueil
               </Link>
               <ChevronRight className="w-4 h-4" />
-              <span className="text-foreground">Conditions d&apos;Utilisation</span>
+              <span className="text-foreground">Conditions d'Utilisation</span>
             </div>
           </motion.div>
 
@@ -179,8 +179,8 @@ export default function ConditionsUtilisationPage() {
             <AlertTriangle className="w-5 h-5 text-accent flex-shrink-0 mt-0.5" />
             <p className="text-muted text-sm leading-relaxed">
               <strong className="text-foreground">Important :</strong> En
-              utilisant Flashback Restore, vous acceptez l&apos;intégralité de
-              ces conditions. Si vous n&apos;êtes pas d&apos;accord, veuillez ne
+              utilisant Flashback Restore, vous acceptez l'intégralité de
+              ces conditions. Si vous n'êtes pas d'accord, veuillez ne
               pas utiliser notre Service.
             </p>
           </motion.div>

@@ -69,8 +69,8 @@ export function RgpdConsentModal({ isOpen, onAccept, onDecline }: RgpdConsentPro
               className="mt-0.5 w-4 h-4 rounded border-card-border bg-surface text-accent focus:ring-accent cursor-pointer"
             />
             <span className="text-sm text-muted group-hover:text-foreground transition-colors leading-relaxed">
-              J&apos;accepte que mes photos soient temporairement transmises
-              et traitées par l&apos;intelligence artificielle de Flashback
+              J'accepte que mes photos soient temporairement transmises
+              et traitées par l'intelligence artificielle de Flashback
               Restore aux fins de restauration, colorisation et/ou animation.{" "}
               <span className="text-red-400">*</span>
             </span>
@@ -89,7 +89,7 @@ export function RgpdConsentModal({ isOpen, onAccept, onDecline }: RgpdConsentPro
             />
             <span className="text-sm text-muted group-hover:text-foreground transition-colors leading-relaxed">
               Je reconnais que mes photos seront traitées par une technologie
-              d&apos;intelligence artificielle. Je comprends qu&apos;aucun
+              d'intelligence artificielle. Je comprends qu'aucun
               humain ne visualise mes images et que les données sont
               automatiquement supprimées après traitement, conformément à la{" "}
               <Link
@@ -123,7 +123,7 @@ export function RgpdConsentModal({ isOpen, onAccept, onDecline }: RgpdConsentPro
             onClick={handleConfirm}
             className="flex-1 py-3 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-sm hover:brightness-110 transition-all active:scale-[0.97]"
           >
-            J&apos;accepte et je continue
+            J'accepte et je continue
           </button>
           <button
             onClick={onDecline}

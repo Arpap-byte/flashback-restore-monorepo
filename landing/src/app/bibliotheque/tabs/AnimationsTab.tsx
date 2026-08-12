@@ -178,7 +178,7 @@ export default function AnimationsTab({
                     className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-violet-500/10 text-violet-400 text-xs hover:bg-violet-500/20 transition-colors"
                   >
                     <Video className="w-3 h-3" />
-                    Voir l&apos;animation
+                    Voir l'animation
                   </a>
                 )}
                 {t.url_original && (

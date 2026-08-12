@@ -51,7 +51,7 @@ export default function MentionsLegalesPage() {
             </h1>
             <p className="text-muted text-lg max-w-xl mx-auto">
               Conformément aux dispositions des articles 6-III et 19 de la loi
-              n°2004-575 du 21 juin 2004 pour la Confiance dans l&apos;économie
+              n°2004-575 du 21 juin 2004 pour la Confiance dans l'économie
               numérique (LCEN).
             </p>
           </motion.div>
@@ -186,9 +186,9 @@ export default function MentionsLegalesPage() {
                     Propriété intellectuelle
                   </h3>
                   <p className="text-muted leading-relaxed text-sm sm:text-base">
-                    L&apos;ensemble du site Flashback Restore (structure,
+                    L'ensemble du site Flashback Restore (structure,
                     design, textes, images, logo, marque) est la propriété
-                    exclusive d&apos;APEX-CYBER. Toute reproduction,
+                    exclusive d'APEX-CYBER. Toute reproduction,
                     représentation, modification ou adaptation, totale ou
                     partielle, est interdite sans autorisation écrite
                     préalable.
@@ -229,13 +229,13 @@ export default function MentionsLegalesPage() {
                     <p className="mt-3">
                       Conformément au Règlement Général sur la Protection des
                       Données (RGPD) et à la loi Informatique et Libertés,
-                      vous disposez d&apos;un droit d&apos;accès, de
-                      rectification, d&apos;effacement, de limitation, de
-                      portabilité et d&apos;opposition de vos données
+                      vous disposez d'un droit d'accès, de
+                      rectification, d'effacement, de limitation, de
+                      portabilité et d'opposition de vos données
                       personnelles.
                     </p>
                     <p>
-                      Pour exercer ces droits, contactez-nous à l&apos;adresse
+                      Pour exercer ces droits, contactez-nous à l'adresse
                       ci-dessus. Pour plus de détails, consultez notre{" "}
                       <Link
                         href="/privacy"
@@ -265,7 +265,7 @@ export default function MentionsLegalesPage() {
                   </h3>
                   <p className="text-muted leading-relaxed text-sm sm:text-base">
                     En cas de litige non résolu, vous pouvez saisir la CNIL
-                    (Commission Nationale de l&apos;Informatique et des
+                    (Commission Nationale de l'Informatique et des
                     Libertés) — 3 Place de Fontenoy, 75007 Paris — ou recourir
                     à la plateforme de règlement en ligne des litiges de la
                     Commission européenne :{" "}

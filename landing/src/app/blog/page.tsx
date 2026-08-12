@@ -53,7 +53,7 @@ export default function BlogPage() {
             </h1>
             <p className="text-muted text-lg max-w-2xl mx-auto">
               Guides, tutoriels et comparatifs pour vous aider à restaurer et
-              préserver vos photos anciennes grâce à l&apos;intelligence
+              préserver vos photos anciennes grâce à l'intelligence
               artificielle.
             </p>
           </div>
@@ -112,7 +112,7 @@ export default function BlogPage() {
                   </p>
 
                   <div className="flex items-center gap-1.5 text-accent text-sm font-medium">
-                    Lire l&apos;article
+                    Lire l'article
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
@@ -128,7 +128,7 @@ export default function BlogPage() {
             </h2>
             <p className="text-muted mb-6 max-w-md mx-auto">
               Essayez Flashback Restore gratuitement. Importez une photo
-              ancienne et découvrez la magie de l&apos;IA en quelques secondes.
+              ancienne et découvrez la magie de l'IA en quelques secondes.
             </p>
             <Link
               href="/restore"

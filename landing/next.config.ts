@@ -36,6 +36,11 @@ const nextConfig: NextConfig = {
         permanent: true,
       },
       {
+        source: '/abonnement',
+        destination: '/#pricing',
+        permanent: true,
+      },
+      {
         source: '/contact',
         destination: '/#footer',
         permanent: true,

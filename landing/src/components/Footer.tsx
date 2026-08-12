@@ -42,7 +42,7 @@ export default function Footer() {
               </span>
             </Link>
             <p className="text-muted text-sm leading-relaxed max-w-xs mb-6">
-              Redonnez vie à vos souvenirs grâce à l&apos;intelligence
+              Redonnez vie à vos souvenirs grâce à l'intelligence
               artificielle. Restaurez et animez vos photos anciennes en quelques
               secondes.
             </p>

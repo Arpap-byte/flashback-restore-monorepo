@@ -21,7 +21,7 @@ const steps = [
     icon: Sparkles,
     title: "L'IA restaure et anime",
     description:
-      "Notre IA de restauration corrige les défauts, notre IA d&apos;animation donne vie au portrait. En quelques secondes, votre photo ancienne devient une animation fluide et naturelle.",
+      "Notre IA de restauration corrige les défauts, notre IA d'animation donne vie au portrait. En quelques secondes, votre photo ancienne devient une animation fluide et naturelle.",
     color: "from-violet-500 to-violet-600",
     bg: "bg-violet-500/10",
     border: "border-violet-500/20",
@@ -120,7 +120,7 @@ export default function HowItWorks() {
               </h2>
               <p className="text-muted text-lg">
                 Aucune compétence technique requise. Prenez une photo,
-                laissez l&apos;IA faire le reste, et partagez le résultat avec
+                laissez l'IA faire le reste, et partagez le résultat avec
                 ceux que vous aimez.
               </p>
             </motion.div>
@@ -214,7 +214,7 @@ export default function HowItWorks() {
                 {/* Bottom bar */}
                 <div className="px-4 py-3 border-t border-card-border flex items-center justify-center">
                   <span className="text-[10px] text-muted/60">
-                    Propulsé par l&apos;intelligence artificielle
+                    Propulsé par l'intelligence artificielle
                   </span>
                 </div>
               </div>

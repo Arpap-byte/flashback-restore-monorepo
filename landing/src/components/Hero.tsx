@@ -147,7 +147,7 @@ export default function Hero() {
               {/* Badge */}
               <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-medium mb-8">
                 <Sparkles className="w-4 h-4" />
-                Propulsé par l&apos;intelligence artificielle
+                Propulsé par l'intelligence artificielle
               </div>
             </motion.div>
 
@@ -169,7 +169,7 @@ export default function Hero() {
               className="text-lg sm:text-xl text-muted max-w-xl lg:max-w-none mx-auto lg:mx-0 mb-10 leading-relaxed"
             >
               Restaurez et animez vos photos anciennes grâce à
-              l&apos;intelligence artificielle. Comme par magie, vos souvenirs
+              l'intelligence artificielle. Comme par magie, vos souvenirs
               prennent vie — restauration des couleurs, réparation des défauts,
               et animation façon portrait vivant.
             </motion.p>

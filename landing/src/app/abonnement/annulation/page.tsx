@@ -32,7 +32,7 @@ export default function AbonnementAnnulationPage() {
             </h1>
 
             <p className="text-muted text-lg mb-10 max-w-md mx-auto">
-              Votre abonnement n&apos;a pas été débité. Vous pouvez explorer nos
+              Votre abonnement n'a pas été débité. Vous pouvez explorer nos
               offres et choisir celle qui vous convient le mieux.
             </p>
 

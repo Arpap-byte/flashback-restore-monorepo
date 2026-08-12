@@ -173,9 +173,9 @@ export default function IndustrialContent() {
               <span className="text-gradient">votre industrie</span>
             </h1>
             <p className="text-muted text-lg max-w-2xl mx-auto">
-              Quel que soit votre secteur d&apos;activité, notre intelligence
-              artificielle s&apos;adapte à vos besoins de restauration et
-              d&apos;animation de photos. Découvrez comment nous accompagnons
+              Quel que soit votre secteur d'activité, notre intelligence
+              artificielle s'adapte à vos besoins de restauration et
+              d'animation de photos. Découvrez comment nous accompagnons
               les professionnels.
             </p>
           </motion.div>
@@ -291,25 +291,25 @@ export default function IndustrialContent() {
                   </div>
                   <div>
                     <h2 className="text-2xl sm:text-3xl font-bold text-foreground font-[family-name:var(--font-playfair)]">
-                      Cas d&apos;usage : les archives municipales
+                      Cas d'usage : les archives municipales
                     </h2>
                   </div>
                 </div>
                 <p className="text-muted leading-relaxed text-base sm:text-lg mb-4">
-                  Les services d&apos;archives municipales gèrent des fonds
+                  Les services d'archives municipales gèrent des fonds
                   photographiques considérables, souvent endommagés par le
                   temps. Grâce à Flashback Restore, ils peuvent{" "}
                   <strong className="text-foreground">
                     numériser, restaurer et diffuser leur patrimoine
                   </strong>{" "}
-                  auprès du public en quelques heures plutôt qu&apos;en
+                  auprès du public en quelques heures plutôt qu'en
                   plusieurs semaines.
                 </p>
                 <p className="text-muted leading-relaxed text-base sm:text-lg">
                   Notre solution de traitement par lots permet de restaurer des
                   centaines de clichés simultanément, tout en garantissant une
                   qualité muséale. Les fichiers restaurés sont livrés en haute
-                  résolution, prêts pour l&apos;archivage numérique et la
+                  résolution, prêts pour l'archivage numérique et la
                   publication en ligne.
                 </p>
               </div>
@@ -329,7 +329,7 @@ export default function IndustrialContent() {
             </h2>
             <p className="text-muted mb-6 max-w-md mx-auto">
               Contactez-nous pour découvrir comment Flashback Restore peut
-              s&apos;adapter à votre secteur d&apos;activité et à vos volumes.
+              s'adapter à votre secteur d'activité et à vos volumes.
               Nous vous accompagnons de A à Z.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">

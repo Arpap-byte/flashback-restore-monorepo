@@ -159,7 +159,7 @@ export default function CookiesPage() {
             <Shield className="w-5 h-5 text-emerald-400 flex-shrink-0 mt-0.5" />
             <p className="text-muted text-sm leading-relaxed">
               <strong className="text-foreground">Respect de votre vie privée :</strong>{" "}
-              Flashback Restore n&apos;utilise aucun cookie publicitaire, aucun
+              Flashback Restore n'utilise aucun cookie publicitaire, aucun
               mouchard de tracking tiers, et ne revend aucune donnée. Nous
               utilisons exclusivement des cookies techniques indispensables au
               fonctionnement du Service.

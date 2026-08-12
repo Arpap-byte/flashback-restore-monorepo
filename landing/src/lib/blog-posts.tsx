@@ -35,23 +35,23 @@ export const blogPosts: BlogPost[] = [
           Vous avez retrouvé une vieille photo de famille dans un grenier ? Un
           portrait de vos grands-parents jauni par le temps ? Une photo de
           mariage cornée et décolorée ? Bonne nouvelle : en 2026,
-          l&apos;intelligence artificielle permet de restaurer ces images en
+          l'intelligence artificielle permet de restaurer ces images en
           quelques secondes, sans aucune compétence en retouche photo. Voici
           tout ce que vous devez savoir pour redonner vie à vos souvenirs.
         </p>
 
         <h2 className="text-2xl font-bold text-foreground mt-12 mb-4 font-[family-name:var(--font-playfair)]">
-          Pourquoi les photos anciennes s&apos;abîment-elles ?
+          Pourquoi les photos anciennes s'abîment-elles ?
         </h2>
         <p className="text-muted leading-relaxed mb-4">
-          Les photographies argentiques, qu&apos;elles datent des années 1920
+          Les photographies argentiques, qu'elles datent des années 1920
           ou des années 1980, sont des objets physiques fragiles. Elles
-          subissent l&apos;usure du temps de plusieurs façons :
+          subissent l'usure du temps de plusieurs façons :
         </p>
         <ul className="list-disc pl-6 text-muted space-y-2 mb-6">
           <li>
             <strong className="text-foreground">La décoloration :</strong> les
-            pigments et les encres s&apos;oxydent au contact de l&apos;air et de
+            pigments et les encres s'oxydent au contact de l'air et de
             la lumière, faisant virer les couleurs au jaune ou au magenta.
           </li>
           <li>
@@ -63,13 +63,13 @@ export const blogPosts: BlogPost[] = [
           </li>
           <li>
             <strong className="text-foreground">Les taches et moisissures :</strong>{" "}
-            l&apos;humidité est l&apos;ennemie numéro un du papier photo, créant
+            l'humidité est l'ennemie numéro un du papier photo, créant
             des auréoles brunes ou des points de moisissure.
           </li>
           <li>
             <strong className="text-foreground">Les déchirures :</strong> une
             photo manipulée trop souvent ou stockée sans protection finit par se
-            déchirer, parfois en plein milieu d&apos;un visage.
+            déchirer, parfois en plein milieu d'un visage.
           </li>
           <li>
             <strong className="text-foreground">La perte de détails :</strong>{" "}
@@ -78,10 +78,10 @@ export const blogPosts: BlogPost[] = [
           </li>
         </ul>
         <p className="text-muted leading-relaxed mb-4">
-          Chaque photo abîmée, c&apos;est un souvenir qui s&apos;efface. Un
-          visage qu&apos;on ne distingue plus, un lieu qu&apos;on ne reconnaît
-          plus, un moment qui disparaît. C&apos;est pour ça que la restauration
-          photo est bien plus qu&apos;un simple exercice technique : c&apos;est
+          Chaque photo abîmée, c'est un souvenir qui s'efface. Un
+          visage qu'on ne distingue plus, un lieu qu'on ne reconnaît
+          plus, un moment qui disparaît. C'est pour ça que la restauration
+          photo est bien plus qu'un simple exercice technique : c'est
           un acte de préservation de la mémoire familiale.
         </p>
 
@@ -89,8 +89,8 @@ export const blogPosts: BlogPost[] = [
           Les méthodes traditionnelles et leurs limites
         </h2>
         <p className="text-muted leading-relaxed mb-4">
-          Avant l&apos;IA, restaurer une photo ancienne demandait soit de faire
-          appel à un professionnel, soit d&apos;apprendre à utiliser des
+          Avant l'IA, restaurer une photo ancienne demandait soit de faire
+          appel à un professionnel, soit d'apprendre à utiliser des
           logiciels complexes.
         </p>
         <h3 className="text-xl font-semibold text-foreground mt-8 mb-3">
@@ -98,8 +98,8 @@ export const blogPosts: BlogPost[] = [
         </h3>
         <p className="text-muted leading-relaxed mb-4">
           Un artisan spécialisé peut faire des miracles. Mais le coût est élevé
-          — entre 50€ et 300€ par photo selon l&apos;état — et le délai peut
-          être de plusieurs semaines. C&apos;est une solution de qualité, mais
+          — entre 50€ et 300€ par photo selon l'état — et le délai peut
+          être de plusieurs semaines. C'est une solution de qualité, mais
           inaccessible pour une collection de dizaines ou centaines de photos.
         </p>
         <h3 className="text-xl font-semibold text-foreground mt-8 mb-3">
@@ -108,7 +108,7 @@ export const blogPosts: BlogPost[] = [
         <p className="text-muted leading-relaxed mb-4">
           Avec un outil comme Photoshop, on peut tout faire : tampon de
           duplication pour effacer les rayures, correction colorimétrique,
-          reconstruction des zones manquantes. Mais la courbe d&apos;apprentissage
+          reconstruction des zones manquantes. Mais la courbe d'apprentissage
           est raide. Il faut des heures de pratique pour obtenir un résultat
           naturel, et chaque photo peut demander 30 minutes à 2 heures de
           travail minutieux.
@@ -117,32 +117,32 @@ export const blogPosts: BlogPost[] = [
           <p className="text-muted text-sm leading-relaxed">
             <strong className="text-foreground">Le saviez-vous ?</strong> Une
             étude menée par des généalogistes en 2024 a montré que 73 % des
-            photos de famille datant d&apos;avant 1980 présentent des signes de
+            photos de famille datant d'avant 1980 présentent des signes de
             dégradation visibles. Parmi elles, seules 12 % ont été numérisées et
             restaurées.
           </p>
         </div>
 
         <h2 className="text-2xl font-bold text-foreground mt-12 mb-4 font-[family-name:var(--font-playfair)]">
-          Comment l&apos;IA change tout
+          Comment l'IA change tout
         </h2>
         <p className="text-muted leading-relaxed mb-4">
-          Depuis 2023, l&apos;intelligence artificielle a radicalement
-          transformé la restauration de photos. Les modèles d&apos;IA modernes
-          sont entraînés sur des millions d&apos;images — des photos abîmées
+          Depuis 2023, l'intelligence artificielle a radicalement
+          transformé la restauration de photos. Les modèles d'IA modernes
+          sont entraînés sur des millions d'images — des photos abîmées
           associées à leur version restaurée. Résultat : ils apprennent à
           reconnaître les défauts (rayures, taches, décoloration) et à les
           corriger automatiquement, comme le ferait un restaurateur expert, mais
           en quelques secondes.
         </p>
         <h3 className="text-xl font-semibold text-foreground mt-8 mb-3">
-          Ce que l&apos;IA sait faire aujourd&apos;hui (2026)
+          Ce que l'IA sait faire aujourd'hui (2026)
         </h3>
         <ul className="list-disc pl-6 text-muted space-y-2 mb-6">
           <li>
             <strong className="text-foreground">Colorisation automatique :</strong>{" "}
             redonner des couleurs naturelles à une photo en noir et blanc, en
-            respectant les teintes de l&apos;époque (peau, vêtements, décors).
+            respectant les teintes de l'époque (peau, vêtements, décors).
           </li>
           <li>
             <strong className="text-foreground">Suppression des défauts :</strong>{" "}
@@ -151,8 +151,8 @@ export const blogPosts: BlogPost[] = [
           </li>
           <li>
             <strong className="text-foreground">Reconstruction faciale :</strong>{" "}
-            l&apos;IA peut reconstruire les parties manquantes d&apos;un visage
-            en s&apos;appuyant sur ce qui reste visible, avec une précision
+            l'IA peut reconstruire les parties manquantes d'un visage
+            en s'appuyant sur ce qui reste visible, avec une précision
             étonnante.
           </li>
           <li>
@@ -170,7 +170,7 @@ export const blogPosts: BlogPost[] = [
         <p className="text-muted leading-relaxed mb-4">
           Et contrairement aux méthodes traditionnelles, tout cela se fait en
           quelques secondes à quelques minutes. Plus besoin de passer votre
-          week-end sur Photoshop : vous importez votre photo, l&apos;IA
+          week-end sur Photoshop : vous importez votre photo, l'IA
           travaille, et vous téléchargez le résultat.
         </p>
 
@@ -194,9 +194,9 @@ export const blogPosts: BlogPost[] = [
               <p className="text-muted leading-relaxed">
                 Si votre photo est encore sur papier, prenez-la en photo avec
                 votre smartphone ou utilisez un scanner. Assurez-vous
-                d&apos;avoir un bon éclairage, sans reflet. Posez la photo à
+                d'avoir un bon éclairage, sans reflet. Posez la photo à
                 plat sur une surface sombre pour éviter les ombres parasites.
-                L&apos;idéal est un scan à 300 DPI minimum.
+                L'idéal est un scan à 300 DPI minimum.
               </p>
             </div>
           </div>
@@ -224,7 +224,7 @@ export const blogPosts: BlogPost[] = [
             </div>
             <div>
               <h3 className="text-lg font-semibold text-foreground mb-2">
-                Laissez l&apos;IA opérer sa magie
+                Laissez l'IA opérer sa magie
               </h3>
               <p className="text-muted leading-relaxed">
                 Notre intelligence artificielle analyse votre photo en
@@ -248,7 +248,7 @@ export const blogPosts: BlogPost[] = [
               <p className="text-muted leading-relaxed">
                 Un comparateur avant/après vous permet de voir la différence en
                 faisant glisser un curseur. Si le résultat ne vous convient pas
-                parfaitement, vous pouvez relancer la restauration — l&apos;IA
+                parfaitement, vous pouvez relancer la restauration — l'IA
                 propose parfois des variations subtiles.
               </p>
             </div>
@@ -264,8 +264,8 @@ export const blogPosts: BlogPost[] = [
               </h3>
               <p className="text-muted leading-relaxed">
                 Une fois satisfait, téléchargez le résultat en haute résolution.
-                Vous pouvez l&apos;imprimer, l&apos;encadrer, la partager avec
-                votre famille ou l&apos;intégrer dans un album photo numérique.
+                Vous pouvez l'imprimer, l'encadrer, la partager avec
+                votre famille ou l'intégrer dans un album photo numérique.
               </p>
             </div>
           </div>
@@ -281,7 +281,7 @@ export const blogPosts: BlogPost[] = [
             </strong>{" "}
             plus votre photo de départ est nette et bien éclairée, plus le
             résultat sera bon. Un scan à 600 DPI donne de bien meilleurs
-            résultats qu&apos;une photo prise au smartphone en basse lumière.
+            résultats qu'une photo prise au smartphone en basse lumière.
           </li>
           <li>
             <strong className="text-foreground">Évitez les reflets :</strong> si
@@ -291,10 +291,10 @@ export const blogPosts: BlogPost[] = [
           </li>
           <li>
             <strong className="text-foreground">
-              Recadrez avant d&apos;importer :
+              Recadrez avant d'importer :
             </strong>{" "}
             supprimez les bords inutiles (marges blanches, bouts de table) pour
-            que l&apos;IA se concentre sur la photo elle-même.
+            que l'IA se concentre sur la photo elle-même.
           </li>
           <li>
             <strong className="text-foreground">
@@ -303,13 +303,13 @@ export const blogPosts: BlogPost[] = [
             si la photo est extrêmement dégradée (déchirure traversant un
             visage, moisissures massives), essayez plusieurs passes de
             restauration. Parfois, deux traitements légers donnent un meilleur
-            résultat qu&apos;un seul traitement agressif.
+            résultat qu'un seul traitement agressif.
           </li>
           <li>
             <strong className="text-foreground">
-              Sauvegardez l&apos;original :
+              Sauvegardez l'original :
             </strong>{" "}
-            conservez toujours une copie de votre fichier d&apos;origine. On ne
+            conservez toujours une copie de votre fichier d'origine. On ne
             sait jamais, une future technologie pourrait faire encore mieux !
           </li>
         </ul>
@@ -320,8 +320,8 @@ export const blogPosts: BlogPost[] = [
           </h3>
           <p className="text-muted mb-4">
             Essayez Flashback Restore gratuitement. Importez une photo ancienne
-            et découvrez ce que l&apos;intelligence artificielle peut faire pour
-            vous en moins d&apos;une minute.
+            et découvrez ce que l'intelligence artificielle peut faire pour
+            vous en moins d'une minute.
           </p>
         </div>
 
@@ -329,14 +329,14 @@ export const blogPosts: BlogPost[] = [
           Questions fréquentes sur la restauration photo par IA
         </h2>
         <h3 className="text-lg font-semibold text-foreground mt-6 mb-2">
-          Est-ce que l&apos;IA peut restaurer n&apos;importe quelle photo ?
+          Est-ce que l'IA peut restaurer n'importe quelle photo ?
         </h3>
         <p className="text-muted leading-relaxed mb-4">
-          L&apos;IA donne d&apos;excellents résultats sur la grande majorité des
+          L'IA donne d'excellents résultats sur la grande majorité des
           photos anciennes, en particulier les portraits et les photos de
           famille. Les cas les plus difficiles sont les photos où plus de 50 %
-          de l&apos;image est détruite ou illisible, car l&apos;IA doit alors «
-          inventer » trop d&apos;informations. Mais même dans ces cas extrêmes,
+          de l'image est détruite ou illisible, car l'IA doit alors «
+          inventer » trop d'informations. Mais même dans ces cas extrêmes,
           le résultat est souvent surprenant.
         </p>
         <h3 className="text-lg font-semibold text-foreground mt-6 mb-2">
@@ -351,8 +351,8 @@ export const blogPosts: BlogPost[] = [
           Puis-je restaurer des photos en noir et blanc ET en couleur ?
         </h3>
         <p className="text-muted leading-relaxed mb-4">
-          Oui. L&apos;IA détecte automatiquement si votre photo est en noir et
-          blanc ou en couleur. Dans le cas d&apos;une photo monochrome, elle
+          Oui. L'IA détecte automatiquement si votre photo est en noir et
+          blanc ou en couleur. Dans le cas d'une photo monochrome, elle
           peut soit la restaurer en conservant le noir et blanc (pour un rendu
           vintage) soit la coloriser.
         </p>
@@ -378,12 +378,12 @@ export const blogPosts: BlogPost[] = [
     content: (
       <article>
         <p className="text-lg text-muted leading-relaxed mb-6">
-          Une photo déchirée, c&apos;est un peu comme une blessure sur un
+          Une photo déchirée, c'est un peu comme une blessure sur un
           souvenir. Cette déchirure qui traverse le visage de votre grand-mère
           sur sa photo de mariage, ces rayures qui zèbrent le portrait de votre
-          père enfant, cette tache d&apos;humidité qui a mangé le coin de la
+          père enfant, cette tache d'humidité qui a mangé le coin de la
           seule photo de vos arrière-grands-parents… Avant, il fallait un expert
-          sous Photoshop et des heures de patience. En 2026, l&apos;intelligence
+          sous Photoshop et des heures de patience. En 2026, l'intelligence
           artificielle règle le problème en quelques secondes. Voici comment.
         </p>
 
@@ -409,7 +409,7 @@ export const blogPosts: BlogPost[] = [
           <div className="bg-card border border-card-border rounded-xl p-5">
             <h3 className="font-semibold text-foreground mb-2">🔪 Rayures</h3>
             <p className="text-muted text-sm leading-relaxed">
-              Frottements contre d&apos;autres photos dans une boîte, passage
+              Frottements contre d'autres photos dans une boîte, passage
               dans une imprimante, ou simple usure : les rayures sont le défaut
               le plus fréquent.
             </p>
@@ -428,15 +428,15 @@ export const blogPosts: BlogPost[] = [
             </h3>
             <p className="text-muted text-sm leading-relaxed">
               Exposition au soleil ou à la lumière artificielle : les couleurs
-              passent, le contraste diminue, les détails s&apos;effacent.
+              passent, le contraste diminue, les détails s'effacent.
             </p>
           </div>
         </div>
 
         <p className="text-muted leading-relaxed mb-4">
           Et souvent, une photo cumule plusieurs de ces problèmes : une
-          déchirure ET des taches ET une décoloration. C&apos;est là que
-          l&apos;IA fait vraiment la différence : elle traite tout en une seule
+          déchirure ET des taches ET une décoloration. C'est là que
+          l'IA fait vraiment la différence : elle traite tout en une seule
           passe.
         </p>
 
@@ -451,8 +451,8 @@ export const blogPosts: BlogPost[] = [
           <li>
             <strong className="text-foreground">Utilisez un scanner si possible :</strong>{" "}
             un scan à 300 DPI minimum (600 DPI idéal) capture bien plus de
-            détails qu&apos;une photo au smartphone. Si vous n&apos;avez pas de
-            scanner, beaucoup d&apos;applications mobiles comme Google
+            détails qu'une photo au smartphone. Si vous n'avez pas de
+            scanner, beaucoup d'applications mobiles comme Google
             PhotoScan font un travail correct.
           </li>
           <li>
@@ -464,7 +464,7 @@ export const blogPosts: BlogPost[] = [
           <li>
             <strong className="text-foreground">Nettoyez délicatement :</strong>{" "}
             un petit coup de chiffon microfibre sec peut enlever la poussière de
-            surface. N&apos;utilisez jamais de produit liquide sur une photo
+            surface. N'utilisez jamais de produit liquide sur une photo
             ancienne.
           </li>
           <li>
@@ -472,7 +472,7 @@ export const blogPosts: BlogPost[] = [
               Pour les photos très abîmées :
             </strong>{" "}
             si la photo est en plusieurs morceaux, rassemblez-les sur la vitre
-            du scanner comme un puzzle. L&apos;IA se chargera de recoller les
+            du scanner comme un puzzle. L'IA se chargera de recoller les
             morceaux virtuellement.
           </li>
         </ul>
@@ -492,7 +492,7 @@ export const blogPosts: BlogPost[] = [
           </li>
           <li>
             <strong className="text-foreground">
-              L&apos;IA analyse les dommages :
+              L'IA analyse les dommages :
             </strong>{" "}
             en quelques secondes, notre intelligence artificielle détecte les
             déchirures, rayures, taches et zones décolorées. Elle identifie
@@ -500,9 +500,9 @@ export const blogPosts: BlogPost[] = [
           </li>
           <li>
             <strong className="text-foreground">
-              La restauration s&apos;opère :
+              La restauration s'opère :
             </strong>{" "}
-            l&apos;IA comble les déchirures en s&apos;appuyant sur le contexte
+            l'IA comble les déchirures en s'appuyant sur le contexte
             visuel (texture des vêtements, arrière-plan, symétrie du visage),
             efface les rayures, corrige la colorimétrie.
           </li>
@@ -517,7 +517,7 @@ export const blogPosts: BlogPost[] = [
           <p className="text-muted text-sm leading-relaxed">
             <strong className="text-foreground">Astuce de pro :</strong> si
             votre photo présente plusieurs types de dommages (déchirure + taches
-            + décoloration), n&apos;hésitez pas à faire deux passes de
+            + décoloration), n'hésitez pas à faire deux passes de
             restauration. La première se concentrera sur les dommages
             structurels, la seconde affinera les couleurs et la netteté.
           </p>
@@ -527,27 +527,27 @@ export const blogPosts: BlogPost[] = [
           Étape 3 : Vérifiez et peaufinez
         </h2>
         <p className="text-muted leading-relaxed mb-4">
-          L&apos;IA fait un travail impressionnant, mais il est toujours bon de
+          L'IA fait un travail impressionnant, mais il est toujours bon de
           vérifier le résultat, surtout pour les photos auxquelles vous tenez
           particulièrement.
         </p>
         <ul className="list-disc pl-6 text-muted space-y-2 mb-6">
           <li>
             <strong className="text-foreground">Zoomez sur les visages :</strong>{" "}
-            c&apos;est la zone la plus importante. Vérifiez que les yeux, la
+            c'est la zone la plus importante. Vérifiez que les yeux, la
             bouche et le nez sont bien reconstruits et naturels.
           </li>
           <li>
             <strong className="text-foreground">
-              Comparez avec l&apos;original :
+              Comparez avec l'original :
             </strong>{" "}
             utilisez le comparateur avant/après pour vous assurer que la
-            restauration n&apos;a pas altéré des détails que vous vouliez
+            restauration n'a pas altéré des détails que vous vouliez
             conserver.
           </li>
           <li>
             <strong className="text-foreground">Faites plusieurs essais :</strong>{" "}
-            les algorithmes d&apos;IA ont une part d&apos;aléatoire. Relancer la
+            les algorithmes d'IA ont une part d'aléatoire. Relancer la
             restauration peut donner des résultats légèrement différents — vous
             pouvez choisir celui qui vous plaît le plus.
           </li>
@@ -559,14 +559,14 @@ export const blogPosts: BlogPost[] = [
         <p className="text-muted leading-relaxed mb-4">
           Oui, tout à fait. Des outils comme Flashback Restore proposent un
           essai gratuit qui vous permet de restaurer vos premières photos sans
-          débourser un centime. C&apos;est une excellente façon de tester la
+          débourser un centime. C'est une excellente façon de tester la
           technologie et de voir le résultat sur vos propres photos avant de
           vous engager.
         </p>
         <p className="text-muted leading-relaxed mb-4">
           Pour les restaurations plus avancées (lots de photos, résolution très
           élevée, animations), des formules payantes existent, mais
-          l&apos;essai gratuit couvre déjà l&apos;essentiel des besoins pour une
+          l'essai gratuit couvre déjà l'essentiel des besoins pour une
           photo unique.
         </p>
 
@@ -575,9 +575,9 @@ export const blogPosts: BlogPost[] = [
         </h2>
         <p className="text-muted leading-relaxed mb-4">
           Si votre photo est très sévèrement endommagée — par exemple, une
-          déchirure qui a emporté la moitié d&apos;un visage — l&apos;IA va
-          devoir « deviner » une partie importante de l&apos;image. Le résultat
-          peut être très bon mais pas parfaitement fidèle à l&apos;original.
+          déchirure qui a emporté la moitié d'un visage — l'IA va
+          devoir « deviner » une partie importante de l'image. Le résultat
+          peut être très bon mais pas parfaitement fidèle à l'original.
           Voici ce que vous pouvez faire dans ces cas :
         </p>
         <ul className="list-disc pl-6 text-muted space-y-2 mb-6">
@@ -586,7 +586,7 @@ export const blogPosts: BlogPost[] = [
               Fournissez une photo de référence :
             </strong>{" "}
             si vous avez une autre photo de la même personne (même floue ou
-            partielle), utilisez-la comme référence pour guider l&apos;IA. Cela
+            partielle), utilisez-la comme référence pour guider l'IA. Cela
             améliore considérablement la reconstruction faciale.
           </li>
           <li>
@@ -594,7 +594,7 @@ export const blogPosts: BlogPost[] = [
               Acceptez une restauration « artistique » :
             </strong>{" "}
             parfois, une reconstitution à 95 % fidèle est déjà un trésor. Le
-            rendu sera crédible et émouvant, même si chaque pixel n&apos;est pas
+            rendu sera crédible et émouvant, même si chaque pixel n'est pas
             historiquement exact.
           </li>
           <li>
@@ -603,7 +603,7 @@ export const blogPosts: BlogPost[] = [
             </strong>{" "}
             pour les pièces vraiment exceptionnelles (un daguerréotype de 1860,
             une photo historique), un restaurateur professionnel pourra combiner
-            son expertise avec les outils d&apos;IA pour un résultat optimal.
+            son expertise avec les outils d'IA pour un résultat optimal.
           </li>
         </ul>
 
@@ -614,7 +614,7 @@ export const blogPosts: BlogPost[] = [
           <p className="text-muted mb-4">
             Chaque jour qui passe, vos photos anciennes se dégradent un peu
             plus. Numérisez-les et restaurez-les maintenant, pendant
-            qu&apos;il est encore temps.
+            qu'il est encore temps.
           </p>
         </div>
       </article>
@@ -640,10 +640,10 @@ export const blogPosts: BlogPost[] = [
       <article>
         <p className="text-lg text-muted leading-relaxed mb-6">
           Le marché de la restauration photo par IA a explosé ces dernières
-          années. Face à la multitude d&apos;outils disponibles, il est facile
-          de s&apos;y perdre. Nous avons testé pour vous les 5 solutions les
+          années. Face à la multitude d'outils disponibles, il est facile
+          de s'y perdre. Nous avons testé pour vous les 5 solutions les
           plus pertinentes en 2026, en évaluant la qualité de restauration, la
-          facilité d&apos;utilisation, le prix et les fonctionnalités annexes.
+          facilité d'utilisation, le prix et les fonctionnalités annexes.
           Voici notre comparatif honnête et sans complaisance.
         </p>
 
@@ -654,10 +654,10 @@ export const blogPosts: BlogPost[] = [
           <p className="text-muted text-sm leading-relaxed">
             Nous avons testé chaque outil avec les mêmes 5 photos : un portrait
             en noir et blanc des années 1940, une photo de mariage décolorée des
-            années 1970, une photo d&apos;enfant déchirée, un paysage urbain
+            années 1970, une photo d'enfant déchirée, un paysage urbain
             granuleux, et une photo de groupe jaunie. Chaque outil a été noté
             sur la qualité du résultat, la vitesse de traitement, la facilité
-            d&apos;utilisation, et le rapport qualité-prix.
+            d'utilisation, et le rapport qualité-prix.
           </p>
         </div>
 
@@ -675,9 +675,9 @@ export const blogPosts: BlogPost[] = [
             </span>
           </div>
           <p className="text-muted leading-relaxed mb-4">
-            Remini est probablement l&apos;outil de restauration photo par IA le
+            Remini est probablement l'outil de restauration photo par IA le
             plus célèbre, avec des centaines de millions de téléchargements sur
-            mobile. L&apos;application s&apos;est fait connaître grâce à sa
+            mobile. L'application s'est fait connaître grâce à sa
             capacité à améliorer les visages de façon spectaculaire.
           </p>
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -689,7 +689,7 @@ export const blogPosts: BlogPost[] = [
                 <li>• Excellente reconstruction faciale</li>
                 <li>• Application mobile très fluide</li>
                 <li>• Traitement rapide (~10 secondes)</li>
-                <li>• Grande communauté d&apos;utilisateurs</li>
+                <li>• Grande communauté d'utilisateurs</li>
               </ul>
             </div>
             <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4">
@@ -710,7 +710,7 @@ export const blogPosts: BlogPost[] = [
             lissé » aux visages, comme un filtre beauté. Idéal pour des photos
             floues ou pixélisées, mais pas pour une restauration fidèle de
             photos anciennes avec des défauts comme des rayures ou des
-            déchirures. L&apos;abonnement est aussi très agressif
+            déchirures. L'abonnement est aussi très agressif
             commercialement.
           </p>
         </div>
@@ -729,9 +729,9 @@ export const blogPosts: BlogPost[] = [
             </span>
           </div>
           <p className="text-muted leading-relaxed mb-4">
-            MyHeritage est d&apos;abord une plateforme de généalogie, mais leur
-            outil de restauration photo est devenu l&apos;un des plus utilisés
-            au monde, notamment grâce à sa fonction d&apos;animation de photos
+            MyHeritage est d'abord une plateforme de généalogie, mais leur
+            outil de restauration photo est devenu l'un des plus utilisés
+            au monde, notamment grâce à sa fonction d'animation de photos
             (Deep Nostalgia).
           </p>
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
@@ -742,7 +742,7 @@ export const blogPosts: BlogPost[] = [
               <ul className="text-muted text-sm space-y-1">
                 <li>• Colorisation très naturelle</li>
                 <li>• Fonction animation (Deep Nostalgia)</li>
-                <li>• Intégration avec l&apos;arbre généalogique</li>
+                <li>• Intégration avec l'arbre généalogique</li>
                 <li>• Interface web simple et claire</li>
               </ul>
             </div>
@@ -754,7 +754,7 @@ export const blogPosts: BlogPost[] = [
                 <li>• Nécessite un abonnement MyHeritage</li>
                 <li>• Limité à 10 photos sans abonnement</li>
                 <li>• Ne gère pas bien les déchirures</li>
-                <li>• Pas d&apos;upscaling très poussé</li>
+                <li>• Pas d'upscaling très poussé</li>
               </ul>
             </div>
           </div>
@@ -762,8 +762,8 @@ export const blogPosts: BlogPost[] = [
             <strong className="text-foreground">Notre avis :</strong> Un
             excellent outil si vous faites déjà de la généalogie. La
             colorisation est parmi les plus naturelles du marché et
-            l&apos;animation Deep Nostalgia est bluffante. En revanche,
-            l&apos;outil est très limité sans abonnement, et il n&apos;est pas
+            l'animation Deep Nostalgia est bluffante. En revanche,
+            l'outil est très limité sans abonnement, et il n'est pas
             conçu pour réparer des déchirures ou des dommages physiques
             importants.
           </p>
@@ -784,7 +784,7 @@ export const blogPosts: BlogPost[] = [
           </div>
           <p className="text-muted leading-relaxed mb-4">
             Flashback Restore est une plateforme web française spécialisée dans
-            la restauration et l&apos;animation de photos anciennes par
+            la restauration et l'animation de photos anciennes par
             intelligence artificielle. Elle se distingue par une approche « tout
             en un » : restauration, colorisation, upscaling et animation dans le
             même outil.
@@ -799,7 +799,7 @@ export const blogPosts: BlogPost[] = [
                 <li>• Gère très bien les déchirures et rayures</li>
                 <li>• Essai gratuit sans carte bancaire</li>
                 <li>• Interface en français, simple et rapide</li>
-                <li>• Pas d&apos;application à installer (100% web)</li>
+                <li>• Pas d'application à installer (100% web)</li>
                 <li>• Tarifs abordables</li>
               </ul>
             </div>
@@ -809,20 +809,20 @@ export const blogPosts: BlogPost[] = [
               </h4>
               <ul className="text-muted text-sm space-y-1">
                 <li>• Plus récent que Remini ou MyHeritage</li>
-                <li>• Pas d&apos;application mobile native</li>
+                <li>• Pas d'application mobile native</li>
                 <li>• Moins connu du grand public</li>
               </ul>
             </div>
           </div>
           <p className="text-muted text-sm leading-relaxed">
             <strong className="text-foreground">Notre avis :</strong> Flashback
-            Restore est une excellente découverte. Là où beaucoup d&apos;outils
-            se contentent d&apos;améliorer la netteté et les couleurs, Flashback
-            Restore s&apos;attaque vraiment aux dégâts physiques : déchirures,
+            Restore est une excellente découverte. Là où beaucoup d'outils
+            se contentent d'améliorer la netteté et les couleurs, Flashback
+            Restore s'attaque vraiment aux dégâts physiques : déchirures,
             pliures, taches. La possibilité de tout faire (restaurer ET animer)
             dans le même outil est un vrai plus. Le point faible principal est
             sa notoriété encore limitée, mais la qualité est au rendez-vous.
-            L&apos;essai gratuit permet de tester sans risque.
+            L'essai gratuit permet de tester sans risque.
           </p>
         </div>
 
@@ -836,11 +836,11 @@ export const blogPosts: BlogPost[] = [
               GFP-GAN / CodeFormer
             </h2>
             <span className="text-xs bg-accent/10 text-accent px-2 py-0.5 rounded-full font-medium">
-              L&apos;open source
+              L'open source
             </span>
           </div>
           <p className="text-muted leading-relaxed mb-4">
-            GFP-GAN et CodeFormer sont deux modèles d&apos;IA open source
+            GFP-GAN et CodeFormer sont deux modèles d'IA open source
             développés par des chercheurs. Ils sont gratuits et peuvent être
             exécutés localement sur votre machine si vous avez les compétences
             techniques, ou via des démos en ligne (comme sur Replicate).
@@ -863,9 +863,9 @@ export const blogPosts: BlogPost[] = [
               </h4>
               <ul className="text-muted text-sm space-y-1">
                 <li>• Installation technique (Python, GPU)</li>
-                <li>• Pas d&apos;interface graphique conviviale</li>
+                <li>• Pas d'interface graphique conviviale</li>
                 <li>• Ne gère pas les déchirures</li>
-                <li>• Pas de colorisation ni d&apos;upscaling</li>
+                <li>• Pas de colorisation ni d'upscaling</li>
                 <li>• Résultats parfois imprévisibles</li>
               </ul>
             </div>
@@ -874,8 +874,8 @@ export const blogPosts: BlogPost[] = [
             <strong className="text-foreground">Notre avis :</strong> Si vous
             êtes développeur ou bricoleur, GFP-GAN est un bijou. La qualité de
             restauration faciale est impressionnante, parfois meilleure que des
-            solutions payantes. Mais il faut être honnête : l&apos;installation
-            et l&apos;utilisation sont tout sauf simples. Il faut un GPU, Python
+            solutions payantes. Mais il faut être honnête : l'installation
+            et l'utilisation sont tout sauf simples. Il faut un GPU, Python
             et de la patience. Pour le grand public, les solutions web clé en
             main restent plus accessibles.
           </p>
@@ -907,7 +907,7 @@ export const blogPosts: BlogPost[] = [
               <ul className="text-muted text-sm space-y-1">
                 <li>• Qualité professionnelle exceptionnelle</li>
                 <li>• Contrôle fin des paramètres</li>
-                <li>• Excellent upscaling (jusqu&apos;à 6x)</li>
+                <li>• Excellent upscaling (jusqu'à 6x)</li>
                 <li>• Fonctionne sur Mac et Windows</li>
                 <li>• Traitement par lots</li>
               </ul>
@@ -921,18 +921,18 @@ export const blogPosts: BlogPost[] = [
                 <li>• Pas de colorisation automatique</li>
                 <li>• Pas de réparation de déchirures</li>
                 <li>• Nécessite une machine puissante</li>
-                <li>• Pas d&apos;essai gratuit illimité</li>
+                <li>• Pas d'essai gratuit illimité</li>
               </ul>
             </div>
           </div>
           <p className="text-muted text-sm leading-relaxed">
             <strong className="text-foreground">Notre avis :</strong> Topaz Photo
             AI est le choix des professionnels pour une raison : la qualité de
-            l&apos;upscaling et du débruitage est inégalée. Si vous avez des
+            l'upscaling et du débruitage est inégalée. Si vous avez des
             centaines de photos à traiter et que vous voulez un contrôle total
-            sur les paramètres, c&apos;est l&apos;outil qu&apos;il vous faut.
+            sur les paramètres, c'est l'outil qu'il vous faut.
             Mais à 199 $ et sans fonction de réparation des déchirures, ce
-            n&apos;est pas le meilleur choix pour une utilisation occasionnelle.
+            n'est pas le meilleur choix pour une utilisation occasionnelle.
           </p>
         </div>
 
@@ -1033,11 +1033,11 @@ export const blogPosts: BlogPost[] = [
         <div className="space-y-4 mb-8">
           <div className="bg-card border border-card-border rounded-xl p-5">
             <h3 className="font-semibold text-foreground mb-1">
-              🧑‍💻 Vous n&apos;y connaissez rien en retouche photo
+              🧑‍💻 Vous n'y connaissez rien en retouche photo
             </h3>
             <p className="text-muted text-sm leading-relaxed">
               Choisissez <strong className="text-foreground">Flashback Restore</strong> ou <strong className="text-foreground">Remini</strong>. 
-              Interfaces simples, résultats en un clic, pas de compétences requises. Flashback Restore a l&apos;avantage de gérer les déchirures,
+              Interfaces simples, résultats en un clic, pas de compétences requises. Flashback Restore a l'avantage de gérer les déchirures,
               Remini excelle sur les visages flous.
             </p>
           </div>
@@ -1047,7 +1047,7 @@ export const blogPosts: BlogPost[] = [
             </h3>
             <p className="text-muted text-sm leading-relaxed">
               <strong className="text-foreground">MyHeritage</strong> est fait pour vous. 
-              L&apos;intégration avec l&apos;arbre généalogique et la fonction Deep Nostalgia donnent vie à vos ancêtres.
+              L'intégration avec l'arbre généalogique et la fonction Deep Nostalgia donnent vie à vos ancêtres.
             </p>
           </div>
           <div className="bg-card border border-card-border rounded-xl p-5">
@@ -1056,7 +1056,7 @@ export const blogPosts: BlogPost[] = [
             </h3>
             <p className="text-muted text-sm leading-relaxed">
               <strong className="text-foreground">GFP-GAN / CodeFormer</strong> en open source. 
-              C&apos;est gratuit, puissant, et vous pouvez l&apos;intégrer dans vos propres projets.
+              C'est gratuit, puissant, et vous pouvez l'intégrer dans vos propres projets.
             </p>
           </div>
           <div className="bg-card border border-card-border rounded-xl p-5">
@@ -1064,7 +1064,7 @@ export const blogPosts: BlogPost[] = [
               📸 Vous êtes photographe professionnel
             </h3>
             <p className="text-muted text-sm leading-relaxed">
-              <strong className="text-foreground">Topaz Photo AI</strong> pour la qualité d&apos;upscaling professionnelle. 
+              <strong className="text-foreground">Topaz Photo AI</strong> pour la qualité d'upscaling professionnelle. 
               Combinez-le avec un outil web pour les déchirures si nécessaire.
             </p>
           </div>
@@ -1073,8 +1073,8 @@ export const blogPosts: BlogPost[] = [
               🎯 Vous voulez le meilleur rapport qualité-prix
             </h3>
             <p className="text-muted text-sm leading-relaxed">
-              <strong className="text-foreground">Flashback Restore</strong> propose l&apos;offre la plus complète (restauration + animation) 
-              au prix le plus abordable, avec un essai gratuit sans engagement. C&apos;est le meilleur point d&apos;entrée pour découvrir la restauration photo par IA.
+              <strong className="text-foreground">Flashback Restore</strong> propose l'offre la plus complète (restauration + animation) 
+              au prix le plus abordable, avec un essai gratuit sans engagement. C'est le meilleur point d'entrée pour découvrir la restauration photo par IA.
             </p>
           </div>
         </div>
@@ -1083,21 +1083,21 @@ export const blogPosts: BlogPost[] = [
           Conclusion : le paysage de la restauration photo en 2026
         </h2>
         <p className="text-muted leading-relaxed mb-4">
-          En 2026, restaurer une photo ancienne n&apos;a jamais été aussi
+          En 2026, restaurer une photo ancienne n'a jamais été aussi
           simple. Que vous soyez un passionné de généalogie, un photographe
-          professionnel ou simplement quelqu&apos;un qui veut sauver les photos
+          professionnel ou simplement quelqu'un qui veut sauver les photos
           de famille du grenier, il existe une solution adaptée à votre besoin
           et à votre budget.
         </p>
         <p className="text-muted leading-relaxed mb-4">
           Notre recommandation : commencez par un essai gratuit (Flashback
-          Restore ou MyHeritage) pour voir ce que l&apos;IA peut faire sur vos
+          Restore ou MyHeritage) pour voir ce que l'IA peut faire sur vos
           propres photos. Vous serez probablement bluffé par le résultat. Et si
           vous avez beaucoup de photos à traiter, envisagez une solution
           professionnelle comme Topaz Photo AI pour la production en série.
         </p>
         <p className="text-muted leading-relaxed mb-8">
-          L&apos;important, c&apos;est de ne pas attendre. Chaque année qui
+          L'important, c'est de ne pas attendre. Chaque année qui
           passe, vos photos anciennes se dégradent un peu plus. Numérisez-les
           maintenant, restaurez-les, et offrez-leur une seconde vie. Vos enfants
           et petits-enfants vous remercieront.
@@ -1108,7 +1108,7 @@ export const blogPosts: BlogPost[] = [
             Testez la restauration photo par IA gratuitement
           </h3>
           <p className="text-muted mb-4">
-            Importez une photo ancienne et découvrez en moins d&apos;une minute
+            Importez une photo ancienne et découvrez en moins d'une minute
             ce que la technologie peut faire pour vos souvenirs.
           </p>
         </div>

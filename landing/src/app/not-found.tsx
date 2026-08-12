@@ -31,8 +31,8 @@ export default function NotFound() {
           </h2>
 
           <p className="text-muted leading-relaxed mb-8">
-            Le souvenir que vous cherchez semble s&apos;être égaré dans le temps.
-            Cette page n&apos;existe pas ou a été déplacée.
+            Le souvenir que vous cherchez semble s'être égaré dans le temps.
+            Cette page n'existe pas ou a été déplacée.
           </p>
 
           <Link
@@ -40,7 +40,7 @@ export default function NotFound() {
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-accent text-white dark:text-gray-950 font-semibold text-base hover:brightness-110 transition-all hover:shadow-xl hover:shadow-accent/30 active:scale-[0.97]"
           >
             <Home className="w-5 h-5" />
-            Retour à l&apos;accueil
+            Retour à l'accueil
           </Link>
         </div>
 

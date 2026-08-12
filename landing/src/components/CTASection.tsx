@@ -44,7 +44,7 @@ export default function CTASection() {
 
           <p className="text-muted max-w-xl mx-auto mb-10 text-lg">
             Téléchargez Flashback Restore et découvrez la magie de la
-            restauration photo par IA. Vos souvenirs n&apos;attendent que vous.
+            restauration photo par IA. Vos souvenirs n'attendent que vous.
           </p>
 
           {/* Store buttons */}

@@ -213,7 +213,7 @@ function NotConnected() {
           </h2>
           <p className="text-muted mb-6 max-w-md mx-auto">
             Suivez vos crédits, vos restaurations et gérez votre abonnement
-            en un coup d&apos;œil.
+            en un coup d'œil.
           </p>
           <Link
             href="/auth"
@@ -654,7 +654,7 @@ export default function DashboardPage() {
                 {userMe?.plan === "gratuit" && (
                   <p className="text-sm text-muted mb-4">
                     Passez à un abonnement pour débloquer plus de
-                    restaurations et d&apos;animations.
+                    restaurations et d'animations.
                   </p>
                 )}
 
@@ -691,7 +691,7 @@ export default function DashboardPage() {
                             </p>
                             <p className="text-xs text-muted mt-1">
                               Votre abonnement sera résilié. Vous conserverez
-                              l&apos;accès jusqu&apos;à la fin de la période
+                              l'accès jusqu'à la fin de la période
                               payée. Aucun autre prélèvement.
                             </p>
                           </div>
@@ -734,11 +734,11 @@ export default function DashboardPage() {
                 {cancelResult && !showCancelConfirm && (
                   <div className="mt-3 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20">
                     <p className="text-sm text-emerald-400">
-                      ✓ Abonnement résilié. Votre accès reste actif jusqu&apos;à la fin de la période payée.
+                      ✓ Abonnement résilié. Votre accès reste actif jusqu'à la fin de la période payée.
                     </p>
                     {cancelResult.fin_acces_fr && (
                       <p className="text-xs text-muted mt-1">
-                        Accès jusqu&apos;au {cancelResult.fin_acces_fr}
+                        Accès jusqu'au {cancelResult.fin_acces_fr}
                       </p>
                     )}
                   </div>

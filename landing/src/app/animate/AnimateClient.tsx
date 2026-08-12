@@ -317,7 +317,7 @@ export default function AnimatePage() {
                       <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4">
                         <p className="text-sm text-muted flex items-start gap-2">
                           <Clock className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                          La création de l&apos;animation peut prendre <strong>2 à 3 minutes</strong>. Le temps dépend du service d&apos;animation et de la photo.
+                          La création de l'animation peut prendre <strong>2 à 3 minutes</strong>. Le temps dépend du service d'animation et de la photo.
                         </p>
                       </div>
 
@@ -349,7 +349,7 @@ export default function AnimatePage() {
                         onClick={handleAnimate}
                         className="w-full inline-flex items-center justify-center gap-2 px-6 py-4 rounded-full bg-gradient-to-r from-violet-500 to-violet-600 text-white font-semibold text-base hover:brightness-110 hover:shadow-xl hover:shadow-violet-500/25 transition-all active:scale-[0.97]"
                       >
-                        <Play className="w-5 h-5" /> Créer l&apos;animation
+                        <Play className="w-5 h-5" /> Créer l'animation
                       </button>
                     </>
                   )}

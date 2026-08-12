@@ -62,7 +62,7 @@ export default function ContactFallback({ plan, onClose }: ContactFallbackProps)
         </div>
         <p className="text-sm font-semibold text-foreground mb-1">Demande envoyée !</p>
         <p className="text-xs text-muted">
-          Nous vous recontacterons rapidement à l&apos;adresse{" "}
+          Nous vous recontacterons rapidement à l'adresse{" "}
           <span className="text-foreground font-medium">{email}</span>.
         </p>
       </motion.div>

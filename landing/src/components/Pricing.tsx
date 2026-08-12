@@ -319,7 +319,7 @@ function CreditPacksSection() {
       </p>
       {estAbonne && (
         <p className="text-center text-emerald-500 text-sm mb-8 font-medium">
-          ✓ En tant qu&apos;abonné, vous bénéficiez de -20% sur tous les packs.
+          ✓ En tant qu'abonné, vous bénéficiez de -20% sur tous les packs.
         </p>
       )}
       <div className="grid md:grid-cols-3 gap-6">

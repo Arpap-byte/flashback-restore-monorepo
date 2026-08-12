@@ -6,17 +6,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   const staticRoutes = [
     { route: "", changeFrequency: "weekly" as const, priority: 1 },
-    { route: "/restore", changeFrequency: "weekly" as const, priority: 0.9 },
-    { route: "/animate", changeFrequency: "monthly" as const, priority: 0.8 },
-    { route: "/dashboard", changeFrequency: "monthly" as const, priority: 0.8 },
-    { route: "/bibliotheque", changeFrequency: "monthly" as const, priority: 0.8 },
-    { route: "/abonnement/succes", changeFrequency: "monthly" as const, priority: 0.5 },
     { route: "/about", changeFrequency: "monthly" as const, priority: 0.7 },
+    { route: "/credits", changeFrequency: "monthly" as const, priority: 0.7 },
+    { route: "/business", changeFrequency: "monthly" as const, priority: 0.6 },
+    { route: "/industrial", changeFrequency: "monthly" as const, priority: 0.6 },
+    { route: "/blog", changeFrequency: "weekly" as const, priority: 0.8 },
     { route: "/privacy", changeFrequency: "yearly" as const, priority: 0.3 },
     { route: "/terms", changeFrequency: "yearly" as const, priority: 0.3 },
     { route: "/cookies", changeFrequency: "yearly" as const, priority: 0.3 },
-    { route: "/business", changeFrequency: "monthly" as const, priority: 0.6 },
-    { route: "/blog", changeFrequency: "weekly" as const, priority: 0.8 },
   ];
 
   const blogRoutes = getAllSlugs().map((slug) => ({

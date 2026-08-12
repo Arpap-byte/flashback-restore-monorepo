@@ -200,7 +200,7 @@ export default function StripeCheckoutButton({
               className="mt-1 w-4 h-4 rounded border-card-border bg-surface text-accent focus:ring-accent focus:ring-offset-0 cursor-pointer"
             />
             <span className="text-sm text-muted group-hover:text-foreground transition-colors leading-relaxed">
-              J&apos;accepte les{" "}
+              J'accepte les{" "}
               <Link
                 href="/conditions-utilisation"
                 target="_blank"
@@ -227,7 +227,7 @@ export default function StripeCheckoutButton({
             />
             <span className="text-sm text-muted group-hover:text-foreground transition-colors leading-relaxed">
               Je reconnais être informé(e) que, conformément à
-              l&apos;article L.221-28 du Code de la consommation, je renonce
+              l'article L.221-28 du Code de la consommation, je renonce
               expressément à mon droit de rétractation de 14 jours pour la
               fourniture immédiate de contenu numérique (photos restaurées,
               animations) après validation du paiement.{" "}

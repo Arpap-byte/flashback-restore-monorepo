@@ -38,13 +38,13 @@ export default function BusinessPage() {
           </h1>
           <p className="text-muted leading-relaxed text-lg mb-4">
             APEX Cyber est une entreprise française spécialisée dans le développement
-            de solutions logicielles fondées sur l&apos;intelligence artificielle.
+            de solutions logicielles fondées sur l'intelligence artificielle.
           </p>
           <p className="text-muted leading-relaxed">
             Notre produit principal,{" "}
             <strong className="text-foreground">Flashback Restore</strong>, permet
             aux utilisateurs de restaurer, coloriser et animer leurs photos
-            anciennes grâce à des algorithmes d&apos;IA de pointe. Le service est
+            anciennes grâce à des algorithmes d'IA de pointe. Le service est
             accessible sur{" "}
             <a href="https://flashback-restore.com" className="text-accent hover:underline">
               flashback-restore.com
@@ -91,7 +91,7 @@ export default function BusinessPage() {
 
         {/* ── Refund & Cancellation Policy ── */}
         <section>
-          <h2 className="text-2xl font-bold text-foreground mb-6">Politique de remboursement et d&apos;annulation</h2>
+          <h2 className="text-2xl font-bold text-foreground mb-6">Politique de remboursement et d'annulation</h2>
 
           <div className="space-y-6">
             <div className="bg-card border border-card-border rounded-2xl p-6">
@@ -101,7 +101,7 @@ export default function BusinessPage() {
               </h3>
               <p className="text-muted text-sm leading-relaxed mb-3">
                 Flashback Restore fournit des services numériques de traitement
-                d&apos;images par intelligence artificielle. En raison de la nature
+                d'images par intelligence artificielle. En raison de la nature
                 numérique et immédiate de nos services, les crédits consommés pour
                 une restauration, colorisation ou animation réussie ne sont pas
                 remboursables.
@@ -117,18 +117,18 @@ export default function BusinessPage() {
             <div className="bg-card border border-card-border rounded-2xl p-6">
               <h3 className="text-foreground font-semibold mb-3 flex items-center gap-2">
                 <Shield className="w-5 h-5 text-accent" />
-                Annulation d&apos;abonnement
+                Annulation d'abonnement
               </h3>
               <p className="text-muted text-sm leading-relaxed mb-3">
                 Vous pouvez annuler votre abonnement à tout moment, sans engagement
                 et sans frais, directement depuis votre espace client (Dashboard)
-                ou en nous contactant. L&apos;annulation prend effet à la fin de la
-                période de facturation en cours. Vous conservez l&apos;accès à
-                votre abonnement jusqu&apos;à cette date.
+                ou en nous contactant. L'annulation prend effet à la fin de la
+                période de facturation en cours. Vous conservez l'accès à
+                votre abonnement jusqu'à cette date.
               </p>
               <p className="text-muted text-sm leading-relaxed">
                 Les abonnements sont gérés via Stripe, notre partenaire de paiement
-                sécurisé. Aucune donnée bancaire n&apos;est stockée sur nos serveurs.
+                sécurisé. Aucune donnée bancaire n'est stockée sur nos serveurs.
               </p>
             </div>
 
@@ -139,10 +139,10 @@ export default function BusinessPage() {
               </h3>
               <p className="text-muted text-sm leading-relaxed">
                 En cas de litige concernant un paiement, nous vous invitons à nous
-                contacter en priorité afin de résoudre le problème à l&apos;amiable.
+                contacter en priorité afin de résoudre le problème à l'amiable.
                 Nous répondons à toutes les demandes sous 48 heures ouvrées. Si
-                aucune solution n&apos;est trouvée, vous conservez le droit
-                d&apos;initier une procédure de contestation via votre établissement
+                aucune solution n'est trouvée, vous conservez le droit
+                d'initier une procédure de contestation via votre établissement
                 bancaire ou Stripe.
               </p>
             </div>
@@ -161,7 +161,7 @@ export default function BusinessPage() {
                 <h3 className="text-foreground font-semibold mb-2">Service client</h3>
                 <p className="text-muted text-sm leading-relaxed mb-3">
                   Notre équipe est disponible pour toute question concernant nos
-                  services, votre compte, la facturation ou l&apos;assistance
+                  services, votre compte, la facturation ou l'assistance
                   technique.
                 </p>
                 <div className="space-y-1.5 text-sm">
@@ -213,7 +213,7 @@ export default function BusinessPage() {
               Politique de confidentialité
             </Link>
             <Link href="/terms" className="text-sm text-muted hover:text-accent transition-colors">
-              Conditions d&apos;utilisation
+              Conditions d'utilisation
             </Link>
             <Link href="/cookies" className="text-sm text-muted hover:text-accent transition-colors">
               Politique de cookies

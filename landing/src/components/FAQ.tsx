@@ -9,7 +9,7 @@ const faqs = [
   {
     question: "Comment fonctionne la restauration de photos ?",
     answer:
-      "Notre IA de restauration analyse votre photo pour détecter automatiquement les défauts : rayures, taches, déchirures, décoloration. Elle reconstruit ensuite les zones endommagées en s&apos;appuyant sur le contexte de l&apos;image. Le processus prend moins de 10 secondes.",
+      "Notre IA de restauration analyse votre photo pour détecter automatiquement les défauts : rayures, taches, déchirures, décoloration. Elle reconstruit ensuite les zones endommagées en s'appuyant sur le contexte de l'image. Le processus prend moins de 10 secondes.",
   },
   {
     question: "Mes photos sont-elles conservées en sécurité ?",
@@ -29,22 +29,22 @@ const faqs = [
   {
     question: "L'animation fonctionne-t-elle sur toutes les photos ?",
     answer:
-      "L&apos;animation IA est optimisée pour les portraits de personnes. L&apos;IA détecte les visages et applique des expressions naturelles. Attention : pour des raisons de sécurité, notre IA d&apos;animation n&apos;accepte pas les photos contenant des enfants. Les photos de paysages ou d&apos;objets sans visage ne sont pas adaptées à l&apos;animation.",
+      "L'animation IA est optimisée pour les portraits de personnes. L'IA détecte les visages et applique des expressions naturelles. Attention : pour des raisons de sécurité, notre IA d'animation n'accepte pas les photos contenant des enfants. Les photos de paysages ou d'objets sans visage ne sont pas adaptées à l'animation.",
   },
   {
-    question: "Mes photos sont-elles privées ? L&apos;entreprise y a-t-elle accès ?",
+    question: "Mes photos sont-elles privées ? L'entreprise y a-t-elle accès ?",
     answer:
-      "Vos photos sont strictement privées. L&apos;équipe Flashback Restore n&apos;a aucun accès à vos images. Elles sont traitées automatiquement par notre IA puis supprimées selon votre politique de conservation. Nous ne pouvons pas voir, télécharger ou utiliser vos photos — c&apos;est une garantie fondamentale de notre service.",
+      "Vos photos sont strictement privées. L'équipe Flashback Restore n'a aucun accès à vos images. Elles sont traitées automatiquement par notre IA puis supprimées selon votre politique de conservation. Nous ne pouvons pas voir, télécharger ou utiliser vos photos — c'est une garantie fondamentale de notre service.",
   },
   {
-    question: "Pouvez-vous restaurer des photos que j&apos;ai perdues ou supprimées ?",
+    question: "Pouvez-vous restaurer des photos que j'ai perdues ou supprimées ?",
     answer:
       "Non, nous ne pouvons pas restaurer des photos que vous avez perdues ou supprimées de votre appareil. Flashback Restore améliore la qualité des photos que vous possédez déjà, mais ne récupère pas de données perdues. Aucune demande de restauration de photos perdues ne pourra être traitée : nous ne conservons pas de copie de vos images.",
   },
   {
-    question: "Quelle est la différence entre la restauration et l&apos;animation ?",
+    question: "Quelle est la différence entre la restauration et l'animation ?",
     answer:
-      "Notre IA de restauration analyse, nettoie et répare vos photos anciennes. Notre IA d&apos;animation transforme vos portraits restaurés en vidéos animées avec des expressions faciales réalistes, comme les portraits magiques d&apos;Harry Potter.",
+      "Notre IA de restauration analyse, nettoie et répare vos photos anciennes. Notre IA d'animation transforme vos portraits restaurés en vidéos animées avec des expressions faciales réalistes, comme les portraits magiques d'Harry Potter.",
   },
   {
     question: "Comment fonctionnent les crédits ?",

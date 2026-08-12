@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #f5f5f4; margin: 0; padding: 24px;">
+<div style="max-width: 720px; margin: 0 auto; background: #ffffff; border-radius: 12px; overflow: hidden; border: 1px solid #e7e5e4;">
+
+  <!-- Header -->
+  <div style="background: linear-gradient(135deg, #0c0a09, #292524); padding: 28px 32px;">
+    <h1 style="color: #f59e0b; margin: 0; font-size: 22px;">🔍 Audit complet Flashback Restore</h1>
+    <p style="color: #a8a29e; margin: 6px 0 0; font-size: 13px;">Rapport du 11 août 2026 — Revue utilisateur, icônes, textes, UX, SEO, sécurité</p>
+  </div>
+
+  <div style="padding: 28px 32px;">
+
+    <!-- Synthèse -->
+    <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">
+      <strong style="color: #92400e;">Synthèse :</strong>
+      <span style="color: #78350f; font-size: 14px;">Le site est globalement fonctionnel et bien construit. 2 bugs visibles à corriger (textes <code>&amp;apos;</code> et accès page /industrial), 1 point SEO (sitemap), et 3 améliorations UX recommandées.</span>
+    </div>
+
+    <!-- 1. Ce qui fonctionne -->
+    <h2 style="font-size: 17px; color: #1c1917; border-bottom: 2px solid #f59e0b; padding-bottom: 8px;">✅ 1. Ce qui est vérifié et fonctionne</h2>
+    <table style="width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 24px;">
+      <tr style="background: #fafaf9;">
+        <th style="text-align: left; padding: 8px 10px; border: 1px solid #e7e5e4;">Vérification</th>
+        <th style="text-align: left; padding: 8px 10px; border: 1px solid #e7e5e4;">Résultat</th>
+      </tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Pages publiques (/, /about, /credits, /privacy, /cookies, /blog, /business, /mentions-legales, /conditions-utilisation, /sign-in, /sign-up, /auth)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 200 OK</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Pages protégées (/restore, /animate, /dashboard, /bibliotheque)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 307 → /sign-in (protection correcte)</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Pages de retour Stripe (/abonnement/succes, /abonnement/annulation)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 200 OK</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">API backend (/api/health, /api/credit-packs)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 200 (gemini, db, stripe, b2 OK)</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Sécurité API (POST /api/restore sans token)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 401 refusé</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Icônes Clerk (pages /sign-in et /sign-up)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ Config complète (ui={ui}, colorNeutral #78716c, providerIcon__ google/facebook/tiktok, socialButtonsBlockButton, pas de baseTheme dark)</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Icônes UI (lucide-react)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ SVG inline + aria-hidden sur toute la home</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Assets (favicon.ico, og-image.png, /demo/before.jpg, /demo/after.jpg)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ Tous 200 OK</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Meta SEO (title, description, og:*, JSON-LD)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ Complètes, locale fr_FR, image 1200×630</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">PWA (manifest.json 3 icônes, sw.js)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 200 OK</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Headers sécurité (HSTS, nosniff, frame DENY, referrer, permissions-policy)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ Tous présents</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">CSP (avec worker-src 'self' blob:)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ Live en production</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Textes pages légales (CGU, mentions, privacy, cookies)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ Propres (aucune entité HTML visible)</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Blog (6 articles)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 200, textes propres</td></tr>
+      <tr><td style="padding: 8px 10px; border: 1px solid #e7e5e4;">Erreurs serveur (landing 24h / backend post-fix)</td><td style="padding: 8px 10px; border: 1px solid #e7e5e4; color: #16a34a;">✅ 0 erreur</td></tr>
+    </table>
+
+    <!-- 2. Bugs trouvés -->
+    <h2 style="font-size: 17px; color: #1c1917; border-bottom: 2px solid #ef4444; padding-bottom: 8px;">🔴 2. Bugs détectés</h2>
+
+    <div style="border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
+      <h3 style="margin: 0 0 6px; font-size: 14.5px; color: #991b1b;">🐛 Bug 1 — Textes « &amp;apos; » visibles au lieu d'apostrophes (P1)</h3>
+      <p style="margin: 0 0 8px; font-size: 13.5px; color: #450a0a;">Sur la page d'accueil, les apostrophes s'affichent comme <code>&amp;apos;</code> littéral : <em>« Notre IA d&amp;apos;animation transforme vos clichés »</em> au lieu de « d'animation ».</p>
+      <p style="margin: 0 0 6px; font-size: 13px; color: #450a0a;"><strong>Cause :</strong> 16 chaînes dans des <strong>arrays JavaScript</strong> (pas du JSX direct) contiennent l'entité <code>&amp;apos;</code> qui n'est jamais décodée. Le JSX direct décode correctement, mais les strings JS interpolées non.</p>
+      <p style="margin: 0 0 6px; font-size: 13px; color: #450a0a;"><strong>Impact :</strong> 8 occurrences visibles sur la home (FAQ, Features, HowItWorks) + 1 dans l'écran d'animation.</p>
+      <p style="margin: 0; font-size: 13px; color: #450a0a;"><strong>Fichiers :</strong> FAQ.tsx (7), Features.tsx (2), HowItWorks.tsx (1), AnimateClient.tsx (1), business/page.tsx (1), conditions-utilisation/page.tsx (2), blog-posts.tsx (2).</p>
+    </div>
+
+    <div style="border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
+      <h3 style="margin: 0 0 6px; font-size: 14.5px; color: #991b1b;">🐛 Bug 2 — Page /industrial inaccessible aux visiteurs (P1)</h3>
+      <p style="margin: 0 0 8px; font-size: 13.5px; color: #450a0a;">La page B2B « industrielle » redirige vers /sign-in (307) : elle n'est pas dans <code>isPublicRoute</code> du middleware, contrairement à /business. Une page marketing invisible pour les prospects = trafic perdu.</p>
+      <p style="margin: 0; font-size: 13px; color: #450a0a;"><strong>Fix :</strong> ajouter <code>'/industrial'</code> dans le middleware + rebuild.</p>
+    </div>
+
+    <div style="border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;">
+      <h3 style="margin: 0 0 6px; font-size: 14.5px; color: #991b1b;">🐛 Bug 3 — Sitemap référence des pages protégées (P2, SEO)</h3>
+      <p style="margin: 0 0 8px; font-size: 13.5px; color: #450a0a;">Le sitemap.xml contient <code>/restore</code>, <code>/animate</code>, <code>/dashboard</code>, <code>/bibliotheque</code>, <code>/abonnement/succes</code> — toutes inaccessibles sans connexion (307 → /sign-in). Google les signalera « Indexed though blocked ».</p>
+      <p style="margin: 0; font-size: 13px; color: #450a0a;"><strong>Fix :</strong> retirer ces URLs du sitemap (garder uniquement les pages réellement publiques et indexables).</p>
+    </div>
+
+    <div style="border: 1px solid #fecaca; background: #fef2f2; border-radius: 8px; padding: 14px 18px;">
+      <h3 style="margin: 0 0 6px; font-size: 14.5px; color: #991b1b;">🐛 Bug 4 — /abonnement renvoie 404 (P2)</h3>
+      <p style="margin: 0 0 8px; font-size: 13.5px; color: #450a0a;">L'URL /abonnement renvoie 404 : seules les sous-pages /abonnement/succes et /abonnement/annulation existent. La route est déclarée publique dans le middleware mais la page n'existe pas.</p>
+      <p style="margin: 0; font-size: 13px; color: #450a0a;"><strong>Fix :</strong> ajouter une redirection /abonnement → /#pricing (ou créer une vraie page tarifs).</p>
+    </div>
+
+    <!-- 3. Recommandations -->
+    <h2 style="font-size: 17px; color: #1c1917; border-bottom: 2px solid #3b82f6; padding-bottom: 8px; margin-top: 28px;">🔵 3. Recommandations UX / best practices</h2>
+    <ol style="font-size: 13.5px; color: #292524; line-height: 1.8; margin: 0 0 24px; padding-left: 20px;">
+      <li><strong>Accessibilité :</strong> les SVG d'icônes ont bien <code>aria-hidden</code>, mais vérifier les contrastes de texte <code>text-muted</code> sur fond sombre (contraste WCAG AA ~4.5:1).</li>
+      <li><strong>Landing pages produit :</strong> /restore et /animate sont derrière l'auth wall alors qu'elles ont un contenu marketing. Si tu veux du SEO produit, créer des variantes publiques avec CTA « Commencer » — sinon, les retirer du sitemap (Bug 3).</li>
+      <li><strong>Images demo :</strong> /demo/before.jpg et /demo/after.jpg passent par l'optimiseur Next.js — OK, mais vérifier leur poids (compresser si &gt; 500 Ko).</li>
+      <li><strong>Robustesse textes :</strong> éviter les entités HTML (<code>&amp;apos;</code>, <code>&amp;quot;</code>) dans les strings JS — utiliser directement l'apostrophe droite <code>'</code> (déjà le cas dans les pages légales).</li>
+      <li><strong>Performance :</strong> la home fait 206 Ko de HTML statique — excellent. Vérifier les images LCP (before/after) avec compression WebP.</li>
+      <li><strong>PWA :</strong> manifest OK (3 icônes) — vérifier qu'elles couvrent bien 192×192 et 512×512 avec purpose « any maskable ».</li>
+      <li><strong>Monitoring :</strong> garder le health check API actif ; les emails ont été désactivés comme demandé.</li>
+    </ol>
+
+    <!-- Priorités -->
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px 20px; margin-bottom: 24px;">
+      <strong style="color: #166534;">Priorités de traitement suggérées :</strong>
+      <ul style="margin: 8px 0 0; padding-left: 20px; color: #14532d; font-size: 13.5px; line-height: 1.8;">
+        <li><strong>P1 (rapide, 15 min)</strong> : Bug 1 (16 remplacements <code>&amp;apos;</code> → <code>'</code>) + Bug 2 (ajout /industrial au middleware)</li>
+        <li><strong>P2 (30 min)</strong> : Bug 3 (nettoyage sitemap) + Bug 4 (redirection /abonnement)</li>
+        <li><strong>P3 (à planifier)</strong> : accessibilité contrastes, landing pages produit publiques, optimisation images</li>
+      </ul>
+    </div>
+
+    <!-- Footer -->
+    <div style="border-top: 1px solid #e7e5e4; padding-top: 16px; font-size: 12px; color: #78716c;">
+      Rapport généré automatiquement par Hermes — audit réalisé le 11/08/2026 à 11h15 UTC.<br>
+      Tests effectués : 21 pages, 6 endpoints API, 16 fichiers sources analysés, headers HTTP, SEO, PWA, sécurité.
+    </div>
+  </div>
+</div>
+</body>
+</html>

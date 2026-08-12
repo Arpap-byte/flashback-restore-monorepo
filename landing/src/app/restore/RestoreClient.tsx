@@ -681,7 +681,7 @@ export default function RestorePage() {
                   {/* Comparaison view-mode toggle (segmented control — pas un CTA) */}
                   <div className="flex flex-col items-center gap-2">
                     <span className="text-xs uppercase tracking-wider text-muted/70">
-                      Mode d&apos;aperçu
+                      Mode d'aperçu
                     </span>
                     <div
                       role="tablist"
@@ -862,7 +862,7 @@ export default function RestorePage() {
                   {restoreResult.analyse && (
                     <div className="max-w-xl mx-auto mt-6 p-4 bg-surface rounded-xl border border-card-border">
                       <h4 className="text-sm font-semibold text-foreground mb-2">
-                        Analyse de l&apos;IA
+                        Analyse de l'IA
                       </h4>
                       <div className="grid grid-cols-2 gap-2 text-xs text-muted">
                         <div>

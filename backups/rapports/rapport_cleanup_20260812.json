@@ -1,0 +1,9 @@
+{
+  "type": "nettoyage_quotidien",
+  "service": "Flashback Restore",
+  "date": "2026-08-12T03:00:01.762742+00:00",
+  "travaux_supprimes": 0,
+  "fichiers_supprimes": 0,
+  "espace_libere_octets": 0,
+  "erreurs": 0
+}

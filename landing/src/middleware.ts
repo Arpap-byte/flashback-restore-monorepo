@@ -16,6 +16,7 @@ const isPublicRoute = createRouteMatcher([
   // Pages protégées — la redirection vers /sign-in est gérée par le middleware Clerk
   '/abonnement(.*)',
   '/business',
+  '/industrial',
   '/blog',
   '/blog/(.*)',
   '/api/public(.*)',
