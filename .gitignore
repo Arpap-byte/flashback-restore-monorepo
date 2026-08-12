@@ -94,3 +94,4 @@ backend/uploads/*
 # SQLite test DB files
 file:test_*
 file:flashback_test_*
+backups/
